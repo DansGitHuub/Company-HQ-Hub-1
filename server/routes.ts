@@ -70,6 +70,7 @@ import { registerDailyPlanRoutes } from "./dailyPlanRoutes";
 import { registerAdminDashboardRoutes } from "./adminDashboardRoutes";
 import { searchProductImages } from "./imageSearchService";
 import { sendMaintenanceReminderEmail, sendSOPEmail, sendMessageNotificationEmail, sendCustomerNotificationEmail, sendNewApplicationNotificationEmail, sendApplicationLinkEmail, sendPasswordResetNotificationEmail } from "./email";
+import { getAppUrl } from "./emailService";
 import { looksLikeTestAccount } from "./testAccountHeuristic";
 import { logActivity } from "./activityLogger";
 import { checkAndSendReminders } from "./maintenanceScheduler";
@@ -4683,8 +4684,38 @@ Generate detailed information for this landscaping material.`;
 
   app.patch("/api/candidates/:id", requireAuth, async (req, res) => {
     try {
+      const existing = await storage.getCandidate(req.params.id as string);
       const candidate = await storage.updateCandidate(req.params.id as string, req.body);
       if (!candidate) return res.status(404).json({ message: "Candidate not found" });
+
+      // Notify admins/managers when an interview date is newly set or changed
+      try {
+        if (req.body.interviewDate && existing &&
+            String(existing.interviewDate || "") !== String(req.body.interviewDate)) {
+          const actor = req.user as any;
+          const dateStr = new Date(req.body.interviewDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+          const timeStr = req.body.interviewTime ? ` at ${req.body.interviewTime}` : "";
+          const admins = await pool.query(
+            "SELECT id FROM users WHERE role IN ('Admin', 'Manager') OR is_master_admin = true"
+          );
+          for (const admin of admins.rows as { id: string }[]) {
+            await pool.query(
+              `INSERT INTO staff_notifications (user_id, type, title, message, link)
+               VALUES ($1, $2, $3, $4, $5)`,
+              [
+                admin.id,
+                "interview_scheduled",
+                `Interview Scheduled: ${candidate.name}`,
+                `${actor?.name || "Staff"} scheduled an interview with ${candidate.name} for ${dateStr}${timeStr}.`,
+                "/hiring",
+              ]
+            );
+          }
+        }
+      } catch (notifErr) {
+        console.warn("[hiring] interview notification failed:", notifErr);
+      }
+
       res.json(candidate);
     } catch (err) {
       res.status(500).json({ message: "Error updating candidate" });
@@ -4747,6 +4778,58 @@ Generate detailed information for this landscaping material.`;
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ message: "Error deleting candidate document" });
+    }
+  });
+
+  // Candidate notes
+  app.get("/api/candidates/:id/notes", requireAuth, async (req, res) => {
+    try {
+      const notes = await storage.getApplicantNotes(req.params.id);
+      return res.json(notes);
+    } catch (err) {
+      return res.status(500).json({ message: "Error fetching notes" });
+    }
+  });
+
+  app.post("/api/candidates/:id/notes", requireAuth, async (req, res) => {
+    try {
+      const actor = req.user as any;
+      const note = await storage.createApplicantNote({
+        candidateId: req.params.id,
+        content: req.body.content,
+        authorId: actor?.id,
+        authorName: actor?.name || actor?.username,
+      });
+      return res.json(note);
+    } catch (err) {
+      return res.status(500).json({ message: "Error creating note" });
+    }
+  });
+
+  // Candidate communications
+  app.get("/api/candidates/:id/communications", requireAuth, async (req, res) => {
+    try {
+      const comms = await storage.getApplicantCommunications(req.params.id);
+      return res.json(comms);
+    } catch (err) {
+      return res.status(500).json({ message: "Error fetching communications" });
+    }
+  });
+
+  app.post("/api/candidates/:id/communications", requireAuth, async (req, res) => {
+    try {
+      const actor = req.user as any;
+      const comm = await storage.createApplicantCommunication({
+        candidateId: req.params.id,
+        type: req.body.type,
+        subject: req.body.subject || null,
+        content: req.body.content,
+        sentBy: actor?.id,
+        sentByName: actor?.name || actor?.username,
+      });
+      return res.json(comm);
+    } catch (err) {
+      return res.status(500).json({ message: "Error creating communication" });
     }
   });
 
@@ -10362,7 +10445,7 @@ Provide accurate information based on publicly available documentation.`;
       try {
         const allUsers = await storage.getUsers();
         notifyUsers = allUsers.filter((u: any) => u.role === "Admin" || u.role === "Manager");
-        const appUrl = process.env.APP_URL || `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
+        const appUrl = getAppUrl();
 
         // In-app activity log for all system Admin/Manager users
         for (const u of notifyUsers) {
@@ -10385,7 +10468,9 @@ Provide accurate information based on publicly available documentation.`;
         const landscapingExperience = (data?.skills || "").trim();
         for (const email of recipientEmails) {
           if (email && typeof email === "string") {
-            sendNewApplicationNotificationEmail(email, fullName || "an applicant", position, appUrl, landscapingExperience).catch(() => {});
+            sendNewApplicationNotificationEmail(email, fullName || "an applicant", position, appUrl, landscapingExperience).catch((err: any) => {
+              console.error("[apply] Application Received notification email failed:", err?.message || err);
+            });
           }
         }
       } catch (notifyErr) {
@@ -10412,7 +10497,12 @@ Provide accurate information based on publicly available documentation.`;
   // ADMIN: Generate a new application link
   app.post("/api/apply/generate", requireAdmin, async (req, res) => {
     try {
-      const { expiryDays = 30 } = req.body as { expiryDays?: number };
+      const { expiryDays = 30, applicantName, applicantEmail, position } = req.body as {
+        expiryDays?: number;
+        applicantName?: string;
+        applicantEmail?: string;
+        position?: string;
+      };
       const token = crypto.randomBytes(32).toString("hex");
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + expiryDays);
@@ -10423,6 +10513,9 @@ Provide accurate information based on publicly available documentation.`;
         expiresAt,
         createdBy: (req.user as User)?.id,
         data: {},
+        ...(applicantName?.trim() ? { applicantName: applicantName.trim() } : {}),
+        ...(applicantEmail?.trim() ? { applicantEmail: applicantEmail.trim() } : {}),
+        ...(position?.trim() ? { position: position.trim() } : {}),
       });
       return res.json(application);
     } catch (err) {
@@ -10474,6 +10567,25 @@ Provide accurate information based on publicly available documentation.`;
     }
   });
 
+  // ADMIN: Delete (revoke/remove) an application link
+  app.delete("/api/apply/:id", requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const application = await storage.getJobApplicationById(id);
+      if (!application) {
+        return res.status(404).json({ message: "Application link not found." });
+      }
+      if (application.status === "submitted") {
+        return res.status(409).json({ message: "Cannot delete a link that has already been submitted." });
+      }
+      await pool.query("DELETE FROM job_applications WHERE id = $1", [id]);
+      return res.json({ success: true });
+    } catch (err) {
+      console.error("DELETE /api/apply/:id error:", err);
+      return res.status(500).json({ message: "Server error" });
+    }
+  });
+
   // ADMIN: Email an application link to a prospective applicant
   app.post("/api/apply/:id/send-email", requireAdmin, async (req, res) => {
     try {
@@ -10489,12 +10601,12 @@ Provide accurate information based on publicly available documentation.`;
         return res.status(404).json({ message: "Application link not found." });
       }
 
-      const { getAppUrl } = await import("./emailService");
       const applyUrl = `${getAppUrl()}/apply/${application.token}`;
       const sent = await sendApplicationLinkEmail(email, applyUrl);
 
       if (!sent) {
-        return res.status(500).json({ message: "Failed to send email. Check email service configuration." });
+        console.error(`[apply] sendApplicationLinkEmail returned false for recipient: ${email}`);
+        return res.status(500).json({ message: "Email could not be delivered. The address may be invalid or unreachable — please verify it and try again." });
       }
 
       return res.json({ success: true, message: `Application link sent to ${email}` });

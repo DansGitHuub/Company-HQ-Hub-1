@@ -20,10 +20,8 @@ const REQUIRED_FIELDS: { key: string; label: string }[] = [
   { key: "lastName", label: "Last Name" },
   { key: "phone", label: "Phone" },
   { key: "email", label: "Email" },
-  { key: "streetAddress", label: "Street Address" },
   { key: "city", label: "City" },
   { key: "state", label: "State" },
-  { key: "zip", label: "ZIP Code" },
   { key: "ssn", label: "Social Security Number" },
   { key: "dateAvailable", label: "Date Available" },
   { key: "positionAppliedFor", label: "Position Applied For" },
@@ -229,11 +227,19 @@ export default function PublicApplicationForm() {
 
   const handleChange = useCallback((name: string, val: string) => {
     let processed = val;
-    if (name === "phone") {
+    // Phone masking: applies to main phone + any reference/employer phone field
+    if (name === "phone" || name.endsWith("Phone")) {
       const digits = val.replace(/\D/g, "").slice(0, 10);
       if (digits.length <= 3) processed = digits;
       else if (digits.length <= 6) processed = `${digits.slice(0, 3)}-${digits.slice(3)}`;
       else processed = `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+    }
+    // Month/Year masking: applies to employment history From/To fields
+    if ((name.startsWith("emp") && (name.endsWith("From") || name.endsWith("To"))) ||
+        name === "militaryFrom" || name === "militaryTo") {
+      const digits = val.replace(/\D/g, "").slice(0, 6);
+      if (digits.length <= 2) processed = digits;
+      else processed = `${digits.slice(0, 2)}/${digits.slice(2)}`;
     }
     setData(prev => {
       const updated = { ...prev, [name]: processed };
@@ -298,6 +304,27 @@ export default function PublicApplicationForm() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   })();
 
+  // Employment date helpers — parse MM/YYYY string into comparable integer (YYYYMM)
+  function parseMY(val: string): number | null {
+    const m = val.match(/^(\d{1,2})\/(\d{4})$/);
+    if (!m) return null;
+    const month = parseInt(m[1], 10);
+    const year = parseInt(m[2], 10);
+    if (month < 1 || month > 12) return null;
+    return year * 100 + month;
+  }
+  function empDateError(n: number): string | null {
+    const from = (data[`emp${n}From`] || "").trim();
+    const to = (data[`emp${n}To`] || "").trim();
+    if (!from && !to) return null;
+    const fromNum = from ? parseMY(from) : null;
+    const toNum = to ? parseMY(to) : null;
+    if (from && fromNum === null) return "\"From\" must be MM/YYYY (e.g. 06/2022)";
+    if (to && toNum === null) return "\"To\" must be MM/YYYY (e.g. 03/2024)";
+    if (fromNum && toNum && toNum < fromNum) return "\"To\" date must be the same month as or after \"From\" date";
+    return null;
+  }
+
   // Required field progress — filledRequired declared here (fixes "not defined" crash)
   const missingFields   = REQUIRED_FIELDS.filter(f => !(data[f.key] || "").trim());
   const filledRequired  = REQUIRED_FIELDS.filter(f =>  (data[f.key] || "").trim());
@@ -349,7 +376,7 @@ export default function PublicApplicationForm() {
           <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-gray-800 mb-2">Unable to Load Application</h2>
           <p className="text-gray-600 text-sm mb-4">{error}</p>
-          <p className="text-gray-500 text-xs">If you believe this is a mistake, please contact us at <a href="mailto:office@chapinlandscapes.com" className="text-green-700 underline">office@chapinlandscapes.com</a> or text <a href="tel:4402260518" className="text-green-700 underline">440.226.0518</a>.</p>
+          <p className="text-gray-500 text-xs">If you believe this is a mistake, please contact us at <a href="mailto:office@chapinlandscapes.com" className="text-green-700 underline">office@chapinlandscapes.com</a> or text <a href="tel:4402260518" className="text-green-700 underline">(440) 226-0518</a>.</p>
         </div>
       </div>
     );
@@ -370,7 +397,7 @@ export default function PublicApplicationForm() {
             <p className="mt-2">
               <a href="mailto:office@chapinlandscapes.com" className="text-green-700 underline font-medium">office@chapinlandscapes.com</a>
               <span className="mx-2 text-gray-400">or</span>
-              <a href="tel:4402260518" className="text-green-700 underline font-medium">440.226.0518</a>
+              <a href="tel:4402260518" className="text-green-700 underline font-medium">(440) 226-0518</a>
             </p>
           </div>
         </div>
@@ -394,7 +421,7 @@ export default function PublicApplicationForm() {
             <p className="mt-2">
               <a href="mailto:office@chapinlandscapes.com" className="text-green-700 underline font-medium">office@chapinlandscapes.com</a>
               <span className="mx-2 text-gray-400">or</span>
-              <a href="tel:4402260518" className="text-green-700 underline font-medium">440.226.0518</a>
+              <a href="tel:4402260518" className="text-green-700 underline font-medium">(440) 226-0518</a>
             </p>
           </div>
         </div>
@@ -415,7 +442,7 @@ export default function PublicApplicationForm() {
           <p className="text-gray-500 text-sm">
             <a href="mailto:office@chapinlandscapes.com" className="text-green-700 underline font-medium">office@chapinlandscapes.com</a>
             <span className="mx-2 text-gray-400">or</span>
-            <a href="tel:4402260518" className="text-green-700 underline font-medium">440.226.0518</a>
+            <a href="tel:4402260518" className="text-green-700 underline font-medium">(440) 226-0518</a>
           </p>
         </div>
       </div>
@@ -492,22 +519,14 @@ export default function PublicApplicationForm() {
               <Input name="lastName" value={data.lastName || ""} onChange={handleChange} placeholder="Last" disabled={isDisabled} />
             </Field>
           </Row>
-          <Field>
-            <Label required>Street Address</Label>
-            <Input name="streetAddress" value={data.streetAddress || ""} onChange={handleChange} placeholder="Street Address" disabled={isDisabled} />
-          </Field>
-          <Row cols={4}>
-            <div className="col-span-2 sm:col-span-2">
+          <Row>
+            <Field>
               <Label required>City</Label>
               <Input name="city" value={data.city || ""} onChange={handleChange} placeholder="City" disabled={isDisabled} />
-            </div>
+            </Field>
             <Field>
               <Label required>State</Label>
               <Input name="state" value={data.state || ""} onChange={handleChange} placeholder="OH" disabled={isDisabled} />
-            </Field>
-            <Field>
-              <Label required>ZIP</Label>
-              <Input name="zip" value={data.zip || ""} onChange={handleChange} placeholder="ZIP" disabled={isDisabled} />
             </Field>
           </Row>
           <Row>
@@ -606,9 +625,9 @@ export default function PublicApplicationForm() {
         {/* EDUCATION */}
         <SectionCard title="Education">
           {[
-            { label: "High School", prefix: "highSchool", degreeLabel: "Diploma", required: true },
-            { label: "College", prefix: "college", degreeLabel: "Degree", required: false },
-            { label: "Other", prefix: "otherEdu", degreeLabel: "Degree", required: false },
+            { label: "High School", prefix: "highSchool", degreeLabel: null as string | null, required: true },
+            { label: "College", prefix: "college", degreeLabel: "Degree / Major" as string | null, required: false },
+            { label: "Other", prefix: "otherEdu", degreeLabel: "Degree / Major" as string | null, required: false },
           ].map(edu => (
             <div key={edu.prefix} className="border border-gray-100 rounded-lg p-4 space-y-3">
               <h3 className="font-semibold text-gray-700 text-sm">{edu.label}</h3>
@@ -636,10 +655,12 @@ export default function PublicApplicationForm() {
                   <YesNo name={`${edu.prefix}Graduated`} value={data[`${edu.prefix}Graduated`] || ""} onChange={handleChange} disabled={isDisabled} />
                 </div>
               </Row>
-              <Field>
-                <Label>{edu.degreeLabel}</Label>
-                <Input name={`${edu.prefix}Degree`} value={data[`${edu.prefix}Degree`] || ""} onChange={handleChange} placeholder={edu.degreeLabel} disabled={isDisabled} className="max-w-xs" />
-              </Field>
+              {edu.degreeLabel && (
+                <Field>
+                  <Label>{edu.degreeLabel}</Label>
+                  <Input name={`${edu.prefix}Degree`} value={data[`${edu.prefix}Degree`] || ""} onChange={handleChange} placeholder={edu.degreeLabel} disabled={isDisabled} className="max-w-xs" />
+                </Field>
+              )}
             </div>
           ))}
         </SectionCard>
@@ -851,17 +872,20 @@ export default function PublicApplicationForm() {
               <Row cols={3}>
                 <Field>
                   <Label>From</Label>
-                  <Input name={`emp${n}From`} value={data[`emp${n}From`] || ""} onChange={handleChange} placeholder="Month/Year" disabled={isDisabled} />
+                  <Input name={`emp${n}From`} value={data[`emp${n}From`] || ""} onChange={handleChange} placeholder="MM/YYYY" disabled={isDisabled} />
                 </Field>
                 <Field>
                   <Label>To</Label>
-                  <Input name={`emp${n}To`} value={data[`emp${n}To`] || ""} onChange={handleChange} placeholder="Month/Year" disabled={isDisabled} />
+                  <Input name={`emp${n}To`} value={data[`emp${n}To`] || ""} onChange={handleChange} placeholder="MM/YYYY" disabled={isDisabled} />
                 </Field>
                 <Field>
                   <Label>Reason for Leaving</Label>
                   <Input name={`emp${n}ReasonLeaving`} value={data[`emp${n}ReasonLeaving`] || ""} onChange={handleChange} placeholder="Reason" disabled={isDisabled} />
                 </Field>
               </Row>
+              {empDateError(n) && (
+                <p className="text-xs text-red-500 mt-1" data-testid={`emp-date-error-${n}`}>{empDateError(n)}</p>
+              )}
               <div className="flex flex-wrap items-center gap-4">
                 <Label>May we contact your previous supervisor?</Label>
                 <YesNo name={`emp${n}ContactSupervisor`} value={data[`emp${n}ContactSupervisor`] || ""} onChange={handleChange} disabled={isDisabled} />

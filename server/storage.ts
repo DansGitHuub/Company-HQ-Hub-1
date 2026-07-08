@@ -1056,7 +1056,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateCandidate(id: string, updates: Partial<Candidate>): Promise<Candidate | undefined> {
-    const [candidate] = await db.update(candidates).set(updates).where(eq(candidates.id, id)).returning();
+    const sanitized: any = { ...updates };
+    if (sanitized.interviewDate !== undefined && sanitized.interviewDate !== null) {
+      sanitized.interviewDate = new Date(sanitized.interviewDate);
+    }
+    const [candidate] = await db.update(candidates).set(sanitized).where(eq(candidates.id, id)).returning();
     return candidate || undefined;
   }
 

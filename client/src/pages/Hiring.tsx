@@ -31,6 +31,7 @@ import OnboardingChecklist from "@/components/OnboardingChecklist";
 
 const STAGES = [
   "Application Received",
+  "Phone Screen",
   "Interview Scheduled",
   "1st Interview",
   "2nd Interview",
@@ -44,6 +45,7 @@ const STAGES = [
 
 const STAGE_COLORS: Record<string, string> = {
   "Application Received": "bg-blue-500",
+  "Phone Screen": "bg-purple-400",
   "Interview Scheduled": "bg-cyan-500",
   "1st Interview": "bg-amber-500",
   "2nd Interview": "bg-orange-500",
@@ -1181,6 +1183,9 @@ export default function Hiring() {
 
 function ApplicationLinksPanel() {
   const [expiryDays, setExpiryDays] = useState<14 | 30>(30);
+  const [candidateName, setCandidateName] = useState("");
+  const [candidateEmail, setCandidateEmail] = useState("");
+  const [candidatePosition, setCandidatePosition] = useState("");
   const [generating, setGenerating] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [emailOpenId, setEmailOpenId] = useState<string | null>(null);
@@ -1188,6 +1193,7 @@ function ApplicationLinksPanel() {
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [sentIds, setSentIds] = useState<Set<string>>(new Set());
   const [emailErrors, setEmailErrors] = useState<Record<string, string>>({});
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const { data: links = [], refetch } = useQuery<any[]>({
@@ -1208,9 +1214,17 @@ function ApplicationLinksPanel() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ expiryDays }),
+        body: JSON.stringify({
+          expiryDays,
+          applicantName: candidateName.trim() || undefined,
+          applicantEmail: candidateEmail.trim() || undefined,
+          position: candidatePosition.trim() || undefined,
+        }),
       });
       if (!r.ok) throw new Error("Failed to generate");
+      setCandidateName("");
+      setCandidateEmail("");
+      setCandidatePosition("");
       await refetch();
     } catch {
       alert("Failed to generate link. Please try again.");
@@ -1224,6 +1238,25 @@ function ApplicationLinksPanel() {
       setCopiedId(id);
       setTimeout(() => setCopiedId(null), 2000);
     });
+  };
+
+  const handleDeleteLink = async (linkId: string) => {
+    if (!window.confirm("Delete this application link? This cannot be undone.")) return;
+    setDeletingId(linkId);
+    try {
+      const r = await fetch(`/api/apply/${linkId}`, { method: "DELETE", credentials: "include" });
+      if (!r.ok) {
+        const body = await r.json().catch(() => ({}));
+        toast({ title: "Cannot delete", description: body.message || "Something went wrong.", variant: "destructive" });
+        return;
+      }
+      toast({ title: "Link deleted", description: "The application link has been removed." });
+      await refetch();
+    } catch {
+      toast({ title: "Error", description: "Failed to delete link.", variant: "destructive" });
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const handleSendEmail = async (linkId: string) => {
@@ -1258,45 +1291,78 @@ function ApplicationLinksPanel() {
   return (
     <div className="space-y-5">
       <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-start justify-between gap-4 flex-wrap">
+        <CardContent className="pt-6 space-y-4">
+          <div>
+            <h3 className="text-base font-semibold text-gray-800">Generate Application Link</h3>
+            <p className="text-sm text-gray-500 mt-1">
+              Create a unique shareable link for an applicant. All fields below are optional — fill them in so you know who this link was sent to.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <h3 className="text-base font-semibold text-gray-800">Generate Application Link</h3>
-              <p className="text-sm text-gray-500 mt-1">
-                Create a unique shareable link for an applicant. Paste it into the email or text you send them — no login required.
-              </p>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Candidate Name <span className="text-gray-400">(optional)</span></label>
+              <input
+                type="text"
+                data-testid="input-candidate-name"
+                value={candidateName}
+                onChange={e => setCandidateName(e.target.value)}
+                placeholder="Jane Smith"
+                className="w-full text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent"
+              />
             </div>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-600 font-medium">Expires in:</span>
-                {([14, 30] as const).map(d => (
-                  <button
-                    key={d}
-                    data-testid={`button-expiry-${d}`}
-                    onClick={() => setExpiryDays(d)}
-                    className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${
-                      expiryDays === d
-                        ? "bg-green-700 text-white border-green-700"
-                        : "bg-white text-gray-600 border-gray-300 hover:border-green-600"
-                    }`}
-                  >
-                    {d} days
-                  </button>
-                ))}
-              </div>
-              <button
-                data-testid="button-generate-link"
-                onClick={generateLink}
-                disabled={generating}
-                className="flex items-center gap-2 bg-green-700 hover:bg-green-800 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-60"
-              >
-                {generating ? (
-                  <><Loader2 className="h-4 w-4 animate-spin" /> Generating...</>
-                ) : (
-                  <><ExternalLink className="h-4 w-4" /> Generate Link</>
-                )}
-              </button>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Candidate Email <span className="text-gray-400">(optional)</span></label>
+              <input
+                type="email"
+                data-testid="input-candidate-email-gen"
+                value={candidateEmail}
+                onChange={e => setCandidateEmail(e.target.value)}
+                placeholder="jane@email.com"
+                className="w-full text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent"
+              />
             </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Position <span className="text-gray-400">(optional)</span></label>
+              <input
+                type="text"
+                data-testid="input-candidate-position"
+                value={candidatePosition}
+                onChange={e => setCandidatePosition(e.target.value)}
+                placeholder="Landscape Crew Member"
+                className="w-full text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-green-600 focus:border-transparent"
+              />
+            </div>
+          </div>
+          <div className="flex items-center justify-between gap-3 flex-wrap pt-1">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600 font-medium">Expires in:</span>
+              {([14, 30] as const).map(d => (
+                <button
+                  key={d}
+                  data-testid={`button-expiry-${d}`}
+                  onClick={() => setExpiryDays(d)}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${
+                    expiryDays === d
+                      ? "bg-green-700 text-white border-green-700"
+                      : "bg-white text-gray-600 border-gray-300 hover:border-green-600"
+                  }`}
+                >
+                  {d} days
+                </button>
+              ))}
+            </div>
+            <button
+              data-testid="button-generate-link"
+              onClick={generateLink}
+              disabled={generating}
+              className="flex items-center gap-2 bg-green-700 hover:bg-green-800 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-60"
+            >
+              {generating ? (
+                <><Loader2 className="h-4 w-4 animate-spin" /> Generating...</>
+              ) : (
+                <><ExternalLink className="h-4 w-4" /> Generate Link</>
+              )}
+            </button>
           </div>
         </CardContent>
       </Card>
@@ -1321,10 +1387,11 @@ function ApplicationLinksPanel() {
                 return (
                   <div key={link.id} data-testid={`card-application-link-${link.id}`} className="border border-gray-200 rounded-lg p-4 space-y-2">
                     <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${statusColor}`}>{statusLabel}</span>
                         {link.applicantName && <span className="text-sm font-medium text-gray-700">{link.applicantName}</span>}
                         {link.position && <span className="text-xs text-gray-500">— {link.position}</span>}
+                        {link.applicantEmail && <span className="text-xs text-gray-400">({link.applicantEmail})</span>}
                       </div>
                       <span className="text-xs text-gray-400">
                         Expires {new Date(link.expiresAt).toLocaleDateString()} · Created {new Date(link.createdAt).toLocaleDateString()}
@@ -1345,7 +1412,13 @@ function ApplicationLinksPanel() {
                       </button>
                       <button
                         data-testid={`button-send-email-${link.id}`}
-                        onClick={() => setEmailOpenId(emailOpenId === link.id ? null : link.id)}
+                        onClick={() => {
+                          const opening = emailOpenId !== link.id;
+                          setEmailOpenId(opening ? link.id : null);
+                          if (opening && link.applicantEmail && !emailInputs[link.id]) {
+                            setEmailInputs(prev => ({ ...prev, [link.id]: link.applicantEmail }));
+                          }
+                        }}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors whitespace-nowrap ${
                           sentIds.has(link.id)
                             ? "border-green-300 text-green-700 bg-green-50"
@@ -1360,11 +1433,26 @@ function ApplicationLinksPanel() {
                           <><Mail className="h-3.5 w-3.5" /> Send via Email</>
                         )}
                       </button>
+                      <button
+                        data-testid={`button-delete-link-${link.id}`}
+                        onClick={() => handleDeleteLink(link.id)}
+                        disabled={deletingId === link.id || link.status === "submitted"}
+                        title={link.status === "submitted" ? "Cannot delete a submitted application" : "Delete this link"}
+                        className="flex items-center gap-1.5 px-2 py-1.5 rounded-md border border-gray-200 text-xs font-medium text-red-500 hover:bg-red-50 hover:border-red-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        {deletingId === link.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-3.5 w-3.5" />
+                        )}
+                      </button>
                     </div>
                     {/* Inline email form */}
                     {emailOpenId === link.id && (
                       <div className="pt-2 border-t border-gray-100">
-                        <p className="text-xs text-gray-500 mb-2">Enter the applicant's email to send them this link directly.</p>
+                        <p className="text-xs text-gray-500 mb-2">
+                          {link.applicantEmail ? `Sending to ${link.applicantEmail} — confirm or change the address below.` : "Enter the applicant's email to send them this link directly."}
+                        </p>
                         <div className="flex items-center gap-2">
                           <input
                             type="email"
@@ -2058,6 +2146,24 @@ function ProfileTab({ candidate, onUpdate }: { candidate: Candidate; onUpdate: (
             <div><Label>{t("common.email")}</Label><Input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
             <div><Label>{t("common.phone")}</Label><Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></div>
           </div>
+          <div>
+            <Label>Rating</Label>
+            <div className="flex gap-2 mt-1">
+              {(["green", "yellow", "red"] as const).map(r => (
+                <Button
+                  key={r}
+                  type="button"
+                  variant={form.rating === r ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setForm({ ...form, rating: r })}
+                  data-testid={`button-edit-rating-${r}`}
+                >
+                  <div className={`h-3 w-3 rounded-full mr-1 ${getRatingColor(r)}`} />
+                  {r === "green" ? "Strong" : r === "yellow" ? "Maybe" : "Weak"}
+                </Button>
+              ))}
+            </div>
+          </div>
           <div><Label>{t("common.address")}</Label><Input value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} /></div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div><Label>{t("common.city")}</Label><Input value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} /></div>
@@ -2075,10 +2181,10 @@ function ProfileTab({ candidate, onUpdate }: { candidate: Candidate; onUpdate: (
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Grade</Label>
-                <Select value={form.grade} onValueChange={v => setForm({ ...form, grade: v })}>
+                <Select value={form.grade || "_none"} onValueChange={v => setForm({ ...form, grade: v === "_none" ? "" : v })}>
                   <SelectTrigger data-testid="select-grade"><SelectValue placeholder="— None —" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">— None —</SelectItem>
+                    <SelectItem value="_none">— None —</SelectItem>
                     <SelectItem value="A">A</SelectItem>
                     <SelectItem value="B">B</SelectItem>
                     <SelectItem value="C">C</SelectItem>
@@ -2365,16 +2471,25 @@ function CommunicationTab({ candidateId }: { candidateId: string }) {
 
 function InterviewTab({ candidate, onUpdate }: { candidate: Candidate; onUpdate: (data: any) => void }) {
   const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({
-    interviewDate: candidate.interviewDate ? new Date(candidate.interviewDate).toISOString().split("T")[0] : "",
-    interviewTime: candidate.interviewTime || "",
-    interviewLocation: candidate.interviewLocation || "",
-    interviewType: candidate.interviewType || "in-person",
-    interviewerName: candidate.interviewerName || "",
-    interviewNotes: candidate.interviewNotes || "",
-    interviewRating: candidate.interviewRating || 0,
-    interviewRecommendation: candidate.interviewRecommendation || "",
+  const buildForm = (c: Candidate) => ({
+    interviewDate: c.interviewDate ? new Date(c.interviewDate).toISOString().split("T")[0] : "",
+    interviewTime: c.interviewTime || "",
+    interviewLocation: c.interviewLocation || "",
+    interviewType: c.interviewType || "in-person",
+    interviewerName: c.interviewerName || "",
+    interviewNotes: c.interviewNotes || "",
+    interviewRating: c.interviewRating || 0,
+    interviewRecommendation: c.interviewRecommendation || "",
   });
+  const [form, setForm] = useState(() => buildForm(candidate));
+
+  useEffect(() => {
+    if (!editing) {
+      setForm(buildForm(candidate));
+    }
+  }, [candidate.id, candidate.interviewDate, candidate.interviewTime, candidate.interviewLocation,
+      candidate.interviewType, candidate.interviewerName, candidate.interviewNotes,
+      candidate.interviewRating, candidate.interviewRecommendation, editing]);
 
   return (
     <div className="space-y-4">
