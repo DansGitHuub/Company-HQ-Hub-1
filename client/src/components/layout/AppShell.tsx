@@ -408,6 +408,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     inbox: { icon: Mail, label: "Customer Inbox", href: "/inbox" },
     messages: { icon: MessageSquare, label: "Messages", href: "/messages" },
     customer_messages: { icon: MessageSquare, label: "Customer Messages", href: "/customer-messages" },
+    customer_blasts: { icon: Megaphone, label: "Customer Blasts", href: "/customer-blasts" },
     admin: { icon: Shield, label: t("nav.adminPanel"), href: "/admin" },
   time_reports: { icon: ClipboardList, label: t("nav.timeReports"), href: "/admin/time-reports" },
   worksheet_review: { icon: ClipboardList, label: t("nav.worksheetReview"), href: "/admin/worksheet-review" },
@@ -439,7 +440,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     { label: "SALES", items: ["customers", "consultations", "estimates", "jobs"] },
     { label: "OPERATIONS", items: ["manager_dashboard", "todos", "work_orders", "daily_plan", "scheduling", "time_tracking", "equipment"] },
     { label: "RESOURCES", items: ["sops", "education", "testing", "tools"] },
-    { label: "ADMIN", items: ["admin", "employees", "vendors", "hiring", "invoices", "reports", "budget_settings", "customer_messages"] },
+    { label: "ADMIN", items: ["admin", "employees", "vendors", "hiring", "invoices", "reports", "budget_settings", "customer_messages", "customer_blasts"] },
   ];
 
   const getSectionsForRole = (role: string): NavSection[] => {

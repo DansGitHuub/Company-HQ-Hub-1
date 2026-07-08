@@ -924,6 +924,22 @@ export default function JobDetailPage() {
     onError: (err: Error) => toast({ title: err.message, variant: "destructive" }),
   });
 
+  const notifyMutation = useMutation({
+    mutationFn: async (type: "start_reminder" | "weather_delay" | "completion") => {
+      const res = await apiRequest("POST", `/api/jobs/${id}/notify-customer`, { type });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      if (data.success) {
+        toast({ title: "Message sent", description: `Sent via ${data.channel}.` });
+      } else {
+        toast({ title: "Could not send", description: data.error ?? "No reachable channel", variant: "destructive" });
+      }
+    },
+    onError: (err: Error) => toast({ title: err.message, variant: "destructive" }),
+  });
+
   const saveNotes = async () => {
     if (!job) return;
     setSavingNotes(true);
@@ -979,6 +995,27 @@ export default function JobDetailPage() {
             className="bg-green-600 hover:bg-green-700 text-white">
             <FileText className="h-4 w-4 mr-1.5" /> Generate Invoice
           </Button>
+        )}
+        {isAdminOrManager && job.customer_id && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" disabled={notifyMutation.isPending} data-testid="button-notify-customer">
+                {notifyMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <MessageSquare className="h-4 w-4 mr-1.5" />}
+                Notify Customer
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={() => notifyMutation.mutate("start_reminder")} data-testid="button-notify-start-reminder">
+                Send Start Reminder
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => notifyMutation.mutate("weather_delay")} data-testid="button-notify-weather-delay">
+                Send Weather Delay
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => notifyMutation.mutate("completion")} data-testid="button-notify-completion">
+                Send Completion Message
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
         {isAdminOrManager && (
           <Button variant="outline" size="sm" onClick={() => setShowEdit(true)} data-testid="button-edit-job">

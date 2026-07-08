@@ -71,6 +71,7 @@ import Home from "@/pages/Home";
 import AuthPage from "@/pages/auth-page";
 import AdminPanel from "@/pages/AdminPanel";
 import CustomerMessagesInbox from "@/pages/CustomerMessagesInbox";
+import CustomerBlasts from "@/pages/CustomerBlasts";
 import CustomerHub from "@/pages/CustomerHub";
 import CareGuideManager from "@/pages/CareGuideManager";
 import ApplicantPortal from "@/pages/ApplicantPortal";
@@ -357,6 +358,7 @@ function AppRoutes() {
         <ProtectedRoute path="/settings" component={SettingsPage} allowedRoles={ADMIN_OR_MANAGER} />
         <Route path="/messages" component={MessagesPage} />
         <Route path="/customer-messages" component={CustomerMessagesInbox} />
+        <ProtectedRoute path="/customer-blasts" component={CustomerBlasts} allowedRoles={ADMIN_OR_MANAGER} />
         <ProtectedRoute path="/catalog/import" component={CatalogImport} allowedRoles={ADMIN_OR_MANAGER} />
         <ProtectedRoute path="/catalog/:id" component={CatalogDetail} allowedRoles={ADMIN_OR_MANAGER} />
         <ProtectedRoute path="/catalog" component={CatalogPage} allowedRoles={ADMIN_OR_MANAGER} />

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -13,6 +14,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
   MessageSquare,
@@ -28,6 +37,7 @@ import {
   RefreshCw,
   Lock,
   StickyNote,
+  ListTodo,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, formatDistanceToNow } from "date-fns";
@@ -136,6 +146,11 @@ export default function CustomerMessagesInbox() {
   const [replyText, setReplyText]     = useState("");
   const [asInternal, setAsInternal]   = useState(false);
 
+  const [taskDialogMessage, setTaskDialogMessage] = useState<ThreadMessage | null>(null);
+  const [taskTitle, setTaskTitle]             = useState("");
+  const [taskDescription, setTaskDescription] = useState("");
+  const [taskAssignee, setTaskAssignee]       = useState("__none__");
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const isManager =
@@ -199,6 +214,36 @@ export default function CustomerMessagesInbox() {
     },
     onError: () => toast({ title: "Failed to update thread", variant: "destructive" }),
   });
+
+  const createTaskMutation = useMutation({
+    mutationFn: (body: { title: string; description: string; assignedToUserId: string | null }) =>
+      apiRequest("POST", "/api/tasks", {
+        title: body.title,
+        description: body.description,
+        priority: "medium",
+        assignedToUserId: body.assignedToUserId,
+        linkedRecordType: "messaging_thread",
+        linkedRecordId: selectedId,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      toast({ title: "Task created", description: "Follow-up task created from this message." });
+      setTaskDialogMessage(null);
+      setTaskTitle("");
+      setTaskDescription("");
+      setTaskAssignee("__none__");
+    },
+    onError: () => toast({ title: "Failed to create task", variant: "destructive" }),
+  });
+
+  function openTaskDialog(msg: ThreadMessage) {
+    const customer = selectedThread ? userMap[selectedThread.customerId] : undefined;
+    const customerName = customer ? (customer.name || customer.username) : "customer";
+    setTaskDialogMessage(msg);
+    setTaskTitle(selectedThread ? `Follow up: ${selectedThread.subject}` : "Follow up on customer message");
+    setTaskDescription(`Re: message from ${customerName}\n\n"${msg.content}"`);
+    setTaskAssignee(selectedThread?.assignedEmployeeId || "__none__");
+  }
 
   // ── Filtered thread list ────────────────────────────────────────────────────
 
@@ -454,7 +499,7 @@ export default function CustomerMessagesInbox() {
                     key={msg.id}
                     data-testid={`message-${msg.id}`}
                     className={cn(
-                      "flex gap-3",
+                      "group flex gap-3",
                       !isFromCustomer && "flex-row-reverse"
                     )}
                   >
@@ -486,6 +531,14 @@ export default function CustomerMessagesInbox() {
                         <span className="text-xs text-muted-foreground">
                           {fmtTime(msg.createdAt)}
                         </span>
+                        <button
+                          onClick={() => openTaskDialog(msg)}
+                          title="Create task from this message"
+                          data-testid={`button-create-task-${msg.id}`}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary"
+                        >
+                          <ListTodo className="h-3 w-3" />
+                        </button>
                       </div>
                       <div className={cn(
                         "rounded-lg px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap",
@@ -571,6 +624,81 @@ export default function CustomerMessagesInbox() {
           </p>
         </div>
       )}
+
+      {/* Create Task from Message dialog */}
+      <Dialog open={!!taskDialogMessage} onOpenChange={(open) => !open && setTaskDialogMessage(null)}>
+        <DialogContent data-testid="dialog-create-task">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ListTodo className="h-4 w-4" />
+              Create Task from Message
+            </DialogTitle>
+            <DialogDescription>
+              Creates a follow-up task linked back to this conversation.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label htmlFor="task-title" className="text-xs">Title</Label>
+              <Input
+                id="task-title"
+                value={taskTitle}
+                onChange={(e) => setTaskTitle(e.target.value)}
+                data-testid="input-task-title"
+              />
+            </div>
+            <div>
+              <Label htmlFor="task-description" className="text-xs">Description</Label>
+              <Textarea
+                id="task-description"
+                value={taskDescription}
+                onChange={(e) => setTaskDescription(e.target.value)}
+                className="min-h-[100px] text-sm"
+                data-testid="textarea-task-description"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Assign to</Label>
+              <Select value={taskAssignee} onValueChange={setTaskAssignee}>
+                <SelectTrigger className="h-9" data-testid="select-task-assignee">
+                  <SelectValue placeholder="Unassigned" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Unassigned</SelectItem>
+                  {staffUsers.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.name || u.username}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTaskDialogMessage(null)} data-testid="button-cancel-task">
+              Cancel
+            </Button>
+            <Button
+              onClick={() =>
+                createTaskMutation.mutate({
+                  title: taskTitle.trim(),
+                  description: taskDescription.trim(),
+                  assignedToUserId: taskAssignee === "__none__" ? null : taskAssignee,
+                })
+              }
+              disabled={!taskTitle.trim() || createTaskMutation.isPending}
+              data-testid="button-submit-task"
+            >
+              {createTaskMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+              ) : (
+                <ListTodo className="h-4 w-4 mr-1.5" />
+              )}
+              Create Task
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

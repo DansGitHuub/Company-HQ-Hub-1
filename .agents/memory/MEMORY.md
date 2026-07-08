@@ -25,5 +25,6 @@
 - [Test account cleanup: audit_log columns](test-account-cleanup-audit-log.md) — audit_log has no user_id column; use actor_user_id/target_user_id when deleting disposable test-account rows.
 - [Tool route/grid role gating](tool-route-role-gating.md) — Tools page cards and their underlying routes share one role map (client/src/lib/toolAccess.ts) so grid visibility and route access never drift apart.
 - [tsc --noEmit OOM on this project](tsc-noemit-oom.md) — plain tsc crashes on this codebase; needs a larger Node heap and grep-by-file-path since the baseline has pre-existing errors.
+- [Test data can trigger background schedulers](test-data-triggers-background-schedulers.md) — disposable rows matching a real trigger condition (e.g. overdue invoice) can make a live cron send a real outbound email/SMS mid-test.
 - [Twilio dual-channel SMS routing](twilio-dual-channel.md) — customer SMS uses 844 number ("customer" channel); hiring/applicant SMS uses 440 ("hiring" channel); wrong channel → Twilio Error 30034.
 - [Drizzle timestamp coercion](drizzle-timestamp-coercion.md) — Drizzle .set() silently rejects string values for timestamp() columns; must convert to new Date() in storage layer before calling .set().

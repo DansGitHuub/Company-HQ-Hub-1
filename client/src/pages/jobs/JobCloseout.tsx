@@ -37,6 +37,7 @@ interface Closeout {
   submitted_by_name: string | null;
   submitted_at: string | null;
   approved_at: string | null;
+  review_requested_at: string | null;
   created_at: string;
 }
 
@@ -395,6 +396,23 @@ export default function JobCloseout({ jobId, isAdminOrManager }: { jobId: string
     onError: (err: Error) => toast({ title: err.message, variant: "destructive" }),
   });
 
+  const reviewRequestMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/jobs/${jobId}/closeout/send-review-request`);
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId, "closeout"] });
+      if (data.success) {
+        toast({ title: "Review request sent", description: `Sent via ${data.channel}.` });
+      } else {
+        toast({ title: "Could not send", description: data.error ?? "No reachable channel", variant: "destructive" });
+      }
+    },
+    onError: (err: Error) => toast({ title: err.message, variant: "destructive" }),
+  });
+
   if (isLoading) {
     return <Card><CardContent className="py-12 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></CardContent></Card>;
   }
@@ -449,7 +467,24 @@ export default function JobCloseout({ jobId, isAdminOrManager }: { jobId: string
                   Approved by {closeout.manager_approved_by_name}
                 </p>
               )}
+              {closeout.review_requested_at && (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Review requested {format(new Date(closeout.review_requested_at), "MMM d, yyyy")}
+                </p>
+              )}
             </div>
+            {isAdminOrManager && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => reviewRequestMutation.mutate()}
+                disabled={reviewRequestMutation.isPending}
+                data-testid="button-send-review-request"
+              >
+                {reviewRequestMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <ThumbsUp className="h-4 w-4 mr-1.5" />}
+                {closeout.review_requested_at ? "Resend Review Request" : "Send Review Request"}
+              </Button>
+            )}
             {isAdminOrManager && !isLocked && (
               <Button size="sm" variant="outline" onClick={() => setEditing(true)} data-testid="button-edit-closeout">
                 Edit

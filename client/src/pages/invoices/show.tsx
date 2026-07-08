@@ -234,6 +234,22 @@ export default function InvoiceDetailPage() {
     onError: (err: Error) => toast({ title: err.message, variant: "destructive" }),
   });
 
+  const paymentReminderMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/invoices/${id}/send-payment-reminder`, {});
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      if (data.success) {
+        toast({ title: "Payment reminder sent", description: `Sent via ${data.channel}.` });
+      } else {
+        toast({ title: "Could not send", description: data.error ?? "No reachable channel", variant: "destructive" });
+      }
+    },
+    onError: (err: Error) => toast({ title: err.message, variant: "destructive" }),
+  });
+
   const responseMutation = useMutation({
     mutationFn: async ({ type, text }: { type: string; text: string }) => {
       const res = await apiRequest("PATCH", `/api/invoices/${id}/response`, {
@@ -296,6 +312,13 @@ export default function InvoiceDetailPage() {
                 className="border-green-400 text-green-700 hover:bg-green-50" data-testid="button-mark-paid">
                 {paidMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <BadgeDollarSign className="h-4 w-4 mr-1.5" />}
                 {t("markPaid")}
+              </Button>
+            )}
+            {invoice.status === "overdue" && (
+              <Button size="sm" variant="outline" onClick={() => paymentReminderMutation.mutate()} disabled={paymentReminderMutation.isPending}
+                className="border-red-300 text-red-600 hover:bg-red-50" data-testid="button-send-payment-reminder">
+                {paymentReminderMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Send className="h-4 w-4 mr-1.5" />}
+                Send Payment Reminder
               </Button>
             )}
             <a href={`/api/invoices/${invoice.id}/pdf`} target="_blank" rel="noopener noreferrer">

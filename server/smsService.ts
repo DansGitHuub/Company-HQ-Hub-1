@@ -10,8 +10,40 @@
 //   TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_MESSAGING_SERVICE_SID (preferred) or TWILIO_PHONE_NUMBER
 // Required for customer channel:
 //   TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_CUSTOMER_MESSAGING_SERVICE_SID (preferred) or TWILIO_CUSTOMER_PHONE_NUMBER
+//
+// Test/live gate (mirrors emailService.ts's EMAIL_SENDING_LIVE pattern):
+//   SMS_SENDING_LIVE !== 'true' → no real Twilio API call is ever made.
+//     - If SMS_TEST_REDIRECT_PHONE is set, the message is redirected there with a
+//       banner noting the original intended recipient (useful for manual QA).
+//     - Otherwise the send is logged and skipped entirely (safe default).
+//   SMS_SENDING_LIVE === 'true' → sends to the real "to" number as normal.
 
 export type SmsChannel = "customer" | "hiring";
+
+function isSmsLive(): boolean {
+  return process.env.SMS_SENDING_LIVE === "true";
+}
+
+/**
+ * Resolve effective recipient + body when not in live mode.
+ * Returns null actualTo when the send should be skipped entirely (no redirect configured).
+ */
+function resolveSmsRecipient(
+  to: string,
+  body: string
+): { actualTo: string | null; finalBody: string } {
+  if (isSmsLive()) {
+    return { actualTo: to, finalBody: body };
+  }
+
+  const redirect = process.env.SMS_TEST_REDIRECT_PHONE;
+  if (!redirect) {
+    return { actualTo: null, finalBody: body };
+  }
+
+  const banner = `[TEST/REDIRECT MODE — intended for ${to}] `;
+  return { actualTo: redirect, finalBody: banner + body };
+}
 
 export function isSmsConfigured(channel: SmsChannel = "hiring"): boolean {
   const hasCreds = !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN);
@@ -57,11 +89,20 @@ export async function sendSms(to: string, body: string, channel: SmsChannel = "h
     return false;
   }
 
+  const { actualTo, finalBody } = resolveSmsRecipient(normalized, body);
+  if (!actualTo) {
+    console.log(`[sms] TEST MODE (SMS_SENDING_LIVE not set) — skipping real Twilio send. Would have sent via "${channel}" channel to: ${normalized}, Body: "${body}"`);
+    return true;
+  }
+  if (actualTo !== normalized) {
+    console.log(`[sms] TEST/REDIRECT MODE — redirecting SMS intended for ${normalized} to ${actualTo}`);
+  }
+
   try {
     const credentials = Buffer.from(`${accountSid}:${authToken}`).toString("base64");
 
     // Prefer MessagingServiceSid over From number
-    const params: Record<string, string> = { To: normalized, Body: body };
+    const params: Record<string, string> = { To: actualTo, Body: finalBody };
     if (messagingServiceSid) {
       params.MessagingServiceSid = messagingServiceSid;
     } else {
