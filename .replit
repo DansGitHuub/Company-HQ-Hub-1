@@ -57,6 +57,7 @@ ADMIN_SETUP_CODE = "CompanyHQ2026!"
 
 [userenv.shared]
 TWILIO_CUSTOMER_PHONE_NUMBER = "+18444409258"
+EMAIL_SENDING_LIVE = "true"
 
 [objectStorage]
 defaultBucketID = "replit-objstore-a9e18d46-f663-49f2-a6b5-e31b7d9ddb0e"
