@@ -205,7 +205,22 @@ export default function TimeCardApproval() {
     setRejectDialog((d) => ({ ...d, open: false }));
   }
 
-  // ─── Edit punch helpers ──────────────────────────────────────────────────────
+  // ─── Approve-all-pending ─────────────────────────────────────────────────────
+
+  const allPendingIds = useMemo(
+    () => (data?.entries ?? []).filter((e) => e.approval_status === "pending").map((e) => e.id),
+    [data?.entries]
+  );
+
+  const [approveAllDialog, setApproveAllDialog] = useState(false);
+
+  async function approveAllPending() {
+    if (allPendingIds.length === 0) return;
+    await bulkUpdate(allPendingIds, "approved");
+    setApproveAllDialog(false);
+  }
+
+  // ─── Edit punch helpers ───────────────────────────────────────────────────────
 
   function toDatetimeLocal(iso: string) {
     const d = new Date(iso);
@@ -286,10 +301,23 @@ export default function TimeCardApproval() {
             Approve or reject employee time entries
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()} data-testid="button-refresh">
-          <RotateCcw className="w-4 h-4 mr-1.5" />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          {allPendingIds.length > 0 && (
+            <Button
+              size="sm"
+              className="bg-green-600 hover:bg-green-700 text-white"
+              onClick={() => setApproveAllDialog(true)}
+              data-testid="button-approve-all-pending"
+            >
+              <CheckCircle2 className="w-4 h-4 mr-1.5" />
+              Approve All Pending ({allPendingIds.length})
+            </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={() => refetch()} data-testid="button-refresh">
+            <RotateCcw className="w-4 h-4 mr-1.5" />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* ── Filters ── */}
@@ -627,6 +655,41 @@ export default function TimeCardApproval() {
             <Button variant="destructive" onClick={confirmReject} data-testid="button-confirm-reject">
               <XCircle className="w-4 h-4 mr-1.5" />
               Confirmar rechazo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Approve All Pending confirmation dialog ── */}
+      <Dialog open={approveAllDialog} onOpenChange={setApproveAllDialog}>
+        <DialogContent className="sm:max-w-md" data-testid="approve-all-dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-green-700">
+              <CheckCircle2 className="w-5 h-5" />
+              Approve All Pending Entries
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 py-2 text-sm text-gray-600">
+            <p>
+              This will approve <strong>{allPendingIds.length} pending {allPendingIds.length === 1 ? "entry" : "entries"}</strong> matching
+              the current date and employee filters.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Each affected employee will receive a notification. This action cannot be undone automatically —
+              you can reset individual entries to pending afterward if needed.
+            </p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setApproveAllDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-green-600 hover:bg-green-700 text-white"
+              onClick={approveAllPending}
+              data-testid="button-confirm-approve-all"
+            >
+              <CheckCircle2 className="w-4 h-4 mr-1.5" />
+              Approve {allPendingIds.length} {allPendingIds.length === 1 ? "Entry" : "Entries"}
             </Button>
           </DialogFooter>
         </DialogContent>
