@@ -101,10 +101,13 @@ export function registerCustomerHubRoutes(app: Express, requireAuth: RequestHand
       city:                     job.city,
       state:                    job.state,
       zip:                      job.zip,
-      crewLeadName:             job.crewLeadName             || null,
-      crewNotesCustomerVisible: job.crewNotesCustomerVisible || null,
-      scopeOfWork:              job.scopeOfWork              || null,
-      materialsUsed:            job.materialsUsed            || null,
+      crewLeadName:                  job.crewLeadName                  || null,
+      crewNotesCustomerVisible:      job.crewNotesCustomerVisible      || null,
+      scopeOfWork:                   job.scopeOfWork                   || null,
+      materialsUsed:                 job.materialsUsed                 || null,
+      customerSatisfactionRating:    job.customerSatisfactionRating    ?? null,
+      customerSatisfactionFeedback:  job.customerSatisfactionFeedback  ?? null,
+      customerSatisfactionAt:        job.customerSatisfactionAt        ?? null,
     };
   }
 
@@ -147,6 +150,277 @@ export function registerCustomerHubRoutes(app: Express, requireAuth: RequestHand
         customerDocuments: jobCustomerDocs,
       });
     } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ===== CUSTOMER CHANGE-ORDER APPROVAL =====
+  // Returns change orders in 'pending_approval' status for a job the customer owns.
+  app.get("/api/customer-hub/jobs/:id/change-orders", requireAuth, requireCustomer, async (req: any, res) => {
+    try {
+      const links = await storage.getCustomerJobs(req.user.id);
+      const hasAccess = links.some((l: any) => l.jobId === req.params.id);
+      if (!hasAccess) return res.status(403).json({ message: "Not authorized" });
+
+      const { rows } = await pool.query(
+        `SELECT co.id, co.co_number, co.title, co.description, co.notes,
+                co.subtotal, co.tax_rate, co.tax_amount, co.total,
+                co.status, co.created_at, co.updated_at
+         FROM   job_change_orders co
+         WHERE  co.job_id = $1
+           AND  co.status = 'pending_approval'
+         ORDER BY co.created_at DESC`,
+        [req.params.id]
+      );
+
+      // Attach line items for each CO
+      const coIds = rows.map((r: any) => r.id);
+      let itemsByCoId: Record<string, any[]> = {};
+      if (coIds.length) {
+        const { rows: items } = await pool.query(
+          `SELECT id, change_order_id, item_type, description, quantity, unit, unit_price, amount
+           FROM   job_change_order_items
+           WHERE  change_order_id = ANY($1::uuid[])
+           ORDER BY sort_order`,
+          [coIds]
+        );
+        for (const item of items) {
+          if (!itemsByCoId[item.change_order_id]) itemsByCoId[item.change_order_id] = [];
+          itemsByCoId[item.change_order_id].push(item);
+        }
+      }
+
+      res.json(rows.map((r: any) => ({ ...r, items: itemsByCoId[r.id] ?? [] })));
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Customer approves a pending change order (digital signature optional).
+  app.post("/api/customer-hub/change-orders/:id/approve", requireAuth, requireCustomer, async (req: any, res) => {
+    const { signature_data, approved_by_name } = req.body;
+    try {
+      // Verify customer owns the job linked to this CO
+      const { rows: coRows } = await pool.query(
+        `SELECT co.id, co.job_id, co.status, co.total, co.co_number, co.title
+         FROM   job_change_orders co WHERE co.id = $1`,
+        [req.params.id]
+      );
+      if (!coRows.length) return res.status(404).json({ message: "Change order not found" });
+      if (coRows[0].status !== "pending_approval") {
+        return res.status(400).json({ message: "Change order is not pending approval" });
+      }
+      const links = await storage.getCustomerJobs(req.user.id);
+      if (!links.some((l: any) => l.jobId === coRows[0].job_id)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const { rows: updated } = await pool.query(
+        `UPDATE job_change_orders
+         SET status = 'approved', approval_type = 'customer_portal',
+             signature_data = $1, approved_by_name = $2,
+             approved_at = NOW(), updated_at = NOW()
+         WHERE id = $3
+         RETURNING *`,
+        [signature_data || null, approved_by_name || null, req.params.id]
+      );
+
+      // Add CO total to job price
+      await pool.query(
+        `UPDATE jobs SET price = COALESCE(price::numeric, 0) + $1, updated_at = NOW()
+         WHERE id = $2`,
+        [coRows[0].total, coRows[0].job_id]
+      );
+
+      // Notify admin/manager via staff_notifications
+      const custName = (req.user as any).name ?? req.user.username ?? "Customer";
+      await pool.query(
+        `INSERT INTO staff_notifications (type, title, message, link, created_at, seen_by)
+         VALUES ('change_order_approved', $1, $2, $3, NOW(), '[]'::jsonb)`,
+        [
+          `Change Order Approved by Customer`,
+          `${custName} approved change order ${coRows[0].co_number} "${coRows[0].title}" — $${Number(coRows[0].total).toFixed(2)}`,
+          `/jobs/${coRows[0].job_id}`,
+        ]
+      );
+
+      res.json(updated[0]);
+    } catch (err: any) {
+      console.error("[customer-hub/change-orders] approve error:", err.message);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Customer rejects a pending change order.
+  app.post("/api/customer-hub/change-orders/:id/reject", requireAuth, requireCustomer, async (req: any, res) => {
+    const { reason } = req.body;
+    try {
+      const { rows: coRows } = await pool.query(
+        `SELECT co.id, co.job_id, co.status, co.co_number, co.title
+         FROM   job_change_orders co WHERE co.id = $1`,
+        [req.params.id]
+      );
+      if (!coRows.length) return res.status(404).json({ message: "Change order not found" });
+      if (coRows[0].status !== "pending_approval") {
+        return res.status(400).json({ message: "Change order is not pending approval" });
+      }
+      const links = await storage.getCustomerJobs(req.user.id);
+      if (!links.some((l: any) => l.jobId === coRows[0].job_id)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const { rows: updated } = await pool.query(
+        `UPDATE job_change_orders
+         SET status = 'rejected',
+             internal_notes = CASE WHEN $1::text IS NOT NULL
+               THEN COALESCE(internal_notes || E'\\n', '') || 'Customer rejection reason: ' || $1
+               ELSE internal_notes END,
+             updated_at = NOW()
+         WHERE id = $2
+         RETURNING *`,
+        [reason || null, req.params.id]
+      );
+
+      const custName = (req.user as any).name ?? req.user.username ?? "Customer";
+      await pool.query(
+        `INSERT INTO staff_notifications (type, title, message, link, created_at, seen_by)
+         VALUES ('change_order_rejected', $1, $2, $3, NOW(), '[]'::jsonb)`,
+        [
+          `Change Order Rejected by Customer`,
+          `${custName} rejected change order ${coRows[0].co_number} "${coRows[0].title}"${reason ? `: ${reason}` : ""}`,
+          `/jobs/${coRows[0].job_id}`,
+        ]
+      );
+
+      res.json(updated[0]);
+    } catch (err: any) {
+      console.error("[customer-hub/change-orders] reject error:", err.message);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ===== CUSTOMER SATISFACTION / JOB SIGN-OFF =====
+  // Lets a customer submit a 1-5 star rating + optional comment on a completed job.
+  // One-time: once satisfied_at is set the endpoint returns 409 to prevent duplicates.
+  app.post("/api/customer-hub/jobs/:id/satisfaction", requireAuth, requireCustomer, async (req: any, res) => {
+    const { rating, feedback } = req.body;
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ message: "rating must be 1–5" });
+    }
+    try {
+      const links = await storage.getCustomerJobs(req.user.id);
+      if (!links.some((l: any) => l.jobId === req.params.id)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      // Only allow one submission
+      const { rows: existing } = await pool.query(
+        `SELECT customer_satisfaction_at FROM jobs WHERE id = $1`,
+        [req.params.id]
+      );
+      if (!existing.length) return res.status(404).json({ message: "Job not found" });
+      if (existing[0].customer_satisfaction_at) {
+        return res.status(409).json({ message: "Satisfaction already submitted for this job" });
+      }
+
+      const { rows } = await pool.query(
+        `UPDATE jobs
+         SET customer_satisfaction_rating = $1,
+             customer_satisfaction_feedback = $2,
+             customer_satisfaction_at = NOW(),
+             updated_at = NOW()
+         WHERE id = $3
+         RETURNING customer_satisfaction_rating, customer_satisfaction_feedback, customer_satisfaction_at`,
+        [rating, feedback || null, req.params.id]
+      );
+
+      // Notify staff
+      const custName = (req.user as any).name ?? req.user.username ?? "Customer";
+      const stars = "★".repeat(rating) + "☆".repeat(5 - rating);
+      await pool.query(
+        `INSERT INTO staff_notifications (type, title, message, link, created_at, seen_by)
+         VALUES ('customer_satisfaction', $1, $2, $3, NOW(), '[]'::jsonb)`,
+        [
+          `Job Review Received — ${stars}`,
+          `${custName} rated their job ${rating}/5${feedback ? `: "${feedback}"` : ""}`,
+          `/jobs/${req.params.id}`,
+        ]
+      );
+
+      res.json(rows[0]);
+    } catch (err: any) {
+      console.error("[customer-hub/satisfaction] error:", err.message);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ===== JOB PHOTOS (before/after — customer-facing) =====
+  // Returns worksheet photos tagged before/after for a job the customer owns.
+  app.get("/api/customer-hub/jobs/:id/photos", requireAuth, requireCustomer, async (req: any, res) => {
+    try {
+      const links = await storage.getCustomerJobs(req.user.id);
+      const hasAccess = links.some((l: any) => l.jobId === req.params.id);
+      if (!hasAccess) return res.status(403).json({ message: "Not authorized" });
+
+      const { rows } = await pool.query(
+        `SELECT wp.id, wp.photo_type, wp.caption, wp.created_at
+         FROM   worksheet_photos wp
+         JOIN   worksheet_sessions ws ON ws.id = wp.session_id
+         WHERE  ws.job_id = $1
+           AND  wp.photo_type IN ('before', 'after')
+         ORDER BY wp.photo_type DESC, wp.created_at ASC`,
+        [req.params.id]
+      );
+      const photos = rows.map((r: any) => ({
+        id: r.id,
+        photo_type: r.photo_type,
+        caption: r.caption,
+        created_at: r.created_at,
+        photo_url: `/api/customer-hub/photos/${r.id}/download`,
+      }));
+      res.json(photos);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Streams a single job photo from object storage — only for customers who own the job.
+  app.get("/api/customer-hub/photos/:photoId/download", requireAuth, requireCustomer, async (req: any, res) => {
+    const photoId = parseInt(req.params.photoId, 10);
+    if (isNaN(photoId)) return res.status(400).json({ message: "Invalid photo ID" });
+    try {
+      // Verify this customer owns the job linked to the photo
+      const { rows } = await pool.query(
+        `SELECT wp.photo_url, ws.job_id
+         FROM   worksheet_photos wp
+         JOIN   worksheet_sessions ws ON ws.id = wp.session_id
+         WHERE  wp.id = $1`,
+        [photoId]
+      );
+      if (!rows.length) return res.status(404).json({ message: "Photo not found" });
+
+      const { photo_url, job_id } = rows[0];
+      const links = await storage.getCustomerJobs(req.user.id);
+      if (!links.some((l: any) => l.jobId === job_id)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const { ObjectStorageService } = await import(
+        "./replit_integrations/object_storage/objectStorage"
+      );
+      const svc = new ObjectStorageService();
+      const file = await svc.getObjectEntityFile(photo_url);
+      const buffer = Buffer.from(await file.arrayBuffer());
+
+      const ext = (photo_url as string).split(".").pop()?.toLowerCase() ?? "jpg";
+      const mimeMap: Record<string, string> = {
+        jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png",
+        gif: "image/gif", webp: "image/webp", heic: "image/heic",
+      };
+      res.setHeader("Content-Type", mimeMap[ext] ?? "image/jpeg");
+      res.setHeader("Cache-Control", "private, max-age=3600");
+      res.send(buffer);
+    } catch (err: any) {
+      console.error("[customer-hub/photos] download error:", err.message);
       res.status(500).json({ message: err.message });
     }
   });

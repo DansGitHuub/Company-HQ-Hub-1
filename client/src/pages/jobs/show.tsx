@@ -55,6 +55,10 @@ interface JobDetail {
   scheduled_end_time: string | null; completion_date: string | null;
   estimated_hours: string | null; actual_hours: string | null;
   price: string | null; value: number | null; crew_notes: string | null; notes: string | null;
+  skipped_work_notes: string | null;
+  customer_satisfaction_rating: number | null;
+  customer_satisfaction_feedback: string | null;
+  customer_satisfaction_at: string | null;
   customer_id: string | null; property_id: string | null;
   cust_first: string | null; cust_last: string | null; cust_company: string | null;
   prop_address: string | null; prop_city: string | null; prop_state: string | null; prop_zip: string | null;
@@ -786,6 +790,7 @@ export default function JobDetailPage() {
   const [showEdit, setShowEdit] = useState(false);
   const [showGenerateInvoice, setShowGenerateInvoice] = useState(false);
   const [crewNotes, setCrewNotes] = useState<string | null>(null);
+  const [skippedWorkNotes, setSkippedWorkNotes] = useState<string | null>(null);
   const [savingNotes, setSavingNotes] = useState(false);
 
   // Work Areas modal state
@@ -803,6 +808,7 @@ export default function JobDetailPage() {
       if (!res.ok) throw new Error("Job not found");
       const data = await res.json();
       setCrewNotes(data.crew_notes ?? data.notes ?? "");
+      setSkippedWorkNotes(data.skipped_work_notes ?? "");
       return data;
     },
   });
@@ -922,7 +928,11 @@ export default function JobDetailPage() {
     if (!job) return;
     setSavingNotes(true);
     try {
-      await apiRequest("PATCH", `/api/jobs/${id}`, { crew_notes: crewNotes, notes: crewNotes });
+      await apiRequest("PATCH", `/api/jobs/${id}`, {
+        crew_notes: crewNotes,
+        notes: crewNotes,
+        skipped_work_notes: skippedWorkNotes || null,
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/jobs", id] });
       toast({ title: t("notesSaved") });
     } catch {
@@ -1101,6 +1111,47 @@ export default function JobDetailPage() {
               </CardHeader>
               <CardContent className="px-4 pb-4">
                 <p className="text-sm whitespace-pre-wrap">{job.crew_notes || job.notes}</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Skipped / Incomplete Work (left col quick view) */}
+          {job.skipped_work_notes && (
+            <Card className="border-amber-200 bg-amber-50/40">
+              <CardHeader className="pb-2 pt-4 px-4">
+                <CardTitle className="text-sm font-medium text-amber-800 flex items-center gap-1.5">
+                  <span>⚠️</span>
+                  <span>Skipped / Incomplete Work</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="px-4 pb-4">
+                <p className="text-sm whitespace-pre-wrap text-amber-900">{job.skipped_work_notes}</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Customer Satisfaction Rating */}
+          {job.customer_satisfaction_rating && (
+            <Card className="border-yellow-200 bg-yellow-50/40">
+              <CardHeader className="pb-2 pt-4 px-4">
+                <CardTitle className="text-sm font-medium text-yellow-800 flex items-center gap-1.5">
+                  <span>⭐</span>
+                  <span>Customer Satisfaction</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="px-4 pb-4 space-y-1">
+                <div className="flex items-center gap-1 text-yellow-400 text-lg">
+                  {[1,2,3,4,5].map(s => (
+                    <span key={s}>{s <= job.customer_satisfaction_rating! ? "★" : "☆"}</span>
+                  ))}
+                  <span className="text-sm text-muted-foreground ml-1">
+                    {job.customer_satisfaction_rating}/5
+                    {job.customer_satisfaction_at && ` · ${new Date(job.customer_satisfaction_at).toLocaleDateString()}`}
+                  </span>
+                </div>
+                {job.customer_satisfaction_feedback && (
+                  <p className="text-sm text-muted-foreground italic">"{job.customer_satisfaction_feedback}"</p>
+                )}
               </CardContent>
             </Card>
           )}
@@ -1447,28 +1498,49 @@ export default function JobDetailPage() {
 
           {/* Notes Panel */}
           {activeSection === "notes" && (
-            <Card>
-              <CardHeader className="pb-2 pt-4">
-                <CardTitle className="text-sm">{t("crewNotes")}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Textarea
-                  value={crewNotes ?? ""}
-                  onChange={(e) => setCrewNotes(e.target.value)}
-                  rows={8}
-                  placeholder={t("crewNotesTabPlaceholder")}
-                  className="resize-none"
-                  data-testid="textarea-crew-notes"
-                  readOnly={!isAdminOrManager}
-                />
-                {isAdminOrManager && (
-                  <Button size="sm" onClick={saveNotes} disabled={savingNotes} data-testid="button-save-notes">
-                    {savingNotes ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
-                    {t("saveNotes")}
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
+            <div className="space-y-4">
+              <Card>
+                <CardHeader className="pb-2 pt-4">
+                  <CardTitle className="text-sm">{t("crewNotes")}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Textarea
+                    value={crewNotes ?? ""}
+                    onChange={(e) => setCrewNotes(e.target.value)}
+                    rows={6}
+                    placeholder={t("crewNotesTabPlaceholder")}
+                    className="resize-none"
+                    data-testid="textarea-crew-notes"
+                    readOnly={!isAdminOrManager}
+                  />
+                </CardContent>
+              </Card>
+              <Card className="border-amber-200 bg-amber-50/40">
+                <CardHeader className="pb-2 pt-4">
+                  <CardTitle className="text-sm flex items-center gap-2 text-amber-800">
+                    <span>Skipped / Incomplete Work</span>
+                    <span className="text-xs font-normal text-amber-600">(internal only — for office reference when customers ask)</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Textarea
+                    value={skippedWorkNotes ?? ""}
+                    onChange={(e) => setSkippedWorkNotes(e.target.value)}
+                    rows={4}
+                    placeholder="Describe any work that was skipped or left incomplete, and the reason why (e.g. 'Back gate was locked — couldn't access rear beds. Called customer, will return Thursday.')…"
+                    className="resize-none border-amber-200 focus:border-amber-400"
+                    data-testid="textarea-skipped-work-notes"
+                    readOnly={!isAdminOrManager}
+                  />
+                  {isAdminOrManager && (
+                    <Button size="sm" onClick={saveNotes} disabled={savingNotes} data-testid="button-save-notes">
+                      {savingNotes ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : null}
+                      {t("saveNotes")}
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           )}
 
           {/* Invoices Panel */}

@@ -15,7 +15,7 @@ import {
   ChevronRight, Download, Bookmark, BookmarkCheck, Search,
   Send, Clock, MapPin, Calendar, CheckCircle2, AlertCircle,
   Leaf, Sun, Snowflake, CloudRain, ArrowLeft, Eye, Star,
-  Lightbulb, Receipt, AlertTriangle
+  Lightbulb, Receipt, AlertTriangle, Camera, X as XIcon, Loader2
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
@@ -598,11 +598,181 @@ function JobCard({ job, onClick }: { job: any; onClick: () => void }) {
   );
 }
 
+function CustomerSatisfactionCard({ jobId, jobStatus }: { jobId: string; jobStatus: string }) {
+  const { toast } = useToast();
+  const [rating, setRating] = React.useState(0);
+  const [hoverRating, setHoverRating] = React.useState(0);
+  const [feedback, setFeedback] = React.useState("");
+  const [submitted, setSubmitted] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
+
+  const isCompleted = ["completed", "done", "closed"].includes((jobStatus ?? "").toLowerCase());
+
+  const { data: existing, isLoading: checkingExisting } = useQuery({
+    queryKey: [`/api/customer-hub/jobs/${jobId}/satisfaction-status`],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/customer-hub/jobs/${jobId}`);
+      const data = await res.json();
+      return {
+        hasRating: !!data.customerSatisfactionRating,
+        rating: data.customerSatisfactionRating,
+        feedback: data.customerSatisfactionFeedback,
+        at: data.customerSatisfactionAt,
+      };
+    },
+    enabled: !!jobId && isCompleted,
+  });
+
+  if (!isCompleted) return null;
+  if (checkingExisting) return null;
+
+  if (existing?.hasRating || submitted) {
+    const r = existing?.rating ?? rating;
+    return (
+      <Card className="border-green-200 bg-green-50/40">
+        <CardHeader className="pb-2 pt-4">
+          <CardTitle className="text-sm text-green-800 flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4" /> Thank You for Your Feedback!
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-0.5 text-yellow-400 text-xl mb-1">
+            {[1,2,3,4,5].map(s => <span key={s}>{s <= r ? "★" : "☆"}</span>)}
+          </div>
+          {(existing?.feedback || feedback) && (
+            <p className="text-sm text-gray-600 italic">"{existing?.feedback ?? feedback}"</p>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const submit = async () => {
+    if (!rating) return;
+    setLoading(true);
+    try {
+      const res = await apiRequest("POST", `/api/customer-hub/jobs/${jobId}/satisfaction`, { rating, feedback: feedback || undefined });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      setSubmitted(true);
+      toast({ title: "Thank you for your feedback!" });
+    } catch (e: any) {
+      toast({ title: e.message ?? "Could not submit", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Card className="border-blue-200 bg-blue-50/30">
+      <CardHeader className="pb-2 pt-4">
+        <CardTitle className="text-sm text-blue-800">How Did We Do? ⭐</CardTitle>
+        <p className="text-xs text-gray-500 mt-0.5">Your job is complete — we'd love your feedback (takes 10 seconds).</p>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex gap-1 text-3xl" onMouseLeave={() => setHoverRating(0)}>
+          {[1,2,3,4,5].map(s => (
+            <button
+              key={s}
+              onClick={() => setRating(s)}
+              onMouseEnter={() => setHoverRating(s)}
+              className="text-yellow-400 hover:text-yellow-500 focus:outline-none transition-transform hover:scale-110"
+              data-testid={`star-rating-${s}`}
+            >
+              {s <= (hoverRating || rating) ? "★" : "☆"}
+            </button>
+          ))}
+          {rating > 0 && (
+            <span className="text-sm text-gray-500 ml-2 self-center">
+              {["","Needs Improvement","Fair","Good","Very Good","Excellent!"][rating]}
+            </span>
+          )}
+        </div>
+        <Textarea
+          value={feedback}
+          onChange={e => setFeedback(e.target.value)}
+          placeholder="Optional: anything we could improve, or what you loved most about our work…"
+          rows={2}
+          className="text-sm resize-none"
+          data-testid="textarea-satisfaction-feedback"
+        />
+        <Button
+          size="sm"
+          disabled={!rating || loading}
+          onClick={submit}
+          className="bg-blue-700 hover:bg-blue-800"
+          data-testid="button-submit-satisfaction"
+        >
+          {loading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+          Submit Feedback
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
 function JobDetail({ jobId, onBack }: { jobId: string; onBack: () => void }) {
+  const [lightboxPhoto, setLightboxPhoto] = React.useState<string | null>(null);
+
   const { data: job, isLoading } = useQuery({
     queryKey: [`/api/customer-hub/jobs/${jobId}`],
     queryFn: async () => (await apiRequest("GET", `/api/customer-hub/jobs/${jobId}`)).json(),
   });
+
+  const { data: photos = [] } = useQuery<Array<{ id: number; photo_type: string; caption: string | null; created_at: string; photo_url: string }>>({
+    queryKey: [`/api/customer-hub/jobs/${jobId}/photos`],
+    queryFn: async () => (await apiRequest("GET", `/api/customer-hub/jobs/${jobId}/photos`)).json(),
+    enabled: !!jobId,
+  });
+
+  interface ChangeOrderItem { id: string; description: string; quantity: number; unit: string | null; unit_price: number; amount: number; item_type: string; }
+  interface ChangeOrder { id: string; co_number: string; title: string; description: string | null; notes: string | null; subtotal: number; tax_rate: number; tax_amount: number; total: number; status: string; items: ChangeOrderItem[]; }
+
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const { data: pendingCOs = [], refetch: refetchCOs } = useQuery<ChangeOrder[]>({
+    queryKey: [`/api/customer-hub/jobs/${jobId}/change-orders`],
+    queryFn: async () => (await apiRequest("GET", `/api/customer-hub/jobs/${jobId}/change-orders`)).json(),
+    enabled: !!jobId,
+  });
+
+  const [coRejectId, setCoRejectId] = React.useState<string | null>(null);
+  const [coRejectReason, setCoRejectReason] = React.useState("");
+  const [coActionLoading, setCoActionLoading] = React.useState<string | null>(null);
+
+  const approveCO = async (coId: string) => {
+    setCoActionLoading(coId);
+    try {
+      const res = await apiRequest("POST", `/api/customer-hub/change-orders/${coId}/approve`, {});
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      toast({ title: "Change order approved — thank you!" });
+      refetchCOs();
+      queryClient.invalidateQueries({ queryKey: [`/api/customer-hub/jobs/${jobId}`] });
+    } catch (e: any) {
+      toast({ title: e.message ?? "Could not approve", variant: "destructive" });
+    } finally {
+      setCoActionLoading(null);
+    }
+  };
+
+  const rejectCO = async (coId: string) => {
+    setCoActionLoading(coId);
+    try {
+      const res = await apiRequest("POST", `/api/customer-hub/change-orders/${coId}/reject`, { reason: coRejectReason });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      toast({ title: "Change order declined." });
+      setCoRejectId(null);
+      setCoRejectReason("");
+      refetchCOs();
+    } catch (e: any) {
+      toast({ title: e.message ?? "Could not decline", variant: "destructive" });
+    } finally {
+      setCoActionLoading(null);
+    }
+  };
+
+  const beforePhotos = photos.filter(p => p.photo_type === "before");
+  const afterPhotos  = photos.filter(p => p.photo_type === "after");
 
   if (isLoading) return <div className="animate-pulse"><div className="h-8 bg-gray-200 rounded w-48 mb-4" /><div className="h-64 bg-gray-200 rounded" /></div>;
   if (!job) return <p>Job not found</p>;
@@ -646,6 +816,13 @@ function JobDetail({ jobId, onBack }: { jobId: string; onBack: () => void }) {
         </Card>
       )}
 
+      {job.crewNotesCustomerVisible && (
+        <Card>
+          <CardHeader><CardTitle className="text-sm">Notes From Our Crew</CardTitle></CardHeader>
+          <CardContent><p className="text-sm text-gray-600 whitespace-pre-wrap">{job.crewNotesCustomerVisible}</p></CardContent>
+        </Card>
+      )}
+
       {job.materialsUsed && (
         <Card>
           <CardHeader><CardTitle className="text-sm">Materials Used</CardTitle></CardHeader>
@@ -653,6 +830,168 @@ function JobDetail({ jobId, onBack }: { jobId: string; onBack: () => void }) {
         </Card>
       )}
 
+      {/* Pending Change Orders — require customer approval */}
+      {pendingCOs.length > 0 && (
+        <div className="space-y-3">
+          {pendingCOs.map(co => (
+            <Card key={co.id} className="border-orange-200 bg-orange-50/40">
+              <CardHeader className="pb-2 pt-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <CardTitle className="text-sm text-orange-800 flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 shrink-0" />
+                      Change Order Requires Your Approval — {co.co_number}
+                    </CardTitle>
+                    <p className="text-sm font-medium mt-0.5">{co.title}</p>
+                  </div>
+                  <Badge className="bg-orange-100 text-orange-700 border-orange-300 shrink-0">Pending</Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {co.description && <p className="text-sm text-gray-600">{co.description}</p>}
+                {co.items.length > 0 && (
+                  <table className="w-full text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-orange-100">
+                        <th className="text-left p-2 border border-orange-200 font-medium">Description</th>
+                        <th className="text-right p-2 border border-orange-200 font-medium w-16">Qty</th>
+                        <th className="text-right p-2 border border-orange-200 font-medium w-20">Unit Price</th>
+                        <th className="text-right p-2 border border-orange-200 font-medium w-20">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {co.items.map(item => (
+                        <tr key={item.id} className="border-b border-orange-100">
+                          <td className="p-2 border border-orange-200">{item.description}</td>
+                          <td className="p-2 border border-orange-200 text-right">{item.quantity}{item.unit ? ` ${item.unit}` : ""}</td>
+                          <td className="p-2 border border-orange-200 text-right">${Number(item.unit_price).toFixed(2)}</td>
+                          <td className="p-2 border border-orange-200 text-right">${Number(item.amount).toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      {Number(co.tax_amount) > 0 && (
+                        <tr className="bg-orange-50">
+                          <td colSpan={3} className="p-2 border border-orange-200 text-right font-medium">Tax</td>
+                          <td className="p-2 border border-orange-200 text-right">${Number(co.tax_amount).toFixed(2)}</td>
+                        </tr>
+                      )}
+                      <tr className="bg-orange-100">
+                        <td colSpan={3} className="p-2 border border-orange-200 text-right font-bold">Total</td>
+                        <td className="p-2 border border-orange-200 text-right font-bold">${Number(co.total).toFixed(2)}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                )}
+                {co.notes && <p className="text-xs text-gray-500 italic">{co.notes}</p>}
+
+                {coRejectId === co.id ? (
+                  <div className="space-y-2">
+                    <Textarea
+                      value={coRejectReason}
+                      onChange={e => setCoRejectReason(e.target.value)}
+                      placeholder="Optional: let us know why you're declining this change order…"
+                      rows={2}
+                      className="text-sm resize-none"
+                      data-testid={`textarea-co-reject-reason-${co.id}`}
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => rejectCO(co.id)}
+                        disabled={coActionLoading === co.id}
+                        data-testid={`button-co-confirm-reject-${co.id}`}
+                      >
+                        {coActionLoading === co.id ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                        Confirm Decline
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => { setCoRejectId(null); setCoRejectReason(""); }}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex gap-2 flex-wrap">
+                    <Button
+                      size="sm"
+                      className="bg-green-700 hover:bg-green-800"
+                      onClick={() => approveCO(co.id)}
+                      disabled={coActionLoading === co.id}
+                      data-testid={`button-co-approve-${co.id}`}
+                    >
+                      {coActionLoading === co.id ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <CheckCircle2 className="h-3 w-3 mr-1" />}
+                      Approve Change Order
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-red-300 text-red-700 hover:bg-red-50"
+                      onClick={() => setCoRejectId(co.id)}
+                      data-testid={`button-co-reject-${co.id}`}
+                    >
+                      Decline
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Before / After Photo Gallery */}
+      {photos.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Camera className="h-4 w-4" /> Job Photos
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {beforePhotos.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Before</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {beforePhotos.map(p => (
+                    <button
+                      key={p.id}
+                      onClick={() => setLightboxPhoto(p.photo_url)}
+                      className="relative group aspect-square rounded-lg overflow-hidden bg-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500"
+                      data-testid={`photo-before-${p.id}`}
+                    >
+                      <img src={p.photo_url} alt="Before" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                        <Eye className="h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {afterPhotos.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">After</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {afterPhotos.map(p => (
+                    <button
+                      key={p.id}
+                      onClick={() => setLightboxPhoto(p.photo_url)}
+                      className="relative group aspect-square rounded-lg overflow-hidden bg-gray-100 focus:outline-none focus:ring-2 focus:ring-green-500"
+                      data-testid={`photo-after-${p.id}`}
+                    >
+                      <img src={p.photo_url} alt="After" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                        <Eye className="h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {(job.documents?.length > 0 || job.customerDocuments?.length > 0) && (
         <Card>
@@ -673,6 +1012,31 @@ function JobDetail({ jobId, onBack }: { jobId: string; onBack: () => void }) {
             ))}
           </CardContent>
         </Card>
+      )}
+
+      {/* Customer Satisfaction / Job Sign-Off */}
+      <CustomerSatisfactionCard jobId={jobId} jobStatus={job.stage ?? job.status} />
+
+      {/* Lightbox */}
+      {lightboxPhoto && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setLightboxPhoto(null)}
+          data-testid="photo-lightbox"
+        >
+          <button
+            className="absolute top-4 right-4 text-white hover:text-gray-300"
+            onClick={() => setLightboxPhoto(null)}
+          >
+            <XIcon className="h-8 w-8" />
+          </button>
+          <img
+            src={lightboxPhoto}
+            alt="Job photo"
+            className="max-h-[90vh] max-w-full rounded-lg object-contain"
+            onClick={e => e.stopPropagation()}
+          />
+        </div>
       )}
     </div>
   );

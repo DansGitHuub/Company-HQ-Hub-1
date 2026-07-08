@@ -34,12 +34,25 @@ async function sendJobStatusEmail(jobId: string, newStatus: string) {
       ? `${row.first_name} ${row.last_name}`.trim()
       : row.company_name || "Valued Customer";
 
+    // Build the Customer Hub portal link — works in both dev and production
+    const appBase = process.env.APP_BASE_URL
+      ?? (process.env.NODE_ENV === "production"
+        ? "https://companyhq.chapinlandscapes.com"
+        : `http://localhost:${process.env.PORT ?? 5000}`);
+    const portalLink = `${appBase}/customer-hub`;
+
     const statusLine: Record<string, string> = {
       scheduled:   "Great news — your job has been scheduled! Our team will be there on the date below.",
       in_progress: "Our crew has started work on your job. We'll keep you updated as we make progress.",
-      completed:   "Your job is complete! Thank you for choosing Chapin Landscapes.",
+      completed:   "Your job is complete! Thank you for choosing Chapin Landscapes. You can view your job details, photos, and documents in your Customer Portal.",
       cancelled:   "We wanted to let you know that your job has been cancelled. Please contact us if you have any questions.",
     };
+
+    const completionCta = newStatus === "completed"
+      ? `<div style="text-align:center;margin:24px 0">
+           <a href="${portalLink}" style="display:inline-block;background:#2d5a27;color:#fff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px">View My Job in Customer Portal →</a>
+         </div>`
+      : "";
 
     const dateStr = row.scheduled_date
       ? new Date(row.scheduled_date).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })
@@ -62,8 +75,9 @@ async function sendJobStatusEmail(jobId: string, newStatus: string) {
               ${dateStr ? `<tr><td style="padding:8px 12px;font-weight:bold;background:#f9fafb;border:1px solid #e5e7eb">Date</td><td style="padding:8px 12px;border:1px solid #e5e7eb">${dateStr}</td></tr>` : ""}
               ${location ? `<tr><td style="padding:8px 12px;font-weight:bold;background:#f9fafb;border:1px solid #e5e7eb">Location</td><td style="padding:8px 12px;border:1px solid #e5e7eb">${escapeHtml(location)}</td></tr>` : ""}
             </table>
+            ${completionCta}
             <p>If you have any questions, please don't hesitate to reach out.</p>
-            <p style="margin-top:24px;color:#666;font-size:0.85em">Chapin Landscapes · (555) 000-0000</p>
+            <p style="margin-top:24px;color:#666;font-size:0.85em">Chapin Landscapes · <a href="${portalLink}" style="color:#2d5a27">Customer Portal</a></p>
           </div>
         </div>
       `,
@@ -362,6 +376,7 @@ export function registerJobRoutes(app: Express, requireAuth: any) {
           category            = COALESCE($21, category),
           stage               = COALESCE($22, stage),
           value               = COALESCE($23, value),
+          skipped_work_notes  = $25,
           updated_at          = NOW()
         WHERE id = $24
         RETURNING *
@@ -390,6 +405,7 @@ export function registerJobRoutes(app: Express, requireAuth: any) {
         stage ?? null,
         value ?? null,
         req.params.id,
+        skipped_work_notes ?? null,
       ]);
 
       if (result.rows.length === 0) return res.status(404).json({ message: "Job not found" });

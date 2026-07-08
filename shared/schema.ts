@@ -631,6 +631,10 @@ export const jobs = pgTable("jobs", {
   crewLeadName: text("crew_lead_name"),
   scopeOfWork: text("scope_of_work"),
   materialsUsed: text("materials_used"),
+  skippedWorkNotes: text("skipped_work_notes"),
+  customerSatisfactionRating: integer("customer_satisfaction_rating"),
+  customerSatisfactionFeedback: text("customer_satisfaction_feedback"),
+  customerSatisfactionAt: timestamp("customer_satisfaction_at", { withTimezone: true }),
   // Extended job fields
   customerId: uuid("customer_id"),
   propertyId: uuid("property_id"),
