@@ -4750,15 +4750,6 @@ Generate detailed information for this landscaping material.`;
     }
   });
 
-  app.get("/api/campaigns", requireAuth, async (req, res) => {
-    try {
-      const campaigns = await storage.getCampaigns();
-      res.json(campaigns);
-    } catch (err) {
-      res.status(500).json({ message: "Error fetching campaigns" });
-    }
-  });
-
   app.get("/api/jobs", requireAuth, async (req, res) => {
     try {
       const jobs = await storage.getJobs();

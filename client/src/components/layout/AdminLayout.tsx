@@ -39,6 +39,7 @@ import {
   SlidersHorizontal,
   FlagTriangleRight,
   MessageSquareWarning,
+  Library,
 } from "lucide-react";
 
 type AdminNavItem = {
@@ -63,7 +64,7 @@ const ADMIN_GROUPS: AdminNavGroup[] = [
     labelColor: "text-green-600 dark:text-green-400",
     items: [
       { value: "overdue", label: "Overdue Items", icon: AlertTriangle, href: "/overdue" },
-      { value: "time-reports", label: "Time Reports", icon: ClipboardList, href: "/admin/time?tab=reports" },
+      { value: "time-reports", label: "Time Reports", icon: ClipboardList, href: "/admin/time-reports" },
       { value: "time-admin", label: "Time Admin", icon: Clock, href: "/admin/time" },
       { value: "worksheet-review", label: "Worksheet Review", icon: ClipboardCheck, href: "/admin/time?tab=worksheet" },
       { value: "qbo-export", label: "QuickBooks Export", icon: Upload, href: "/admin/qbo-export" },
@@ -100,6 +101,7 @@ const ADMIN_GROUPS: AdminNavGroup[] = [
     label: "Catalogs & Integrations",
     labelColor: "text-teal-600 dark:text-teal-400",
     items: [
+      { value: "document-library", label: "Document Library", icon: Library, href: "/admin/documents" },
       { value: "work-areas", label: "Work Areas", icon: Layers, href: "/admin/work-areas" },
       { value: "service-types", label: "Service Types", icon: Tag, href: "/admin/service-types" },
       { value: "quickbooks", label: "QuickBooks Online", icon: DollarSign, tab: "quickbooks" },

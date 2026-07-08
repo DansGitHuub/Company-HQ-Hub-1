@@ -163,6 +163,7 @@ import ManagerDashboard from "@/pages/ManagerDashboard";
 import OverduePage from "@/pages/Overdue";
 import DailyPlanPage from "@/pages/DailyPlan";
 import AdminInbox from "@/pages/AdminInbox";
+import DocumentLibraryPage from "@/pages/admin/DocumentLibraryPage";
 
 const ADMIN_ONLY = ["Admin"];
 const ADMIN_OR_MANAGER = ["Admin", "Manager"];
@@ -319,7 +320,8 @@ function AppRoutes() {
         <ProtectedRoute path="/admin/qbo-export" component={QBOExportPage} allowedRoles={ADMIN_ONLY} />
         <ProtectedRoute path="/admin/archive" component={ArchivePage} allowedRoles={ADMIN_ONLY} />
         <ProtectedRoute path="/admin/time" component={TimeAdminPage} allowedRoles={ADMIN_ONLY} />
-        <Route path="/admin/time-reports"><Redirect to="/admin/time?tab=reports" /></Route>
+        <ProtectedRoute path="/admin/time-reports" component={TimeReports} allowedRoles={ADMIN_ONLY} />
+        <ProtectedRoute path="/admin/documents" component={DocumentLibraryPage} allowedRoles={ADMIN_ONLY} />
         <Route path="/admin/worksheet-review"><Redirect to="/admin/time?tab=worksheet" /></Route>
         <Route path="/admin/time-card-approval"><Redirect to="/admin/time?tab=approval" /></Route>
         <ProtectedRoute path="/admin/service-types" component={ServiceTypesPage} allowedRoles={ADMIN_ONLY} />

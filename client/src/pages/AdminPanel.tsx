@@ -3134,7 +3134,7 @@ function CreateAgentDialog({ onCreated }: { onCreated: () => void }) {
     { value: "content_creator", label: "Content Creator" },
     { value: "forms", label: "Forms Analyzer" },
     { value: "sops", label: "SOP Analyzer" },
-    { value: "communications", label: "Communications" },
+    { value: "communications", label: "Hiring/HR Comms AI" },
     { value: "hiring", label: "Hiring" },
   ];
 
