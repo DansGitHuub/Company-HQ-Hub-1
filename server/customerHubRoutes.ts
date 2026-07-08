@@ -232,11 +232,12 @@ export function registerCustomerHubRoutes(app: Express, requireAuth: RequestHand
         [coRows[0].total, coRows[0].job_id]
       );
 
-      // Notify admin/manager via staff_notifications
+      // Notify all admins via staff_notifications (one row per admin, matching codebase pattern)
       const custName = (req.user as any).name ?? req.user.username ?? "Customer";
       await pool.query(
-        `INSERT INTO staff_notifications (type, title, message, link, created_at, seen_by)
-         VALUES ('change_order_approved', $1, $2, $3, NOW(), '[]'::jsonb)`,
+        `INSERT INTO staff_notifications (user_id, type, title, message, link, is_read, created_at)
+         SELECT u.id, 'change_order_approved', $1, $2, $3, false, NOW()
+         FROM   users u WHERE u.role = 'Admin'`,
         [
           `Change Order Approved by Customer`,
           `${custName} approved change order ${coRows[0].co_number} "${coRows[0].title}" — $${Number(coRows[0].total).toFixed(2)}`,
@@ -283,8 +284,9 @@ export function registerCustomerHubRoutes(app: Express, requireAuth: RequestHand
 
       const custName = (req.user as any).name ?? req.user.username ?? "Customer";
       await pool.query(
-        `INSERT INTO staff_notifications (type, title, message, link, created_at, seen_by)
-         VALUES ('change_order_rejected', $1, $2, $3, NOW(), '[]'::jsonb)`,
+        `INSERT INTO staff_notifications (user_id, type, title, message, link, is_read, created_at)
+         SELECT u.id, 'change_order_rejected', $1, $2, $3, false, NOW()
+         FROM   users u WHERE u.role = 'Admin'`,
         [
           `Change Order Rejected by Customer`,
           `${custName} rejected change order ${coRows[0].co_number} "${coRows[0].title}"${reason ? `: ${reason}` : ""}`,
@@ -337,8 +339,9 @@ export function registerCustomerHubRoutes(app: Express, requireAuth: RequestHand
       const custName = (req.user as any).name ?? req.user.username ?? "Customer";
       const stars = "★".repeat(rating) + "☆".repeat(5 - rating);
       await pool.query(
-        `INSERT INTO staff_notifications (type, title, message, link, created_at, seen_by)
-         VALUES ('customer_satisfaction', $1, $2, $3, NOW(), '[]'::jsonb)`,
+        `INSERT INTO staff_notifications (user_id, type, title, message, link, is_read, created_at)
+         SELECT u.id, 'customer_satisfaction', $1, $2, $3, false, NOW()
+         FROM   users u WHERE u.role = 'Admin'`,
         [
           `Job Review Received — ${stars}`,
           `${custName} rated their job ${rating}/5${feedback ? `: "${feedback}"` : ""}`,
