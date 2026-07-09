@@ -1051,9 +1051,13 @@ export function registerHiringRoutes(app: Express, requireAuth: RequestHandler) 
   app.post("/api/candidates/:id/schedule-interview", requireAuth, requireHRAccess, async (req: any, res) => {
     try {
       const { id } = req.params;
-      const { date, time, duration = 30, type = "zoom", location = "", notes = "", interviewerName = "", sendNotification = true } = req.body as {
+      const {
+        date, time, duration = 30, type = "zoom", location = "", notes = "", interviewerName = "",
+        sendNotification = true, preserveStage = false, interviewRecommendation,
+      } = req.body as {
         date: string; time: string; duration?: number; type?: string;
         location?: string; notes?: string; interviewerName?: string; sendNotification?: boolean;
+        preserveStage?: boolean; interviewRecommendation?: string;
       };
 
       if (!date || !time) return res.status(400).json({ message: "Date and time are required" });
@@ -1125,13 +1129,14 @@ export function registerHiringRoutes(app: Express, requireAuth: RequestHandler) 
 
       // ── Update candidate record ───────────────────────────────────────────
       const updates: Record<string, any> = {
-        stage: "Interview Scheduled",
+        ...(preserveStage ? {} : { stage: "Interview Scheduled" }),
         interviewDate: startDatetime,
         interviewTime: time,
         interviewType: type,
         interviewLocation: type === "in-person" ? location : "",
         interviewerName,
         interviewNotes: notes,
+        ...(interviewRecommendation !== undefined ? { interviewRecommendation } : {}),
         ...(zoomResult ? {
           zoomMeetingUrl: zoomResult.joinUrl,
           zoomMeetingId: zoomResult.meetingId,

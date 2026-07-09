@@ -349,7 +349,7 @@ export default function Hiring() {
           <div className="space-y-3 text-sm pt-1">
             {[
               { step: 1, stage: "Application Received", color: "bg-blue-500", desc: "The candidate is automatically created here the moment they submit the online form. You'll get an in-app notification and email. Their card is pre-populated with everything from their application." },
-              { step: 2, stage: "Review & Rate", color: "bg-gray-400", desc: "Click the card to open it. Go to the Profile tab to review their info, or click \"View Application\" to see everything they submitted. Set a color rating (green/yellow/red) to flag their potential." },
+              { step: 2, stage: "Review & Rate", color: "bg-gray-400", desc: "Click the card to open it. Go to the Profile tab to review their info, or click \"View Application\" to see everything they submitted. Use the rating buttons to flag their potential: Strong (green), Maybe (yellow), or Weak (red)." },
               { step: 3, stage: "Phone Screen", color: "bg-purple-500", desc: "Drag here if you want to do a quick call before committing to a full interview. Optional — you can skip this stage." },
               { step: 4, stage: "Interview Scheduled", color: "bg-cyan-500", desc: "Dragging here opens the scheduling modal. Pick date, time, duration, and Zoom or In-Person. The system automatically creates the Zoom meeting, adds it to Google Calendar, emails the candidate, and texts them." },
               { step: 5, stage: "1st Interview", color: "bg-amber-500", desc: "Move them here once the first interview is done. Use the Interview tab on the card to record your rating and recommendation." },
@@ -2471,16 +2471,19 @@ function CommunicationTab({ candidateId }: { candidateId: string }) {
 
 function InterviewTab({ candidate, onUpdate }: { candidate: Candidate; onUpdate: (data: any) => void }) {
   const [editing, setEditing] = useState(false);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const buildForm = (c: Candidate) => ({
     interviewDate: c.interviewDate ? new Date(c.interviewDate).toISOString().split("T")[0] : "",
     interviewTime: c.interviewTime || "",
     interviewLocation: c.interviewLocation || "",
-    interviewType: c.interviewType || "in-person",
+    interviewType: c.interviewType === "zoom" ? "zoom" : "in-person",
     interviewerName: c.interviewerName || "",
     interviewNotes: c.interviewNotes || "",
     interviewRecommendation: c.interviewRecommendation || "",
   });
   const [form, setForm] = useState(() => buildForm(candidate));
+  const [sendNotification, setSendNotification] = useState(true);
 
   useEffect(() => {
     if (!editing) {
@@ -2490,22 +2493,69 @@ function InterviewTab({ candidate, onUpdate }: { candidate: Candidate; onUpdate:
       candidate.interviewType, candidate.interviewerName, candidate.interviewNotes,
       candidate.interviewRecommendation, editing]);
 
+  const scheduleMutation = useMutation({
+    mutationFn: async (payload: any) => {
+      const res = await apiRequest("POST", `/api/candidates/${candidate.id}/schedule-interview`, payload);
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/candidates"] });
+      toast({
+        title: "Interview Updated",
+        description: sendNotification
+          ? (data.zoomMeeting
+              ? `Zoom meeting created. ${data.emailSent ? "Confirmation email sent." : "No applicant email on file."}`
+              : `Interview updated. ${data.emailSent ? "Confirmation email sent." : "No applicant email on file."}`)
+          : "Interview updated. No notification sent to candidate.",
+      });
+      setEditing(false);
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message || "Failed to update interview", variant: "destructive" });
+    },
+  });
+
+  const orig = buildForm(candidate);
+  const dateTimeChanged = form.interviewDate !== orig.interviewDate || form.interviewTime !== orig.interviewTime;
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="font-semibold">Interview Details</h3>
-        <Button variant="outline" size="sm" onClick={() => {
-          if (editing) {
-            onUpdate({
-              ...form,
-              interviewDate: form.interviewDate ? new Date(form.interviewDate) : null,
-            });
-            setEditing(false);
-          } else {
-            setEditing(true);
-          }
-        }} data-testid="button-edit-interview">
-          {editing ? "Save" : "Edit"}
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={scheduleMutation.isPending}
+          onClick={() => {
+            if (editing) {
+              if (form.interviewDate && form.interviewTime && dateTimeChanged) {
+                scheduleMutation.mutate({
+                  date: form.interviewDate,
+                  time: form.interviewTime,
+                  duration: 30,
+                  type: form.interviewType,
+                  location: form.interviewLocation,
+                  notes: form.interviewNotes,
+                  interviewerName: form.interviewerName,
+                  interviewRecommendation: form.interviewRecommendation,
+                  sendNotification,
+                  preserveStage: true,
+                });
+              } else {
+                onUpdate({
+                  ...form,
+                  interviewDate: form.interviewDate ? new Date(form.interviewDate) : null,
+                });
+                setEditing(false);
+              }
+            } else {
+              setSendNotification(true);
+              setEditing(true);
+            }
+          }} data-testid="button-edit-interview">
+          {scheduleMutation.isPending ? (
+            <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Saving...</>
+          ) : editing ? "Save" : "Edit"}
         </Button>
       </div>
 
@@ -2513,23 +2563,34 @@ function InterviewTab({ candidate, onUpdate }: { candidate: Candidate; onUpdate:
         <div className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div><Label>Date</Label><Input type="date" value={form.interviewDate} onChange={e => setForm({ ...form, interviewDate: e.target.value })} data-testid="input-interview-date" /></div>
-            <div><Label>Time</Label><Input value={form.interviewTime} onChange={e => setForm({ ...form, interviewTime: e.target.value })} placeholder="e.g. 2:00 PM" data-testid="input-interview-time" /></div>
+            <div><Label>Time</Label><Input type="time" value={form.interviewTime} onChange={e => setForm({ ...form, interviewTime: e.target.value })} data-testid="input-interview-time" /></div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label>Type</Label>
               <Select value={form.interviewType} onValueChange={v => setForm({ ...form, interviewType: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger data-testid="select-interview-type"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="in-person">In-Person</SelectItem>
-                  <SelectItem value="phone">Phone</SelectItem>
-                  <SelectItem value="video">Video</SelectItem>
+                  <SelectItem value="zoom">
+                    <div className="flex items-center gap-2"><Video className="h-4 w-4 text-blue-500" /> Zoom</div>
+                  </SelectItem>
+                  <SelectItem value="in-person">
+                    <div className="flex items-center gap-2"><MapPin className="h-4 w-4" /> In-Person</div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div><Label>Interviewer</Label><Input value={form.interviewerName} onChange={e => setForm({ ...form, interviewerName: e.target.value })} /></div>
           </div>
-          <div><Label>Location</Label><Input value={form.interviewLocation} onChange={e => setForm({ ...form, interviewLocation: e.target.value })} /></div>
+          {form.interviewType === "zoom" && dateTimeChanged && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-700 flex items-center gap-2">
+              <Video className="h-3.5 w-3.5 flex-shrink-0" />
+              Saving will create a new Zoom meeting and send the applicant the updated link.
+            </div>
+          )}
+          {form.interviewType === "in-person" && (
+            <div><Label>Location</Label><Input value={form.interviewLocation} onChange={e => setForm({ ...form, interviewLocation: e.target.value })} /></div>
+          )}
           <div><Label>Notes</Label><Textarea value={form.interviewNotes} onChange={e => setForm({ ...form, interviewNotes: e.target.value })} rows={3} /></div>
           <div>
             <Label>Recommendation</Label>
@@ -2540,6 +2601,20 @@ function InterviewTab({ candidate, onUpdate }: { candidate: Candidate; onUpdate:
               </SelectContent>
             </Select>
           </div>
+          {dateTimeChanged && form.interviewDate && form.interviewTime && (
+            <div className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30">
+              <Checkbox
+                id="send-interview-update"
+                checked={sendNotification}
+                onCheckedChange={(v) => setSendNotification(!!v)}
+                data-testid="checkbox-send-interview-update"
+              />
+              <div>
+                <label htmlFor="send-interview-update" className="text-sm font-medium cursor-pointer">Send email &amp; SMS to candidate</label>
+                <p className="text-xs text-muted-foreground">Notify the applicant of the new date/time and alert HR, same as scheduling from the pipeline board</p>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div className="space-y-3 text-sm">

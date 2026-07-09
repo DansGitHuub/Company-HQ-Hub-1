@@ -251,9 +251,11 @@ export default function PublicApplicationForm() {
       else if (digits.length <= 6) processed = `${digits.slice(0, 3)}-${digits.slice(3)}`;
       else processed = `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
     }
-    // Month/Year masking: applies to employment history From/To fields
+    // Month/Year masking: applies to employment history, education, and military From/To fields
     if ((name.startsWith("emp") && (name.endsWith("From") || name.endsWith("To"))) ||
-        name === "militaryFrom" || name === "militaryTo") {
+        name === "militaryFrom" || name === "militaryTo" ||
+        ((name.startsWith("highSchool") || name.startsWith("college") || name.startsWith("otherEdu")) &&
+          (name.endsWith("From") || name.endsWith("To")))) {
       const digits = val.replace(/\D/g, "").slice(0, 6);
       if (digits.length <= 2) processed = digits;
       else processed = `${digits.slice(0, 2)}/${digits.slice(2)}`;
@@ -330,9 +332,9 @@ export default function PublicApplicationForm() {
     if (month < 1 || month > 12) return null;
     return year * 100 + month;
   }
-  function empDateError(n: number): string | null {
-    const from = (data[`emp${n}From`] || "").trim();
-    const to = (data[`emp${n}To`] || "").trim();
+  function dateRangeError(from: string, to: string): string | null {
+    from = (from || "").trim();
+    to = (to || "").trim();
     if (!from && !to) return null;
     const fromNum = from ? parseMY(from) : null;
     const toNum = to ? parseMY(to) : null;
@@ -340,6 +342,15 @@ export default function PublicApplicationForm() {
     if (to && toNum === null) return "\"To\" must be MM/YYYY (e.g. 03/2024)";
     if (fromNum && toNum && toNum < fromNum) return "\"To\" date must be the same month as or after \"From\" date";
     return null;
+  }
+  function empDateError(n: number): string | null {
+    return dateRangeError(data[`emp${n}From`] || "", data[`emp${n}To`] || "");
+  }
+  function eduDateError(prefix: string): string | null {
+    return dateRangeError(data[`${prefix}From`] || "", data[`${prefix}To`] || "");
+  }
+  function militaryDateError(): string | null {
+    return dateRangeError(data.militaryFrom || "", data.militaryTo || "");
   }
 
   // Required field progress — filledRequired declared here (fixes "not defined" crash)
@@ -655,17 +666,20 @@ export default function PublicApplicationForm() {
               <Row cols={4}>
                 <Field>
                   <Label>From</Label>
-                  <Input name={`${edu.prefix}From`} value={data[`${edu.prefix}From`] || ""} onChange={handleChange} placeholder="Year" disabled={isDisabled} />
+                  <Input name={`${edu.prefix}From`} value={data[`${edu.prefix}From`] || ""} onChange={handleChange} placeholder="MM/YYYY" disabled={isDisabled} />
                 </Field>
                 <Field>
                   <Label>To</Label>
-                  <Input name={`${edu.prefix}To`} value={data[`${edu.prefix}To`] || ""} onChange={handleChange} placeholder="Year" disabled={isDisabled} />
+                  <Input name={`${edu.prefix}To`} value={data[`${edu.prefix}To`] || ""} onChange={handleChange} placeholder="MM/YYYY" disabled={isDisabled} />
                 </Field>
                 <div className="col-span-2">
                   <Label>Did you graduate?</Label>
                   <YesNo name={`${edu.prefix}Graduated`} value={data[`${edu.prefix}Graduated`] || ""} onChange={handleChange} disabled={isDisabled} />
                 </div>
               </Row>
+              {eduDateError(edu.prefix) && (
+                <p className="text-xs text-red-500 mt-1" data-testid={`edu-date-error-${edu.prefix}`}>{eduDateError(edu.prefix)}</p>
+              )}
               {edu.degreeLabel && (
                 <Field>
                   <Label>{edu.degreeLabel}</Label>
@@ -914,13 +928,16 @@ export default function PublicApplicationForm() {
             </Field>
             <Field>
               <Label>From</Label>
-              <Input name="militaryFrom" value={data.militaryFrom || ""} onChange={handleChange} placeholder="Year" disabled={isDisabled} />
+              <Input name="militaryFrom" value={data.militaryFrom || ""} onChange={handleChange} placeholder="MM/YYYY" disabled={isDisabled} />
             </Field>
             <Field>
               <Label>To</Label>
-              <Input name="militaryTo" value={data.militaryTo || ""} onChange={handleChange} placeholder="Year" disabled={isDisabled} />
+              <Input name="militaryTo" value={data.militaryTo || ""} onChange={handleChange} placeholder="MM/YYYY" disabled={isDisabled} />
             </Field>
           </Row>
+          {militaryDateError() && (
+            <p className="text-xs text-red-500 mt-1" data-testid="military-date-error">{militaryDateError()}</p>
+          )}
           <Row>
             <Field>
               <Label>Rank at Discharge</Label>
