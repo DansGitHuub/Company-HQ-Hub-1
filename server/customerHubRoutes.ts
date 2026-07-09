@@ -696,9 +696,9 @@ export function registerCustomerHubRoutes(app: Express, requireAuth: RequestHand
         if (!crmCheck.length) {
           // Create a minimal CRM row so resolveCustomerCrmId (invoices) works
           const { rows: newCrm } = await pool.query(
-            `INSERT INTO customers (first_name, last_name, billing_email, is_active, created_at, updated_at)
-             VALUES ($1, '', $2, true, NOW(), NOW()) RETURNING id`,
-            [name, email]
+            `INSERT INTO customers (first_name, last_name, is_active, created_at, updated_at)
+             VALUES ($1, '', true, NOW(), NOW()) RETURNING id`,
+            [name]
           );
           await pool.query(
             `INSERT INTO customer_emails (customer_id, email, is_primary, created_at)
@@ -734,9 +734,9 @@ export function registerCustomerHubRoutes(app: Express, requireAuth: RequestHand
       `, [email]);
       if (!existingCrm.length) {
         const { rows: newCrm } = await pool.query(
-          `INSERT INTO customers (first_name, last_name, billing_email, is_active, created_at, updated_at)
-           VALUES ($1, '', $2, true, NOW(), NOW()) RETURNING id`,
-          [name, email]
+          `INSERT INTO customers (first_name, last_name, is_active, created_at, updated_at)
+           VALUES ($1, '', true, NOW(), NOW()) RETURNING id`,
+          [name]
         );
         await pool.query(
           `INSERT INTO customer_emails (customer_id, email, is_primary, created_at)
