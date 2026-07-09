@@ -10490,7 +10490,7 @@ Provide accurate information based on publicly available documentation.`;
       // Notify all Admins and Managers
       let notifyUsers: any[] = [];
       try {
-        const allUsers = await storage.getUsers();
+        const allUsers = await storage.getAllUsers();
         notifyUsers = allUsers.filter((u: any) => u.role === "Admin" || u.role === "Manager");
         const appUrl = getAppUrl();
 
