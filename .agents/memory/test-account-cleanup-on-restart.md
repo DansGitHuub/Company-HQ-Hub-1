@@ -1,0 +1,10 @@
+---
+name: Dev server restarts silently delete @example.com test users mid-session
+description: seed.ts runs an automated test-account cleanup sweep on every boot that deletes users matching an email/username heuristic (including @example.com) — an unplanned workflow restart mid-session can vanish disposable test users you're actively using, mimicking a data-loss bug.
+---
+
+`server/seed.ts`'s account-maintenance routine runs once on every server boot and deletes any `users` row where `looksLikeTestAccount(username, email)` returns true (see `server/testAccountHeuristic.ts` — matches on username prefixes like `e2e`, `tester`, `testcustomer`, etc., OR email domain `@example.com`/`@test.com`). It logs `[seed] Removed test account: <username>`.
+
+**Why:** During Section 9 audit testing, a manually-created portal test user (`zzz.portal.customer@example.com`) vanished mid-session — `messaging_threads` looked empty and a later send silently fell back from `channel:"portal"` to `channel:"email"`, looking exactly like a persistence bug in the messaging feature. The real cause: the dev workflow restarted mid-session (unrelated to any edit I made), which re-ran `seedUsers()` at boot, and the cleanup sweep matched the `@example.com` domain and deleted the row — cascading away the associated `messaging_threads`/`thread_messages` rows via `ON DELETE CASCADE`. The messaging code itself was correct (confirmed by an isolated create-send-verify-immediately test).
+
+**How to apply:** If a manually-created test user/row disappears mid-session with no corresponding `DELETE` in your own action history, check the workflow log for a fresh `serving on port 5000` boot line followed by `[seed] Removed test account: ...` before assuming a feature bug — especially if the test account's email uses `@example.com`/`@test.com` or a matching username prefix. Prefer a non-matching test email domain (e.g. `@chapintest.local`, as used for the `zzzblasttest` admin account, which survived every restart) for any test data that must persist across a multi-step session.

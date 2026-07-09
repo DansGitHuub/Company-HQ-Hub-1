@@ -36,10 +36,9 @@ export async function runMessageBlastsMigration() {
 }
 
 export async function runMessageBlastsConstraintsMigration() {
-  await pool.query(`ALTER TABLE message_blasts ADD COLUMN IF NOT EXISTS name TEXT`);
-  await pool.query(`ALTER TABLE message_blasts ADD COLUMN IF NOT EXISTS recipient_count INTEGER`);
-  await pool.query(`ALTER TABLE message_blast_recipients ADD COLUMN IF NOT EXISTS customer_name TEXT`);
-
+  // FK: every recipient must point at a real CRM customer (customer_id is populated by
+  // segmentCustomers()/sendContextualMessage() in customerMessagingService.ts, always a
+  // valid customers.id). Cascade delete so removing a customer cleans up their history.
   await pool.query(`
     DO $$
     BEGIN
@@ -51,12 +50,14 @@ export async function runMessageBlastsConstraintsMigration() {
     END $$;
   `);
 
+  // CHECK: channel must be one of the values customerMessagingService.ts actually writes —
+  // 'email'/'sms'/'portal' for a reachable send, or 'none' for a skipped/unreachable recipient.
   await pool.query(`
     DO $$
     BEGIN
       ALTER TABLE message_blast_recipients
         ADD CONSTRAINT chk_message_blast_recipients_channel
-        CHECK (channel IN ('email', 'sms'));
+        CHECK (channel IN ('email', 'sms', 'portal', 'none'));
     EXCEPTION
       WHEN duplicate_object THEN NULL;
     END $$;
@@ -67,5 +68,5 @@ export async function runMessageBlastsConstraintsMigration() {
     ON message_blast_recipients(customer_id)
   `);
 
-  console.log("[migration] Message blasts constraints ready (customer FK, channel check, name/recipient_count/customer_name columns)");
+  console.log("[migration] Message blasts constraints ready (customer FK, channel check)");
 }

@@ -54,7 +54,6 @@ import { registerCatalogRoutes } from "./catalogRoutes";
 import { registerVendorRoutes } from "./vendorRoutes";
 import { registerMessagesRoutes } from "./messagesRoutes";
 import { registerDirectMessageRoutes } from "./directMessageRoutes";
-import { registerMessageBlastRoutes } from "./messageBlastRoutes";
 import { registerPlantCardRoutes } from "./plantCardRoutes";
 import { registerChangeOrderRoutes } from "./changeOrderRoutes";
 import { registerCheckpointRoutes } from "./checkpointRoutes";
@@ -136,13 +135,7 @@ export async function registerRoutes(
   registerCatalogRoutes(app, requireAuth);
   registerMessagesRoutes(app, requireAuth);
   registerDirectMessageRoutes(app, requireAuth);
-  // NOTE: registerCustomerMessagingRoutes (below, near end of file) already owns
-  // GET/POST /api/message-blasts and GET /api/message-blasts/:id for the pre-existing
-  // "Customer Blasts" feature (client/src/pages/CustomerBlasts.tsx). It is intentionally
-  // registered BEFORE registerMessageBlastRoutes so those three paths keep resolving to
-  // the original, in-use handlers. Do not reorder without reconciling the two features.
   registerCustomerMessagingRoutes(app, requireAuth);
-  await registerMessageBlastRoutes(app, requireAuth, requireRole);
   registerPlantCardRoutes(app, requireAuth, requireAdmin);
   registerWorkOrderRoutes(app, requireAuth);
 
@@ -10038,8 +10031,6 @@ Provide accurate information based on publicly available documentation.`;
   registerEmployeeFormsRoutes(app, requireAuth);
   registerAgreementRoutes(app, requireAuth, requireAdmin);
   registerCustomerHubRoutes(app, requireAuth);
-  // registerCustomerMessagingRoutes moved earlier (before registerMessageBlastRoutes) so its
-  // /api/message-blasts routes take priority — see note near that call site.
   registerSuggestionsRoutes(app, requireAuth);
   registerEquipmentRoutes(app, requireAuth);
   registerVendorRoutes(app, requireAuth);

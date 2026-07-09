@@ -28,3 +28,4 @@
 - [Test data can trigger background schedulers](test-data-triggers-background-schedulers.md) — disposable rows matching a real trigger condition (e.g. overdue invoice) can make a live cron send a real outbound email/SMS mid-test.
 - [Twilio dual-channel SMS routing](twilio-dual-channel.md) — customer SMS uses 844 number ("customer" channel); hiring/applicant SMS uses 440 ("hiring" channel); wrong channel → Twilio Error 30034.
 - [Drizzle timestamp coercion](drizzle-timestamp-coercion.md) — Drizzle .set() silently rejects string values for timestamp() columns; must convert to new Date() in storage layer before calling .set().
+- [Test-account cleanup fires on restart](test-account-cleanup-on-restart.md) — a mid-session workflow restart re-runs seed.ts's cleanup sweep, silently deleting @example.com test users and cascading their data, mimicking a feature bug.

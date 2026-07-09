@@ -167,7 +167,7 @@ export const CONTEXTUAL_TEMPLATES: Record<ContextualMessageType, { subject: stri
   },
   review_request: {
     subject: "How did we do?",
-    body: "Hi {{customer_name}}, we hope you're loving your new {{job_title}}! We'd really appreciate it if you could take a moment to leave us a review — it helps us out a lot. Thank you for your business!",
+    body: "Hi {{customer_name}}, we hope you're loving your new {{job_title}}! We'd really appreciate it if you could take a moment to leave us a review — it helps us out a lot. You can leave one here: https://g.page/r/CTIAEga798WHEB0/review\n\nThank you for your business!",
   },
   payment_reminder: {
     subject: "Payment reminder — Invoice {{invoice_number}}",
