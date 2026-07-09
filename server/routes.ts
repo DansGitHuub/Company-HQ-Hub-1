@@ -70,7 +70,7 @@ import { registerWorkOrderRoutes } from "./workOrderRoutes";
 import { registerDailyPlanRoutes } from "./dailyPlanRoutes";
 import { registerAdminDashboardRoutes } from "./adminDashboardRoutes";
 import { searchProductImages } from "./imageSearchService";
-import { sendMaintenanceReminderEmail, sendSOPEmail, sendMessageNotificationEmail, sendCustomerNotificationEmail, sendNewApplicationNotificationEmail, sendApplicationLinkEmail, sendPasswordResetNotificationEmail } from "./email";
+import { sendMaintenanceReminderEmail, sendSOPEmail, sendMessageNotificationEmail, sendCustomerNotificationEmail, sendNewApplicationNotificationEmail, sendApplicationLinkEmail, sendPasswordResetNotificationEmail, sendHiringStageEmail } from "./email";
 import { getAppUrl } from "./emailService";
 import { looksLikeTestAccount } from "./testAccountHeuristic";
 import { logActivity } from "./activityLogger";
@@ -10424,6 +10424,7 @@ Provide accurate information based on publicly available documentation.`;
       } as any);
 
       // Auto-create candidate in "Application Received"
+      let newCandidate: any = null;
       try {
         const candidate = await storage.createCandidate({
           name: fullName || "Unknown Applicant",
@@ -10438,9 +10439,52 @@ Provide accurate information based on publicly available documentation.`;
           source: "Other",
           notes: `Applied via online application form. Token: ${req.params.token}`,
         });
+        newCandidate = candidate;
         await storage.updateJobApplication(app.id, { candidateId: candidate.id });
       } catch (candidateErr) {
         console.error("[apply] Could not create candidate:", candidateErr);
+      }
+
+      // Send the applicant-facing "Application Received" auto-reply email (if the
+      // admin has enabled/configured that template). This mirrors the same
+      // template lookup/placeholder logic used for later manual stage changes,
+      // but is triggered here since a brand-new submission never goes through
+      // the stage-change route.
+      if (newCandidate && newCandidate.email) {
+        try {
+          const template = await storage.getHiringEmailTemplate("Application Received");
+          if (template && template.isEnabled) {
+            const replacements: Record<string, string> = {
+              "{{position}}": newCandidate.role || "the position",
+              "{{name}}": newCandidate.name,
+              "{{date}}": "[TBD]",
+              "{{time}}": "[TBD]",
+              "{{location}}": "[TBD]",
+            };
+            let subject = template.subject;
+            let body = template.body;
+            for (const [key, value] of Object.entries(replacements)) {
+              subject = subject.replace(new RegExp(key.replace(/[{}]/g, "\\$&"), "g"), value);
+              body = body.replace(new RegExp(key.replace(/[{}]/g, "\\$&"), "g"), value);
+            }
+            const statusUrl = `${getAppUrl()}/status/${req.params.token}`;
+            const sent = await sendHiringStageEmail(newCandidate.email, newCandidate.name, subject, body, statusUrl);
+            if (sent) {
+              await storage.createApplicantCommunication({
+                candidateId: newCandidate.id,
+                type: "Email",
+                subject,
+                content: body,
+                sentBy: null,
+                sentByName: "System",
+              });
+            } else {
+              console.error(`[apply] Application Received auto-reply failed to send to ${newCandidate.email}`);
+            }
+          }
+        } catch (autoReplyErr: any) {
+          console.error("[apply] Application Received auto-reply error:", autoReplyErr?.message || autoReplyErr);
+        }
       }
 
       // Notify all Admins and Managers
