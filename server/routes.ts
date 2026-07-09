@@ -10357,14 +10357,27 @@ Provide accurate information based on publicly available documentation.`;
       const status: "open" | "submitted" | "expired" =
         hasSubmitted ? "submitted" : isExpired ? "expired" : "open";
 
-      // Return ONLY the six fields needed by the public form — no PII, no form-data blob
+      // Company contact phone: sourced from the company_info setting (Settings > Company
+      // Information). No dedicated "hiring contact phone" setting exists, so this is the
+      // fallback described in the task. If it's blank, we omit it — never guess a number.
+      let companyPhone: string | null = null;
+      try {
+        const { rows } = await pool.query(`SELECT value FROM app_settings WHERE key = 'company_info'`);
+        const raw = rows[0]?.value;
+        const parsed = raw ? JSON.parse(raw) : null;
+        companyPhone = (parsed?.phone && String(parsed.phone).trim()) || null;
+      } catch (e) {
+        console.error("[apply] Failed to load company_info phone setting:", e);
+      }
+
+      // Return ONLY the fields needed by the public form — no PII, no form-data blob
       return res.json({
         id:           app.id,
         position:     app.position,
         status,
         expiresAt:    app.expiresAt,
         hasSubmitted,
-        company:      { name: "Chapin Landscapes" },
+        company:      { name: "Chapin Landscapes", phone: companyPhone },
       });
     } catch (err) {
       console.error("[apply] Error fetching application:", err);

@@ -11,7 +11,24 @@ interface JobApplication {
   status: "open" | "submitted" | "expired";
   expiresAt: string;
   hasSubmitted: boolean;
-  company: { name: string };
+  company: { name: string; phone: string | null };
+}
+
+// Renders "email or phone" contact text, omitting the phone part entirely when no
+// company phone number is configured in Settings — never guesses/hardcodes a number.
+function ContactLine({ phone }: { phone?: string | null }) {
+  const telHref = phone ? `tel:${phone.replace(/\D/g, "")}` : null;
+  return (
+    <>
+      <a href="mailto:office@chapinlandscapes.com" className="text-green-700 underline font-medium">office@chapinlandscapes.com</a>
+      {telHref && (
+        <>
+          <span className="mx-2 text-gray-400">or</span>
+          <a href={telHref} className="text-green-700 underline font-medium">{phone}</a>
+        </>
+      )}
+    </>
+  );
 }
 
 // Required fields for submit lock
@@ -376,7 +393,7 @@ export default function PublicApplicationForm() {
           <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-gray-800 mb-2">Unable to Load Application</h2>
           <p className="text-gray-600 text-sm mb-4">{error}</p>
-          <p className="text-gray-500 text-xs">If you believe this is a mistake, please contact us at <a href="mailto:office@chapinlandscapes.com" className="text-green-700 underline">office@chapinlandscapes.com</a> or text <a href="tel:4402260518" className="text-green-700 underline">(440) 226-0518</a>.</p>
+          <p className="text-gray-500 text-xs">If you believe this is a mistake, please contact us at <a href="mailto:office@chapinlandscapes.com" className="text-green-700 underline">office@chapinlandscapes.com</a>.</p>
         </div>
       </div>
     );
@@ -395,9 +412,7 @@ export default function PublicApplicationForm() {
             <p className="font-semibold text-green-800 mb-1">Need to follow up?</p>
             <p>If you don't receive a phone call or text within <strong>48 hours</strong>, please reach out:</p>
             <p className="mt-2">
-              <a href="mailto:office@chapinlandscapes.com" className="text-green-700 underline font-medium">office@chapinlandscapes.com</a>
-              <span className="mx-2 text-gray-400">or</span>
-              <a href="tel:4402260518" className="text-green-700 underline font-medium">(440) 226-0518</a>
+              <ContactLine phone={application?.company.phone} />
             </p>
           </div>
         </div>
@@ -419,9 +434,7 @@ export default function PublicApplicationForm() {
             <p className="font-semibold text-green-800 mb-1">Need to follow up?</p>
             <p>If you don't receive a phone call or text within <strong>48 hours</strong>, please reach out:</p>
             <p className="mt-2">
-              <a href="mailto:office@chapinlandscapes.com" className="text-green-700 underline font-medium">office@chapinlandscapes.com</a>
-              <span className="mx-2 text-gray-400">or</span>
-              <a href="tel:4402260518" className="text-green-700 underline font-medium">(440) 226-0518</a>
+              <ContactLine phone={application?.company.phone} />
             </p>
           </div>
         </div>
@@ -440,9 +453,7 @@ export default function PublicApplicationForm() {
             This application link is no longer active. Please contact us to request a new one.
           </p>
           <p className="text-gray-500 text-sm">
-            <a href="mailto:office@chapinlandscapes.com" className="text-green-700 underline font-medium">office@chapinlandscapes.com</a>
-            <span className="mx-2 text-gray-400">or</span>
-            <a href="tel:4402260518" className="text-green-700 underline font-medium">(440) 226-0518</a>
+            <ContactLine phone={application?.company.phone} />
           </p>
         </div>
       </div>
