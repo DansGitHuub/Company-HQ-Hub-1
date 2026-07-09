@@ -110,12 +110,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       queryClient.setQueryData(["/api/user"], null);
       try { sessionStorage.removeItem(PREVIEW_ROLE_KEY); } catch {}
     },
-    onError: (error: Error) => {
-      toast({
-        title: "Logout failed",
-        description: error.message,
-        variant: "destructive",
-      });
+    onError: () => {
+      // Server call failed (e.g. server restarting), but always clear local
+      // auth state so the user is not stuck on a "logged in" screen.
+      queryClient.setQueryData(["/api/user"], null);
+      try { sessionStorage.removeItem(PREVIEW_ROLE_KEY); } catch {}
     },
   });
 

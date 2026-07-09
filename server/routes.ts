@@ -107,7 +107,8 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  setupAuth(app);
+  // setupAuth(app) is now called in server/index.ts before migrations so that
+  // /api/login, /api/logout, /api/user are available immediately at server start.
 
   // CompanyCam + Wave 4 routes registered here so Passport session middleware is active
   registerCompanyCamRoutes(app);

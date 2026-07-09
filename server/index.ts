@@ -87,6 +87,7 @@ import { startGpsPingCleanupScheduler } from "./gpsPingCleanupScheduler";
 import { startInvoiceOverdueScheduler } from "./invoiceOverdueScheduler";
 import { startWorksheetAlertScheduler } from "./worksheetAlertScheduler";
 import { startAutomationScheduler } from "./automationScheduler";
+import { setupAuth } from "./auth";
 
 const app = express();
 const httpServer = createServer(app);
@@ -174,6 +175,14 @@ app.use((req, res, next) => {
   if (process.env.NODE_ENV === "production") {
     serveStaticFiles(app);
   }
+
+  // ── Auth routes registered BEFORE migrations and before listen() ────────────
+  // /api/login, /api/logout, and /api/user must be available the moment the
+  // server starts accepting connections.  Previously setupAuth() was called
+  // inside registerRoutes() which runs after all ~60 migrations (~30 seconds).
+  // Any logout attempt during that window returned 404, leaving the user stuck.
+  // The session store uses createTableIfMissing:true so it is safe to init here.
+  setupAuth(app);
 
   httpServer.listen(
     { port, host: "0.0.0.0", reusePort: true },
