@@ -20,6 +20,7 @@ import {
   Star, Archive, MailOpen, Check, CheckCheck, Inbox, Mail, Paperclip, FileText,
   Briefcase, Link2, X as XIcon, ChevronDown,
   FolderPlus, FolderOpen, MoreHorizontal, Plus, Printer, Download,
+  ClipboardList
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -627,6 +628,7 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
   onClose: () => void;
 }) {
   const { toast } = useToast();
+  const { user: currentAuthUser } = useAuth();
   const qc = useQueryClient();
   const bottomRef = useRef<HTMLDivElement>(null);
   const [reply, setReply] = useState("");
@@ -634,6 +636,7 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const prevCountRef = useRef(0);
+  const canCreateTask = ["Admin", "Manager", "Master Admin"].includes(currentAuthUser?.role || "") || currentAuthUser?.isMasterAdmin;
 
   const { data: messages = [], isLoading } = useQuery<ThreadMessage[]>({
     queryKey: ["/api/dm/conversation", userId],
@@ -941,9 +944,30 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
                     {!isMine && (
                       <Avatar name={msg.sender_name} picture={msg.sender_picture} size={28} />
                     )}
-                    <div className={cn("max-w-[72%] flex flex-col", isMine ? "items-end" : "items-start")}>
+                    <div className={cn("max-w-[72%] flex flex-col relative", isMine ? "items-end" : "items-start")}>
                       {!isMine && (
-                        <span className="text-[11px] text-gray-400 px-1 mb-0.5">{msg.sender_name}</span>
+                        <div className="flex items-baseline justify-between w-full mb-0.5">
+                          <span className="text-[11px] text-gray-400 px-1">{msg.sender_name}</span>
+                          {canCreateTask && msg.sender_role === "Customer" && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity ml-auto"
+                              title="Create Task from this message"
+                              data-testid={`button-create-task-msg-${msg.id}`}
+                              onClick={() => {
+                                const params = new URLSearchParams();
+                                params.set("title", `Follow up: ${msg.body.replace(/<[^>]*>/g, "").slice(0, 50)}...`);
+                                params.set("description", `From message: ${msg.body.replace(/<[^>]*>/g, "")}`);
+                                params.set("linkType", "customer");
+                                params.set("linkId", msg.sender_id);
+                                window.location.href = `/tasks?${params.toString()}`;
+                              }}
+                            >
+                              <ClipboardList className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
                       )}
                       {msg.subject && (
                         <p className="text-xs font-semibold text-gray-600 px-1 mb-0.5">{msg.subject}</p>

@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -85,6 +85,21 @@ export default function Tasks() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [collapsedStatuses, setCollapsedStatuses] = useState<Record<string, boolean>>({ complete: true, cancelled: true });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const titleParam = params.get("title");
+    const descParam = params.get("description");
+    const linkTypeParam = params.get("linkType");
+    const linkIdParam = params.get("linkId");
+
+    if (titleParam || descParam || linkTypeParam || linkIdParam) {
+      setEditingTask(null);
+      setIsCreateOpen(true);
+      // We'll let the resetForm logic handle initial values if we can hook into it
+      // or we can just set them here since TaskModal will use them if it's not "editing"
+    }
+  }, []);
 
   const { data: currentUser } = useQuery<any>({ queryKey: ["/api/user"] });
   const { data: allTasks = [], isLoading } = useQuery<Task[]>({ queryKey: ["/api/tasks"] });
@@ -582,6 +597,7 @@ function TaskModal({ task, isOpen, onClose, users, currentUser, isManagerOrAdmin
   });
 
   const resetForm = useCallback(() => {
+    const params = new URLSearchParams(window.location.search);
     if (task) {
       setTitle(task.title);
       setDescription(task.description || "");
@@ -595,10 +611,23 @@ function TaskModal({ task, isOpen, onClose, users, currentUser, isManagerOrAdmin
       setLinkedRecordType(task.linkedRecordType || "__none__");
       setLinkedRecordId(task.linkedRecordId || "");
     } else {
-      setTitle(""); setDescription(""); setStatus("todo"); setPriority("medium");
-      setAssignedToUserId("__none__"); setDueDate(""); setStartDate(""); setEstimatedMinutes("");
-      setReminderDate(""); setLinkedRecordType("__none__"); setLinkedRecordId("");
+      setTitle(params.get("title") || "");
+      setDescription(params.get("description") || "");
+      setStatus("todo");
+      setPriority("medium");
+      setAssignedToUserId("__none__");
+      setDueDate("");
+      setStartDate("");
+      setEstimatedMinutes("");
+      setReminderDate("");
+      setLinkedRecordType(params.get("linkType") || "__none__");
+      setLinkedRecordId(params.get("linkId") || "");
       setCustomFields([]);
+      
+      // Clean up URL after consumption
+      if (params.toString()) {
+        window.history.replaceState({}, '', window.location.pathname);
+      }
     }
     setCommentText("");
   }, [task]);
