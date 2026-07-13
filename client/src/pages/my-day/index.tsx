@@ -242,7 +242,8 @@ export default function MyDayPage() {
     return 0;
   });
 
-  // ── Auto-highlight first job on day start ───────────────────────────────
+  // ── Auto-highlight + auto-scroll to first job on day start ─────────────
+  // (drives start-here-banner and green ring on the crew's next job card)
   const highlightSetRef = useRef(false);
   const [highlightedJobId, setHighlightedJobId] = useState<string | null>(null);
   useEffect(() => {
