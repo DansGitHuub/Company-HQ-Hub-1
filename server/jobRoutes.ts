@@ -504,6 +504,28 @@ export function registerJobRoutes(app: Express, requireAuth: any) {
         }
       }
 
+      // ── Work Order gate for "ready" status ──────────────────────────────────
+      if (status.toLowerCase() === "ready") {
+        const woCheck = await pool.query(
+          `SELECT id, status FROM work_orders
+           WHERE job_id = $1 AND status != 'cancelled'
+           ORDER BY created_at DESC LIMIT 1`,
+          [req.params.id]
+        );
+        if (woCheck.rows.length === 0) {
+          return res.status(400).json({
+            message: "Cannot mark this job Ready — no work order has been created for this job. Create and approve a work order first.",
+            reason: "no_work_order",
+          });
+        }
+        if (woCheck.rows[0].status === "draft") {
+          return res.status(400).json({
+            message: "Cannot mark this job Ready — the work order is still in Draft. A manager must approve the work order before the job can be marked Ready.",
+            reason: "work_order_draft",
+          });
+        }
+      }
+
       const result = await pool.query(
         `UPDATE jobs SET status=$1, updated_at=NOW() WHERE id=$2 RETURNING *`,
         [status, req.params.id]

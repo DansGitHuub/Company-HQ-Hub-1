@@ -114,7 +114,7 @@ export default function JobWorkOrderTab({ jobId, isAdminOrManager }: Props) {
 
   const markReadyMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("PATCH", `/api/work-orders/${wo!.id}`, { status: "ready" });
+      const res = await apiRequest("PATCH", `/api/work-orders/${wo!.id}/status`, { status: "ready" });
       if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
       return res.json();
     },

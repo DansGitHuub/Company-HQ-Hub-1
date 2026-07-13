@@ -79,10 +79,11 @@ const STATUS_MAP: Record<string, { label: string; cls: string; dot: string }> = 
   lead:        { label: "Lead",        cls: "bg-gray-100 text-gray-700 border-gray-200",         dot: "bg-gray-400" },
   scheduled:   { label: "Scheduled",   cls: "bg-blue-100 text-blue-800 border-blue-200",         dot: "bg-blue-500" },
   sold:        { label: "Sold",        cls: "bg-emerald-100 text-emerald-800 border-emerald-200", dot: "bg-emerald-500" },
+  ready:       { label: "Ready",       cls: "bg-sky-100 text-sky-800 border-sky-200",            dot: "bg-sky-500" },
   in_progress: { label: "In Progress", cls: "bg-amber-100 text-amber-800 border-amber-200",      dot: "bg-amber-500 animate-pulse" },
   completed:   { label: "Completed",   cls: "bg-green-100 text-green-800 border-green-200",      dot: "bg-green-500" },
-  invoiced:    { label: "Invoiced",    cls: "bg-purple-100 text-purple-800 border-purple-200",dot: "bg-purple-500" },
-  cancelled:   { label: "Cancelled",   cls: "bg-red-100 text-red-800 border-red-200",         dot: "bg-red-500" },
+  invoiced:    { label: "Invoiced",    cls: "bg-purple-100 text-purple-800 border-purple-200",   dot: "bg-purple-500" },
+  cancelled:   { label: "Cancelled",   cls: "bg-red-100 text-red-800 border-red-200",            dot: "bg-red-500" },
 };
 
 function fmtDate(d: string | null) {

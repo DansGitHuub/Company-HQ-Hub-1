@@ -29,6 +29,7 @@ export const JOB_STATUSES = [
   { value: "lead",        label: "Lead" },
   { value: "scheduled",   label: "Scheduled" },
   { value: "sold",        label: "Sold" },
+  { value: "ready",       label: "Ready" },
   { value: "in_progress", label: "In Progress" },
   { value: "completed",   label: "Completed" },
   { value: "invoiced",    label: "Invoiced" },

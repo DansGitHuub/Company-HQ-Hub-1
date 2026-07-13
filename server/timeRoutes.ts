@@ -61,6 +61,33 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
         return res.status(400).json({ message: "Already clocked in. Please clock out first." });
       }
 
+      // ── Work Order gate (crew members only; Admins/Managers bypass) ───────
+      if (job_id) {
+        const callerRole = (req.user as any)?.role;
+        const isMaster   = (req.user as any)?.isMasterAdmin;
+        const isAdminOrManager = ["Admin", "Manager"].includes(callerRole) || isMaster;
+        if (!isAdminOrManager) {
+          const woCheck = await client.query(
+            `SELECT id, status FROM work_orders
+             WHERE job_id = $1 AND status != 'cancelled'
+             ORDER BY created_at DESC LIMIT 1`,
+            [job_id]
+          );
+          if (woCheck.rows.length === 0) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({
+              message: "No work order has been set up for this job yet. Ask your manager to create and approve a work order before clocking in.",
+            });
+          }
+          if (woCheck.rows[0].status === "draft") {
+            await client.query("ROLLBACK");
+            return res.status(400).json({
+              message: "This job's work order is still in Draft. Your manager needs to mark it Ready before you can clock in.",
+            });
+          }
+        }
+      }
+
       // Insert the time entry
       const entryResult = await client.query(
         `INSERT INTO time_entries (user_id, job_id, entry_type, clock_in, job_work_area_id, work_area_name, local_id, clock_in_lat, clock_in_lng)
