@@ -439,6 +439,8 @@ export function registerJobRoutes(app: Express, requireAuth: any) {
         "customer_id","property_id","address","city","state","zip",
         "category","value","is_mandatory_date","skipped_work_notes",
         "crew_notes_customer_visible",
+        "safety_notes",
+        "restrictions_notes",
       ];
       for (const key of allowed) {
         if (key in fields) {

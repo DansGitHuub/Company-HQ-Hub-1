@@ -27,6 +27,7 @@ export function registerMyDayRoutes(app: Express) {
            j.scheduled_start_time, j.scheduled_end_time,
            j.address,
            j.safety_notes,
+           j.restrictions_notes,
            j.estimated_hours,
            j.crew_lead_id,
            EXISTS(

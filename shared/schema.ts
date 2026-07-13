@@ -652,6 +652,7 @@ export const jobs = pgTable("jobs", {
   sourceEstimateId: varchar("source_estimate_id"),
   crewLeadId: varchar("crew_lead_id"),
   safetyNotes: text("safety_notes"),
+  restrictionsNotes: text("restrictions_notes"),
   // CompanyCam link (Phase 2 addition)
   companycamProjectId: varchar("companycam_project_id"),
   createdAt: timestamp("created_at").defaultNow(),

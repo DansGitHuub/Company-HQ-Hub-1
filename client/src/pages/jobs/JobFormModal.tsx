@@ -48,13 +48,15 @@ export interface JobFormData {
   price: string;
   description: string;
   crew_notes: string;
+  safety_notes: string;
+  restrictions_notes: string;
 }
 
 export const EMPTY_JOB: JobFormData = {
   title: "", customer_id: "", property_id: "", job_type: "",
   status: "lead", scheduled_date: "", scheduled_start_time: "",
   scheduled_end_time: "", estimated_hours: "", price: "",
-  description: "", crew_notes: "",
+  description: "", crew_notes: "", safety_notes: "", restrictions_notes: "",
 };
 
 interface Customer {
@@ -397,6 +399,30 @@ export function JobFormModal({ open, onOpenChange, initialData, lockedCustomerId
               rows={2}
               placeholder={t("crewNotesPlaceholder")}
               data-testid="textarea-crew-notes"
+            />
+          </div>
+
+          {/* Safety Notes */}
+          <div className="space-y-1">
+            <Label className="text-red-700">⚠ Safety Notes (shown to crew on job card)</Label>
+            <Textarea
+              value={form.safety_notes}
+              onChange={(e) => set("safety_notes", e.target.value)}
+              rows={2}
+              placeholder="E.g. wear gloves, bees near shed, steep slope..."
+              data-testid="textarea-safety-notes"
+            />
+          </div>
+
+          {/* Do Not Touch / Restrictions */}
+          <div className="space-y-1">
+            <Label className="text-purple-700">🚫 Do Not Touch / Restrictions (shown to crew on job card)</Label>
+            <Textarea
+              value={form.restrictions_notes}
+              onChange={(e) => set("restrictions_notes", e.target.value)}
+              rows={2}
+              placeholder="E.g. do not enter back gate, stay off new sod, avoid left garden bed..."
+              data-testid="textarea-restrictions-notes"
             />
           </div>
 

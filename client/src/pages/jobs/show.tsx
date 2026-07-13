@@ -70,6 +70,8 @@ interface JobDetail {
   linked_invoice_id: string | null;
   linked_invoice_number: string | null;
   companycam_project_id: string | null;
+  safety_notes: string | null;
+  restrictions_notes: string | null;
 }
 
 // ── Status helpers ────────────────────────────────────────────────────────────
@@ -2038,6 +2040,8 @@ export default function JobDetailPage() {
             price: job.price ? String(job.price) : job.value ? String(job.value) : "",
             description: job.description ?? "",
             crew_notes: job.crew_notes ?? job.notes ?? "",
+            safety_notes: job.safety_notes ?? "",
+            restrictions_notes: job.restrictions_notes ?? "",
           }}
         />
       )}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -70,6 +70,7 @@ interface MyDayJob {
   has_pets: boolean | null;
   work_areas: WorkArea[];
   safety_notes: string | null;
+  restrictions_notes: string | null;
   is_crew_lead: boolean;
   estimated_hours: number | null;
   crew_lead_id: string | null;
@@ -240,6 +241,16 @@ export default function MyDayPage() {
     if (b.scheduled_start_time) return 1;
     return 0;
   });
+
+  // ── Auto-highlight first job on day start ───────────────────────────────
+  const highlightSetRef = useRef(false);
+  const [highlightedJobId, setHighlightedJobId] = useState<string | null>(null);
+  useEffect(() => {
+    if (highlightSetRef.current) return;
+    if (jobsLoading || !prioritizedJobs.length) return;
+    highlightSetRef.current = true;
+    setHighlightedJobId(prioritizedJobs[0].id);
+  }, [jobsLoading, prioritizedJobs]);
 
   // ── Mutations ──────────────────────────────────────────────────────────────
   const clockInMutation = useMutation({
@@ -485,6 +496,7 @@ export default function MyDayPage() {
               job={jobs[0]}
               activeEntry={activeEntry ?? null}
               isAdminOrManager={isAdminOrManager}
+              isHighlighted={highlightedJobId === jobs[0].id}
               onChipTap={(p) => setPending(p)}
               onPickerOpen={(picker) => setPickerJob(picker)}
               onDirectSwitch={handleDirectSwitch}
@@ -503,6 +515,7 @@ export default function MyDayPage() {
                   job={job}
                   activeEntry={activeEntry ?? null}
                   isAdminOrManager={isAdminOrManager}
+                  isHighlighted={highlightedJobId === job.id}
                   onChipTap={(p) => setPending(p)}
                   onPickerOpen={(picker) => setPickerJob(picker)}
                   onDirectSwitch={handleDirectSwitch}
@@ -766,6 +779,7 @@ function JobCard({
   job,
   activeEntry,
   isAdminOrManager,
+  isHighlighted,
   onChipTap,
   onPickerOpen,
   onDirectSwitch,
@@ -774,6 +788,7 @@ function JobCard({
   job: MyDayJob;
   activeEntry: TimeEntry | null;
   isAdminOrManager: boolean;
+  isHighlighted: boolean;
   onChipTap: (p: PendingClockIn) => void;
   onPickerOpen: (picker: PickerJob) => void;
   onDirectSwitch: (p: PendingClockIn) => void;
@@ -786,6 +801,15 @@ function JobCard({
     job.scheduled_start_time
       ? `${job.scheduled_start_time.slice(0, 5)}${job.scheduled_end_time ? " – " + job.scheduled_end_time.slice(0, 5) : ""}`
       : null;
+
+  const cardRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!isHighlighted) return;
+    const t = setTimeout(() => {
+      cardRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }, 350);
+    return () => clearTimeout(t);
+  }, [isHighlighted]);
 
   // ── Gate status ──────────────────────────────────────────────────────────
   const { data: gateData } = useQuery<GateStatusResult | null>({
@@ -834,10 +858,20 @@ function JobCard({
 
   return (
     <Card
+      ref={cardRef}
       data-testid={`job-card-${job.id}`}
-      className="overflow-hidden shadow-sm border-l-4"
+      className={`overflow-hidden shadow-sm border-l-4 transition-shadow ${isHighlighted ? "ring-2 ring-green-400 shadow-md" : ""}`}
       style={{ borderLeftColor: borderColor }}
     >
+      {isHighlighted && (
+        <div
+          data-testid={`start-here-banner-${job.id}`}
+          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-xs font-semibold"
+        >
+          <Zap className="w-3.5 h-3.5 shrink-0" />
+          Start here — your next job
+        </div>
+      )}
       <CardContent className="p-4 space-y-3">
         {/* Title + status */}
         <div className="flex items-start justify-between gap-2">
@@ -891,7 +925,7 @@ function JobCard({
           </div>
         )}
 
-        {/* Feature 4: Safety & Do Not Touch section */}
+        {/* Safety Notes section */}
         {job.safety_notes && (
           <div
             data-testid={`safety-section-${job.id}`}
@@ -899,9 +933,23 @@ function JobCard({
           >
             <p className="text-xs font-bold text-red-800 uppercase tracking-wide flex items-center gap-1.5">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-              Safety &amp; Do Not Touch
+              Safety Notes
             </p>
             <p className="text-sm text-red-900 leading-snug whitespace-pre-line">{job.safety_notes}</p>
+          </div>
+        )}
+
+        {/* Do Not Touch / Restrictions section */}
+        {job.restrictions_notes && (
+          <div
+            data-testid={`restrictions-section-${job.id}`}
+            className="rounded-lg border-2 border-purple-300 bg-purple-50 px-3 py-2.5 space-y-1"
+          >
+            <p className="text-xs font-bold text-purple-800 uppercase tracking-wide flex items-center gap-1.5">
+              <ShieldX className="w-3.5 h-3.5 shrink-0" />
+              Do Not Touch / Restrictions
+            </p>
+            <p className="text-sm text-purple-900 leading-snug whitespace-pre-line">{job.restrictions_notes}</p>
           </div>
         )}
 
