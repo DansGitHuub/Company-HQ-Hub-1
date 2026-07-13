@@ -7,10 +7,25 @@ import { Button } from "@/components/ui/button";
 import {
   CheckCircle2, XCircle, HardHat, User, MapPin,
   ClipboardCheck, ExternalLink, Loader2, AlertTriangle, Plus,
+  Wrench, Package,
 } from "lucide-react";
 import { useLocation } from "wouter";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
+interface ExpectedItem {
+  id: string;
+  name: string;
+  quantity: string | null;
+  unit: string | null;
+  work_area_name: string | null;
+  item_class: "equipment" | "material";
+}
+
+interface ExpectedItemsData {
+  equipment: ExpectedItem[];
+  materials: ExpectedItem[];
+}
+
 interface Readiness {
   has_areas: boolean;
   has_tasks: boolean;
@@ -89,6 +104,12 @@ export default function JobWorkOrderTab({ jobId, isAdminOrManager }: Props) {
       if (!res.ok) throw new Error("Failed to load work order");
       return res.json();
     },
+  });
+
+  const { data: expectedItems } = useQuery<ExpectedItemsData>({
+    queryKey: ["/api/my-day/jobs", jobId, "expected-items"],
+    queryFn: () => fetch(`/api/my-day/jobs/${jobId}/expected-items`, { credentials: "include" }).then((r) => r.json()),
+    enabled: !!wo,
   });
 
   const markReadyMutation = useMutation({
@@ -348,6 +369,69 @@ export default function JobWorkOrderTab({ jobId, isAdminOrManager }: Props) {
               <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
               Add Areas in Work Order View
             </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Equipment & Materials ───────────────────────────────────────────── */}
+      {((expectedItems?.equipment?.length ?? 0) > 0 || (expectedItems?.materials?.length ?? 0) > 0) && (
+        <Card data-testid="card-expected-items">
+          <CardHeader className="pb-2 pt-4 px-4">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Equipment &amp; Materials Needed
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-4 space-y-3">
+            {(expectedItems?.equipment?.length ?? 0) > 0 && (
+              <div>
+                <p className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground mb-2">
+                  <Wrench className="h-3 w-3" />Equipment
+                </p>
+                <ul className="space-y-1">
+                  {expectedItems!.equipment.map((item) => (
+                    <li key={item.id} className="flex items-start gap-2 text-sm" data-testid={`equipment-item-${item.id}`}>
+                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 flex-shrink-0 mt-1.5" />
+                      <span>
+                        {item.name}
+                        {(item.quantity || item.unit) && (
+                          <span className="text-muted-foreground ml-1">
+                            — {[item.quantity, item.unit].filter(Boolean).join(" ")}
+                          </span>
+                        )}
+                        {item.work_area_name && (
+                          <span className="text-muted-foreground/70 text-xs ml-1">({item.work_area_name})</span>
+                        )}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {(expectedItems?.materials?.length ?? 0) > 0 && (
+              <div>
+                <p className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground mb-2">
+                  <Package className="h-3 w-3" />Materials
+                </p>
+                <ul className="space-y-1">
+                  {expectedItems!.materials.map((item) => (
+                    <li key={item.id} className="flex items-start gap-2 text-sm" data-testid={`material-item-${item.id}`}>
+                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 flex-shrink-0 mt-1.5" />
+                      <span>
+                        {item.name}
+                        {(item.quantity || item.unit) && (
+                          <span className="text-muted-foreground ml-1">
+                            — {[item.quantity, item.unit].filter(Boolean).join(" ")}
+                          </span>
+                        )}
+                        {item.work_area_name && (
+                          <span className="text-muted-foreground/70 text-xs ml-1">({item.work_area_name})</span>
+                        )}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

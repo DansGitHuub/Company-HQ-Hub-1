@@ -2,6 +2,10 @@ import { Router, Request, Response } from "express";
 import { pool } from "./db";
 
 export function registerWorkOrderRoutes(app: any, requireAuth: any) {
+  // ── Migrate: track when a job was auto-completed by WO task rollup ───────────
+  pool.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS wo_auto_completed_at TIMESTAMPTZ`)
+    .catch((err: any) => console.error("[workOrderRoutes] wo_auto_completed_at migration:", err.message));
+
   const requireNonCustomer = (req: any, res: any, next: any) => {
     if (req.user?.role === "Customer") return res.status(403).json({ message: "Access denied" });
     next();
@@ -498,6 +502,15 @@ export function registerWorkOrderRoutes(app: any, requireAuth: any) {
         await pool.query(
           `UPDATE work_orders SET closeout_ready_at=NOW(), updated_at=NOW() WHERE id=$1`, [id]
         );
+        // Auto-complete the linked job if it is currently in_progress.
+        // We stamp wo_auto_completed_at so an admin unchecking a task can reverse this.
+        if (jobId) {
+          await pool.query(
+            `UPDATE jobs SET status='completed', wo_auto_completed_at=NOW(), updated_at=NOW()
+             WHERE id::text=$1::text AND status='in_progress'`,
+            [String(jobId)]
+          );
+        }
         const { rows: recipients } = await pool.query(
           `SELECT id FROM users WHERE role IN ('Admin', 'Manager') OR is_master_admin = true`
         );
@@ -517,6 +530,15 @@ export function registerWorkOrderRoutes(app: any, requireAuth: any) {
         await pool.query(
           `UPDATE work_orders SET closeout_ready_at=NULL, updated_at=NOW() WHERE id=$1`, [id]
         );
+        // Revert the job back to in_progress only if WO auto-completed it (wo_auto_completed_at IS NOT NULL).
+        // Manually-completed jobs (wo_auto_completed_at IS NULL) are not touched.
+        if (jobId) {
+          await pool.query(
+            `UPDATE jobs SET status='in_progress', wo_auto_completed_at=NULL, updated_at=NOW()
+             WHERE id::text=$1::text AND status='completed' AND wo_auto_completed_at IS NOT NULL`,
+            [String(jobId)]
+          );
+        }
       } else {
         await pool.query(`UPDATE work_orders SET updated_at=NOW() WHERE id=$1`, [id]);
       }

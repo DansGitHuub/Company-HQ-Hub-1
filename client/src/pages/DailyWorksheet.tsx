@@ -1493,13 +1493,21 @@ function ChecklistDialog({
   ];
 
   // ── Photo gate logic ──────────────────────────────────────────────────────────
-  const showPhotoGate = !!(photoSummary?.has_job && photoSummary?.has_sessions);
+  // showPhotoGate activates whenever a job is linked — session presence is handled
+  // explicitly below (no silent bypass when crew never clocked in).
+  const showPhotoGate = !!(photoSummary?.has_job);
+  const hasJobNoSession = showPhotoGate && !photoSummary?.has_sessions;
   const needsDamagePhoto = cl.q4 === "yes";
 
   const missingPhotos: { type: string; label: string }[] = [];
   if (showPhotoGate) {
-    if ((photoSummary?.before ?? 0) === 0) missingPhotos.push({ type: "before", label: "Before photo" });
-    if ((photoSummary?.after ?? 0)  === 0) missingPhotos.push({ type: "after",  label: "After photo" });
+    if (hasJobNoSession) {
+      // Explicit block: job linked but no time entry found — crew must clock in first
+      missingPhotos.push({ type: "no_session", label: "No time entry for this job — clock into this job and take before/after photos before submitting" });
+    } else {
+      if ((photoSummary?.before ?? 0) === 0) missingPhotos.push({ type: "before", label: "Before photo" });
+      if ((photoSummary?.after ?? 0)  === 0) missingPhotos.push({ type: "after",  label: "After photo" });
+    }
   }
   if (needsDamagePhoto && (photoSummary?.damage ?? 0) === 0) {
     missingPhotos.push({ type: "damage", label: "Damage photo (required when an issue is reported)" });
@@ -1540,7 +1548,7 @@ function ChecklistDialog({
                 </span>
               </div>
 
-              {showPhotoGate && (
+              {showPhotoGate && photoSummary?.has_sessions && (
                 <>
                   <PhotoRow
                     label="Before photo"
@@ -1553,6 +1561,12 @@ function ChecklistDialog({
                     testId="photo-gate-after"
                   />
                 </>
+              )}
+              {showPhotoGate && !photoSummary?.has_sessions && (
+                <div className="flex items-start gap-2 text-xs text-red-700" data-testid="photo-gate-no-session">
+                  <span className="shrink-0 mt-0.5">⚠</span>
+                  <span>No time entry found for this job — clock into this job and take before/after photos before submitting.</span>
+                </div>
               )}
 
               {needsDamagePhoto && (

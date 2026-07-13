@@ -30,3 +30,4 @@
 - [Twilio dual-channel SMS routing](twilio-dual-channel.md) — customer SMS uses 844 number ("customer" channel); hiring/applicant SMS uses 440 ("hiring" channel); wrong channel → Twilio Error 30034.
 - [Drizzle timestamp coercion](drizzle-timestamp-coercion.md) — Drizzle .set() silently rejects string values for timestamp() columns; must convert to new Date() in storage layer before calling .set().
 - [Test-account cleanup fires on restart](test-account-cleanup-on-restart.md) — a mid-session workflow restart re-runs seed.ts's cleanup sweep, silently deleting @example.com test users and cascading their data, mimicking a feature bug.
+- [WO→job auto-complete pattern](wo-job-auto-complete.md) — wo_auto_completed_at column on jobs guards reversible WO task rollup; only reverts if that column IS NOT NULL (i.e. WO triggered the completion, not a manual admin action).

@@ -50,6 +50,7 @@ interface TimeReportsData {
   totalMinutes: number;
   employees: DropdownEmployee[];
   jobs: DropdownJob[];
+  work_areas: string[];
 }
 
 function formatDuration(minutes: number | null, clockIn: string, clockOut: string | null): string {
@@ -104,6 +105,7 @@ export default function TimeReports() {
     date_from: "",
     date_to: "",
     year: "",
+    work_area: "",
   });
   const [applied, setApplied] = useState(filters);
 
@@ -115,6 +117,7 @@ export default function TimeReports() {
     if (applied.date_from) p.set("date_from", applied.date_from);
     if (applied.date_to) p.set("date_to", applied.date_to);
     if (applied.year) p.set("year", applied.year);
+    if (applied.work_area) p.set("work_area", applied.work_area);
     return p.toString();
   }, [applied]);
 
@@ -138,14 +141,14 @@ export default function TimeReports() {
   const applyFilters = () => setApplied({ ...filters });
 
   const resetFilters = () => {
-    const empty = { user_id: "", job_id: "", customer: "", date_from: "", date_to: "", year: "" };
+    const empty = { user_id: "", job_id: "", customer: "", date_from: "", date_to: "", year: "", work_area: "" };
     setFilters(empty);
     setApplied(empty);
   };
 
   const exportCSV = () => {
     if (!data?.entries.length) return;
-    const headers = ["Employee", "Date", "Clock In", "Clock Out", "Total Hours", "Job", "Customer", "Type"];
+    const headers = ["Employee", "Date", "Clock In", "Clock Out", "Total Hours", "Job", "Customer", "Work Area", "Type"];
     const rows = data.entries.map((e) => [
       e.employee_name || e.username,
       formatDate(e.clock_in),
@@ -154,6 +157,7 @@ export default function TimeReports() {
       formatDuration(e.duration_minutes, e.clock_in, e.clock_out),
       e.job_type ?? "",
       e.customer ?? "",
+      e.work_area_name ?? "",
       e.entry_type,
     ]);
     const csv = [headers, ...rows].map((r) => r.map((v) => `"${v}"`).join(",")).join("\n");
@@ -270,6 +274,27 @@ export default function TimeReports() {
               </Select>
             </div>
 
+            {/* Work Area */}
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="filter-work-area">Work Area</Label>
+              <Select
+                value={filters.work_area}
+                onValueChange={(v) => setFilter("work_area", v === "__all__" ? "" : v)}
+              >
+                <SelectTrigger id="filter-work-area" data-testid="select-filter-work-area">
+                  <SelectValue placeholder="All work areas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">All work areas</SelectItem>
+                  {(data?.work_areas ?? []).map((wa) => (
+                    <SelectItem key={wa} value={wa} data-testid={`option-work-area-${wa}`}>
+                      {wa}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Date From */}
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="filter-date-from">Date From</Label>
@@ -349,6 +374,7 @@ export default function TimeReports() {
                     <TableHead>Total Hours</TableHead>
                     <TableHead>Job</TableHead>
                     <TableHead>Customer</TableHead>
+                    <TableHead>Work Area</TableHead>
                     <TableHead>Type</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -382,6 +408,9 @@ export default function TimeReports() {
                       <TableCell data-testid={`text-customer-${entry.id}`}>
                         {entry.customer ?? <span className="text-muted-foreground text-xs">—</span>}
                       </TableCell>
+                      <TableCell data-testid={`text-work-area-${entry.id}`}>
+                        {entry.work_area_name ?? <span className="text-muted-foreground text-xs">—</span>}
+                      </TableCell>
                       <TableCell data-testid={`text-type-${entry.id}`}>
                         {entry.entry_type === "billable" ? (
                           <Badge className="bg-green-100 text-green-700 border border-green-200 text-xs">Billable</Badge>
@@ -405,7 +434,7 @@ export default function TimeReports() {
                     <TableCell data-testid="text-footer-total-hours">
                       {formatHours(data.totalMinutes)}
                     </TableCell>
-                    <TableCell colSpan={3} />
+                    <TableCell colSpan={4} />
                   </TableRow>
                 </TableBody>
               </Table>

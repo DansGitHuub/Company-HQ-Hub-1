@@ -329,7 +329,7 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
       return res.status(403).json({ message: "Admin access required" });
     }
 
-    const { user_id, job_id, customer, date_from, date_to, year } = req.query as Record<string, string>;
+    const { user_id, job_id, customer, date_from, date_to, year, work_area } = req.query as Record<string, string>;
 
     try {
       let q = `
@@ -378,6 +378,10 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
         params.push(date_to);
         q += ` AND te.clock_in::date <= $${params.length}`;
       }
+      if (work_area) {
+        params.push(work_area);
+        q += ` AND te.work_area_name = $${params.length}`;
+      }
 
       q += ` ORDER BY te.clock_in DESC`;
 
@@ -392,12 +396,15 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
         return sum;
       }, 0);
 
-      // Get distinct employees and jobs for filter dropdowns
+      // Get distinct employees, jobs, and work areas for filter dropdowns
       const empResult = await pool.query(
         `SELECT DISTINCT u.id, u.name, u.username FROM time_entries te JOIN users u ON u.id = te.user_id ORDER BY u.name`
       );
       const jobResult = await pool.query(
         `SELECT DISTINCT j.id, j.client, j.type FROM time_entries te JOIN jobs j ON j.id = te.job_id WHERE te.job_id IS NOT NULL ORDER BY j.client`
+      );
+      const workAreaResult = await pool.query(
+        `SELECT DISTINCT work_area_name FROM time_entries WHERE work_area_name IS NOT NULL AND work_area_name != '' ORDER BY work_area_name`
       );
 
       return res.json({
@@ -405,6 +412,7 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
         totalMinutes,
         employees: empResult.rows,
         jobs: jobResult.rows,
+        work_areas: workAreaResult.rows.map((r: any) => r.work_area_name) as string[],
       });
     } catch (err: any) {
       return res.status(500).json({ message: err.message });

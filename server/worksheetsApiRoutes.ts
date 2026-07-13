@@ -376,7 +376,10 @@ export function registerWorksheetsApiRoutes(app: Express, requireAuth: any) {
         const photoTypes  = new Set(photoCheck.rows.map((r: any) => r.photo_type));
         const missing: string[] = [];
 
-        if (hasSessions) {
+        if (!hasSessions) {
+          // Explicit block: job is linked but crew never clocked in — no silent bypass
+          missing.push('a time entry for this job (clock into this job and take before/after photos first)');
+        } else {
           if (!photoTypes.has("before")) missing.push('"Before" photo');
           if (!photoTypes.has("after"))  missing.push('"After" photo');
           if (!!checklist_issue_reported && !photoTypes.has("damage")) {
