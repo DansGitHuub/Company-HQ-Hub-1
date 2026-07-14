@@ -196,6 +196,39 @@ function formatMinutes(total: number): string {
   return `${h}h ${m}m`;
 }
 
+// ─── Stop Materials ────────────────────────────────────────────────────────────
+function StopMaterials({ sessionId }: { sessionId: number }) {
+  const { data: materials = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/worksheets", sessionId, "materials"],
+    queryFn: () =>
+      fetch(`/api/worksheets/${sessionId}/materials`, { credentials: "include" })
+        .then(r => r.json()),
+    staleTime: 60_000,
+  });
+
+  if (isLoading) return <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />;
+  if (materials.length === 0) return (
+    <p className="text-sm text-muted-foreground italic">No materials logged yet</p>
+  );
+
+  return (
+    <ul className="space-y-1">
+      {materials.map((m: any) => (
+        <li key={m.id} className="flex items-start gap-2 text-sm">
+          <span className="mt-1 w-2 h-2 rounded-full bg-orange-400 shrink-0" />
+          <span>
+            <span className="font-medium">{m.material_name || "Unknown"}</span>
+            {m.quantity != null && (
+              <span className="text-muted-foreground ml-1">{m.quantity}{m.unit ? ` ${m.unit}` : ""}</span>
+            )}
+            {m.notes && <span className="text-muted-foreground ml-1 italic">— {m.notes}</span>}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 // ─── Sub-views ─────────────────────────────────────────────────────────────────
 
 function PreView({
@@ -661,6 +694,16 @@ function StopView({
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* Materials logged */}
+      {stop?.session_id && (
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+            Materials Needed
+          </p>
+          <StopMaterials sessionId={stop.session_id} />
         </div>
       )}
 

@@ -129,6 +129,31 @@ export function registerCheckpointRoutes(app: Express, requireAuth: any) {
          user?.id ?? null, req.params.checkpointId, req.params.jobId]
       );
       if (!rows.length) return res.status(404).json({ message: "Checkpoint not found" });
+
+      // Notify linked customer when a customer-visible checkpoint is marked completed
+      if (rows[0].status === "completed" && rows[0].customer_visible) {
+        try {
+          const { rows: custLinks } = await pool.query(
+            `SELECT customer_id FROM customer_jobs WHERE job_id = $1`,
+            [req.params.jobId]
+          );
+          for (const link of custLinks) {
+            await pool.query(
+              `INSERT INTO customer_notifications (customer_id, type, title, message, link)
+               VALUES ($1, 'checkpoint_completed', $2, $3, $4)`,
+              [
+                link.customer_id,
+                `Milestone completed: ${rows[0].name}`,
+                `A milestone on your project has been marked complete: "${rows[0].name}".`,
+                `/customer/jobs/${req.params.jobId}`,
+              ]
+            );
+          }
+        } catch (notifyErr: any) {
+          console.error("[checkpoints] customer notify failed:", notifyErr.message);
+        }
+      }
+
       return res.json(rows[0]);
     } catch (err: any) {
       return res.status(500).json({ message: err.message });

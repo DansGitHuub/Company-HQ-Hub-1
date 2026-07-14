@@ -24,6 +24,7 @@ export async function runEquipmentMigration() {
       ALTER TABLE equipment ADD COLUMN IF NOT EXISTS insurance_expiry timestamp;
       ALTER TABLE equipment ADD COLUMN IF NOT EXISTS warranty_expiry timestamp;
       ALTER TABLE equipment ADD COLUMN IF NOT EXISTS primary_photo_url text;
+      ALTER TABLE equipment ADD COLUMN IF NOT EXISTS hourly_rate numeric(10,2);
     `);
 
     await client.query(`

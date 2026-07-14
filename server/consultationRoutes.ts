@@ -345,6 +345,24 @@ export async function registerConsultationRoutes(app: Express, requireAuth: any)
     }
   });
 
+  // ── LEAD SOURCE BREAKDOWN ────────────────────────────────────────────────────
+  app.get("/api/consultations/source-stats", requireAuth, requireRole("Admin", "Manager"), async (_req, res) => {
+    try {
+      const { rows } = await pool.query(`
+        SELECT
+          COALESCE(NULLIF(lead_source, ''), 'Unknown') AS source,
+          COUNT(*)::int AS count
+        FROM consultations
+        GROUP BY COALESCE(NULLIF(lead_source, ''), 'Unknown')
+        ORDER BY count DESC
+      `);
+      res.json(rows);
+    } catch (err: any) {
+      console.error("[consultations/source-stats]", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // ── UPDATE ────────────────────────────────────────────────────────────────────
   app.patch("/api/consultations/:id", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     const { id } = req.params;
@@ -356,7 +374,7 @@ export async function registerConsultationRoutes(app: Express, requireAuth: any)
       pipeline_stage, budget_range, project_description, best_time_to_reach,
       utilities_marked, permit_required, permit_status, service_type,
       photo_urls, how_heard, project_type, desired_timeline, additional_notes,
-      next_follow_up_date,
+      next_follow_up_date, lost_reason,
     } = req.body;
     try {
       // Get previous stage
@@ -394,8 +412,9 @@ export async function registerConsultationRoutes(app: Express, requireAuth: any)
           desired_timeline    = COALESCE($27, desired_timeline),
           additional_notes    = COALESCE($28, additional_notes),
           next_follow_up_date = $29,
+          lost_reason         = COALESCE($30, lost_reason),
           updated_at          = NOW()
-        WHERE id = $30
+        WHERE id = $31
         RETURNING *
       `, [
         customer_id || null, contact_name ?? null, contact_phone ?? null, contact_email ?? null,
@@ -407,6 +426,7 @@ export async function registerConsultationRoutes(app: Express, requireAuth: any)
         photo_urls ? JSON.stringify(photo_urls) : null,
         how_heard ?? null, project_type ?? null, desired_timeline ?? null, additional_notes ?? null,
         next_follow_up_date ?? null,
+        lost_reason ?? null,
         id,
       ]);
       if (!rows[0]) return res.status(404).json({ error: "Not found" });

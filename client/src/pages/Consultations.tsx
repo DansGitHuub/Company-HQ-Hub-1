@@ -58,6 +58,7 @@ interface Consultation {
   permit_required: boolean;
   permit_status: string | null;
   service_type: string | null;
+  lost_reason: string | null;
   created_at: string;
 }
 
@@ -185,6 +186,7 @@ function emptyForm() {
     permit_required:     false,
     permit_status:       "",
     service_type:        "",
+    lost_reason:         "",
   };
 }
 
@@ -236,6 +238,7 @@ function ConsultationModal({
           permit_required:     editing.permit_required ?? false,
           permit_status:       editing.permit_status ?? "",
           service_type:        editing.service_type ?? "",
+          lost_reason:         editing.lost_reason ?? "",
         });
         setCustSearch(editing.customer_name ?? "");
       } else {
@@ -298,6 +301,7 @@ function ConsultationModal({
       permit_status:   form.permit_status || null,
       service_type:    form.service_type || null,
       best_time_to_reach: form.best_time_to_reach || null,
+      lost_reason: (form as any).lost_reason || null,
     };
     if (editing) updateMut.mutate(payload);
     else createMut.mutate(payload);
@@ -557,6 +561,21 @@ function ConsultationModal({
               onChange={e => f("next_follow_up_date" as any, e.target.value)} />
             <p className="text-xs text-muted-foreground">Set to track when this lead needs a follow-up call or email. Overdue dates appear on the Overdue page.</p>
           </div>
+
+          {/* Lost Reason — show when stage is "lost" group or reason already set */}
+          {(PIPELINE_STAGES.find(s => s.value === form.pipeline_stage)?.group === "lost" || (form as any).lost_reason) && (
+            <div className="space-y-1.5 p-3 rounded-lg border border-red-200 bg-red-50">
+              <Label className="text-xs font-semibold text-red-700">Lost Reason</Label>
+              <Textarea
+                value={(form as any).lost_reason ?? ""}
+                onChange={e => f("lost_reason" as any, e.target.value)}
+                rows={2}
+                placeholder="Why was this lead lost or marked for nurture?"
+                className="resize-none bg-white border-red-200 text-sm"
+                data-testid="input-lost-reason"
+              />
+            </div>
+          )}
         </div>
 
         <DialogFooter className="gap-2 flex-wrap">
@@ -583,6 +602,41 @@ function ConsultationModal({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ─── Lead Source Stats Bar ────────────────────────────────────────────────────
+function SourceStatsBar() {
+  const { data } = useQuery<{ source: string; count: number }[]>({
+    queryKey: ["/api/consultations/source-stats"],
+    queryFn: () => fetch("/api/consultations/source-stats", { credentials: "include" }).then(r => r.json()),
+    staleTime: 60_000,
+  });
+
+  if (!data || data.length === 0) return null;
+
+  const total = data.reduce((s, r) => s + r.count, 0);
+
+  return (
+    <div className="p-3 rounded-lg border bg-card text-xs" data-testid="source-stats-bar">
+      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+        Lead Sources
+      </p>
+      <div className="flex flex-wrap gap-x-6 gap-y-1.5">
+        {data.map(row => (
+          <div key={row.source} className="flex items-center gap-2 min-w-[140px]">
+            <span className="w-24 truncate font-medium text-foreground">{row.source || "Unknown"}</span>
+            <div className="flex-1 min-w-[60px] bg-muted rounded-full h-2 overflow-hidden">
+              <div
+                className="h-full bg-primary rounded-full transition-all"
+                style={{ width: `${Math.round((row.count / total) * 100)}%` }}
+              />
+            </div>
+            <span className="text-muted-foreground tabular-nums">{row.count}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -646,6 +700,21 @@ function KanbanView({
                   {c.assigned_name && (
                     <div className="mt-1 pt-1 border-t text-muted-foreground truncate">{c.assigned_name}</div>
                   )}
+                  {!c.assigned_to && (
+                    <div className="mt-1 text-[10px] font-medium text-orange-600 bg-orange-50 border border-orange-200 rounded px-1.5 py-0.5 inline-flex items-center gap-0.5" data-testid={`badge-unassigned-${c.id}`}>
+                      ⚠ Unassigned
+                    </div>
+                  )}
+                  {c.follow_up_required && c.follow_up_date && c.follow_up_date < new Date().toISOString().slice(0, 10) && (
+                    <div className="mt-0.5 text-[10px] font-medium text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5 inline-flex items-center gap-0.5" data-testid={`badge-overdue-followup-${c.id}`}>
+                      ⚠ Follow-up overdue
+                    </div>
+                  )}
+                  {c.lost_reason && (
+                    <div className="mt-0.5 text-[10px] text-muted-foreground italic truncate" data-testid={`text-lost-reason-${c.id}`}>
+                      &ldquo;{c.lost_reason}&rdquo;
+                    </div>
+                  )}
                   <div className="mt-2 flex gap-1 flex-wrap">
                     {PIPELINE_STAGES.filter(s => s.value !== (c.pipeline_stage || "new_lead")).slice(0, 3).map(s => (
                       <button
@@ -682,9 +751,11 @@ export default function Consultations() {
   const [assignedFilter,  setAssignedFilter]  = useState("");
   const [searchText,      setSearchText]      = useState("");
 
-  const [modalOpen,    setModalOpen]    = useState(false);
-  const [editing,      setEditing]      = useState<Consultation | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<Consultation | null>(null);
+  const [modalOpen,         setModalOpen]         = useState(false);
+  const [editing,           setEditing]           = useState<Consultation | null>(null);
+  const [deleteTarget,      setDeleteTarget]       = useState<Consultation | null>(null);
+  const [lostReasonTarget,  setLostReasonTarget]  = useState<{ id: string; stage: string } | null>(null);
+  const [lostReasonInput,   setLostReasonInput]   = useState("");
 
   const listParams = new URLSearchParams();
   if (statusFilter)   listParams.set("status",      statusFilter);
@@ -729,13 +800,27 @@ export default function Consultations() {
   });
 
   const stageMut = useMutation({
-    mutationFn: ({ id, stage }: { id: string; stage: string }) =>
-      apiRequest("PATCH", `/api/consultations/${id}`, { pipeline_stage: stage }),
+    mutationFn: ({ id, stage, lostReason }: { id: string; stage: string; lostReason?: string }) =>
+      apiRequest("PATCH", `/api/consultations/${id}`, {
+        pipeline_stage: stage,
+        ...(lostReason !== undefined ? { lost_reason: lostReason } : {}),
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/consultations"] });
+      qc.invalidateQueries({ queryKey: ["/api/consultations/source-stats"] });
     },
     onError: (e: any) => toast({ title: "Stage update failed", description: e.message, variant: "destructive" }),
   });
+
+  function handleUpdateStage(id: string, stage: string) {
+    const stageObj = PIPELINE_STAGES.find(s => s.value === stage);
+    if (stageObj?.group === "lost") {
+      setLostReasonInput("");
+      setLostReasonTarget({ id, stage });
+      return;
+    }
+    stageMut.mutate({ id, stage });
+  }
 
   function openNew() { setEditing(null); setModalOpen(true); }
   function openEdit(c: Consultation) { setEditing(c); setModalOpen(true); }
@@ -846,6 +931,9 @@ export default function Consultations() {
             </Card>
           </div>
 
+          {/* ── Lead Source Breakdown */}
+          <SourceStatsBar />
+
           {/* ── Filter Bar */}
           <div className="flex flex-wrap gap-2 items-center p-3 rounded-lg border bg-muted/20">
             <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -896,7 +984,7 @@ export default function Consultations() {
             <KanbanView
               consultations={consultations}
               onEdit={openEdit}
-              updateStage={(id, stage) => stageMut.mutate({ id, stage })}
+              updateStage={handleUpdateStage}
             />
           ) : (
             <div className="rounded-lg border overflow-hidden">
@@ -1008,6 +1096,44 @@ export default function Consultations() {
               onClick={() => deleteTarget && deleteMut.mutate(deleteTarget.id)}
             >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── Lost Reason Dialog */}
+      <AlertDialog open={!!lostReasonTarget} onOpenChange={o => { if (!o) setLostReasonTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Mark as Lost / Nurture</AlertDialogTitle>
+            <AlertDialogDescription>
+              Optionally capture why this lead was lost to help improve future follow-up.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="px-1 py-2">
+            <Textarea
+              value={lostReasonInput}
+              onChange={e => setLostReasonInput(e.target.value)}
+              placeholder="e.g. Budget too high, went with competitor…"
+              rows={3}
+              className="resize-none"
+              data-testid="input-lost-reason-dialog"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setLostReasonTarget(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!lostReasonTarget) return;
+                stageMut.mutate({
+                  id: lostReasonTarget.id,
+                  stage: lostReasonTarget.stage,
+                  lostReason: lostReasonInput.trim() || undefined,
+                });
+                setLostReasonTarget(null);
+              }}
+            >
+              Confirm
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

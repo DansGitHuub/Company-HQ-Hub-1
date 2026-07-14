@@ -572,4 +572,156 @@ export function registerReportRoutes(app: Express, requireAuth: any) {
       res.status(500).json({ error: err.message });
     }
   });
+
+  // ── EQUIPMENT REPAIR COST ────────────────────────────────────────────────────
+  app.get("/api/reports/equipment-repair", requireAuth, async (req, res) => {
+    const { date_from, date_to, equipment_id } = req.query as Record<string, string>;
+    try {
+      const params: any[] = [];
+      const conditions: string[] = [];
+      if (date_from)    { params.push(date_from);    conditions.push(`ml.completed_date::date >= $${params.length}`); }
+      if (date_to)      { params.push(date_to);      conditions.push(`ml.completed_date::date <= $${params.length}`); }
+      if (equipment_id) { params.push(equipment_id); conditions.push(`ml.equipment_id = $${params.length}`); }
+      const where = conditions.length ? "WHERE " + conditions.join(" AND ") : "";
+
+      const [byAsset, byMonth, byType, totals] = await Promise.all([
+        pool.query(`
+          SELECT
+            e.name AS equipment_name,
+            e.asset_id,
+            e.type AS equipment_type,
+            COUNT(ml.id)::int AS service_count,
+            ROUND(COALESCE(SUM(ml.total_cost), 0) / 100.0, 2) AS total_cost
+          FROM maintenance_logs ml
+          JOIN equipment e ON e.id = ml.equipment_id
+          ${where}
+          GROUP BY e.id, e.name, e.asset_id, e.type
+          ORDER BY total_cost DESC
+          LIMIT 25
+        `, params),
+        pool.query(`
+          SELECT
+            TO_CHAR(DATE_TRUNC('month', ml.completed_date), 'Mon YYYY') AS month,
+            DATE_TRUNC('month', ml.completed_date) AS month_start,
+            COUNT(ml.id)::int AS service_count,
+            ROUND(COALESCE(SUM(ml.total_cost), 0) / 100.0, 2) AS total_cost
+          FROM maintenance_logs ml
+          JOIN equipment e ON e.id = ml.equipment_id
+          ${where}
+          GROUP BY DATE_TRUNC('month', ml.completed_date)
+          ORDER BY month_start
+        `, params),
+        pool.query(`
+          SELECT
+            COALESCE(NULLIF(ml.log_type, ''), 'scheduled') AS log_type,
+            COUNT(ml.id)::int AS service_count,
+            ROUND(COALESCE(SUM(ml.total_cost), 0) / 100.0, 2) AS total_cost
+          FROM maintenance_logs ml
+          JOIN equipment e ON e.id = ml.equipment_id
+          ${where}
+          GROUP BY COALESCE(NULLIF(ml.log_type, ''), 'scheduled')
+          ORDER BY total_cost DESC
+        `, params),
+        pool.query(`
+          SELECT
+            COUNT(ml.id)::int AS service_count,
+            COUNT(DISTINCT ml.equipment_id)::int AS asset_count,
+            ROUND(COALESCE(SUM(ml.total_cost), 0) / 100.0, 2) AS total_cost,
+            ROUND(COALESCE(AVG(ml.total_cost), 0) / 100.0, 2) AS avg_cost_per_service
+          FROM maintenance_logs ml
+          JOIN equipment e ON e.id = ml.equipment_id
+          ${where}
+        `, params),
+      ]);
+
+      res.json({
+        summary: {
+          total_cost:           Number(totals.rows[0]?.total_cost ?? 0),
+          service_count:        totals.rows[0]?.service_count ?? 0,
+          asset_count:          totals.rows[0]?.asset_count ?? 0,
+          avg_cost_per_service: Number(totals.rows[0]?.avg_cost_per_service ?? 0),
+        },
+        by_asset:  byAsset.rows.map((r: any) => ({ ...r, total_cost: Number(r.total_cost) })),
+        by_month:  byMonth.rows.map((r: any) => ({ ...r, total_cost: Number(r.total_cost) })),
+        by_type:   byType.rows.map((r: any) => ({ ...r, total_cost: Number(r.total_cost) })),
+      });
+    } catch (err: any) {
+      console.error("[reports/equipment-repair]", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── MATERIAL SHORTAGES ───────────────────────────────────────────────────────
+  // Surfaces worksheets where crew flagged materials needed (checklist_materials_needed=true)
+  // and any worksheet_materials entries logged that day.
+  app.get("/api/reports/material-shortages", requireAuth, async (req, res) => {
+    const { date_from, date_to, job_id } = req.query as Record<string, string>;
+    try {
+      const params: any[] = [];
+      const conditions: string[] = ["w.checklist_materials_needed = true"];
+      if (date_from) { params.push(date_from); conditions.push(`w.date::date >= $${params.length}`); }
+      if (date_to)   { params.push(date_to);   conditions.push(`w.date::date <= $${params.length}`); }
+      if (job_id)    { params.push(job_id);     conditions.push(`w.job_id = $${params.length}`); }
+      const where = "WHERE " + conditions.join(" AND ");
+
+      const [flagged, materials] = await Promise.all([
+        pool.query(`
+          SELECT
+            w.id AS worksheet_id,
+            w.date,
+            w.checklist_materials_note,
+            w.job_id,
+            j.title AS job_title,
+            j.division,
+            u.first_name || ' ' || u.last_name AS crew_member,
+            u.id AS user_id
+          FROM worksheets w
+          LEFT JOIN jobs j ON j.id = w.job_id
+          LEFT JOIN users u ON u.id = w.user_id
+          ${where}
+          ORDER BY w.date DESC
+          LIMIT 100
+        `, params),
+        pool.query(`
+          SELECT
+            wm.worksheet_id,
+            wm.material_name,
+            wm.quantity,
+            wm.unit,
+            wm.unit_cost,
+            wm.notes
+          FROM worksheet_materials wm
+          JOIN worksheets w ON w.id = wm.worksheet_id
+          ${where.replace("w.checklist_materials_needed = true", "1=1")}
+          ORDER BY wm.worksheet_id, wm.id
+        `, params),
+      ]);
+
+      // Group materials by worksheet_id for easy lookup
+      const materialsByWorksheet: Record<string, any[]> = {};
+      for (const m of materials.rows) {
+        if (!materialsByWorksheet[m.worksheet_id]) materialsByWorksheet[m.worksheet_id] = [];
+        materialsByWorksheet[m.worksheet_id].push(m);
+      }
+
+      const result = flagged.rows.map((r: any) => ({
+        ...r,
+        materials_logged: (materialsByWorksheet[r.worksheet_id] ?? []).map((m: any) => ({
+          material_name: m.material_name,
+          quantity:      m.quantity ? Number(m.quantity) : null,
+          unit:          m.unit,
+          unit_cost:     m.unit_cost ? Number(m.unit_cost) : null,
+          notes:         m.notes,
+        })),
+      }));
+
+      res.json({
+        total: result.length,
+        items: result,
+      });
+    } catch (err: any) {
+      console.error("[reports/material-shortages]", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
 }

@@ -212,6 +212,8 @@ export default function MyDayPage() {
   const { data: jobs = [], isLoading: jobsLoading } = useQuery<MyDayJob[]>({
     queryKey: ["/api/my-day"],
     refetchInterval: 60_000,
+    staleTime: 300_000,
+    networkMode: "offlineFirst",
   });
 
   const { data: entries = [], isLoading: entriesLoading } = useQuery<TimeEntry[]>({

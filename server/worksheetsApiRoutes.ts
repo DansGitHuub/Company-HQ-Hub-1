@@ -556,6 +556,19 @@ export function registerWorksheetsApiRoutes(app: Express, requireAuth: any) {
     }
   });
 
+  // ── GET /api/worksheets/:id/materials ────────────────────────────────────────
+  app.get("/api/worksheets/:id/materials", requireAuth, async (req, res) => {
+    try {
+      const result = await pool.query(
+        `SELECT * FROM worksheet_materials WHERE worksheet_id = $1 ORDER BY id`,
+        [req.params.id]
+      );
+      return res.json(result.rows);
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
   // ── POST /api/worksheets/:id/materials ───────────────────────────────────────
   app.post("/api/worksheets/:id/materials", requireAuth, async (req, res) => {
     const { material_name, quantity, unit, unit_cost, notes } = req.body;

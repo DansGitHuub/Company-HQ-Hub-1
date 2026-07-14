@@ -126,6 +126,12 @@ const TEMPLATES: { key: string; label: string; subject: string; body: string }[]
     subject: "An update from Chapin Landscapes",
     body: "Hi {{customer_name}},\n\n[Write your announcement here]\n\nThanks,\nChapin Landscapes",
   },
+  {
+    key: "route_delay",
+    label: "Route Delay Notice",
+    subject: "Service Delay Today — Chapin Landscapes",
+    body: "Hi {{customer_name}},\n\nWe wanted to give you a heads-up that our crew is running a bit behind schedule today due to unexpected conditions. We still plan to complete your service and will be in touch if anything changes significantly.\n\nWe appreciate your patience and understanding!\n\nThank you,\nChapin Landscapes",
+  },
 ];
 
 const CHANNEL_ICON: Record<string, any> = {

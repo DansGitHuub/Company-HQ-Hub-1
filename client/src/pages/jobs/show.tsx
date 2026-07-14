@@ -1369,8 +1369,11 @@ export default function JobDetailPage() {
                             <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${statusCls}`}>
                               {area.status.replace("_", " ")}
                             </span>
-                            <span className="text-xs text-muted-foreground">
-                              {actH.toFixed(1)}h{estH ? ` / ${estH}h est.` : ""}
+                            <span
+                              data-testid={`text-work-area-hours-${area.id}`}
+                              className={`text-xs font-medium ${estH && actH > 0 && actH > estH ? "text-red-500" : estH && actH > 0 && actH <= estH ? "text-green-600" : "text-muted-foreground"}`}
+                            >
+                              {actH.toFixed(1)}h{estH ? ` / ${estH}h est.${actH > 0 && actH > estH ? " ⚠ over" : ""}` : ""}
                             </span>
                           </div>
                         </div>

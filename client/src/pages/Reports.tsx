@@ -13,12 +13,12 @@ import {
 import {
   DollarSign, Briefcase, TrendingUp, TrendingDown, Clock, Users,
   AlertCircle, AlertTriangle, BarChart2, Layers, FileText, Timer, PieChart, ChevronDown, ChevronUp,
-  Download,
+  Download, Wrench, CheckCircle,
 } from "lucide-react";
 import { Loader2 } from "lucide-react";
 import { downloadCsv } from "@/lib/csv-export";
 
-type Tab = "revenue" | "invoice-aging" | "crew-hours" | "profitability" | "time-by-division" | "materials-spend";
+type Tab = "revenue" | "invoice-aging" | "crew-hours" | "profitability" | "time-by-division" | "materials-spend" | "equipment-repair" | "material-shortages";
 
 const DIVISIONS = ["Maintenance", "Install", "Snow", "General"];
 
@@ -1262,6 +1262,240 @@ function AtAGlance() {
   );
 }
 
+// ── Equipment Repair Cost ─────────────────────────────────────────────────────
+function EquipmentRepairReport() {
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo,   setDateTo]   = useState("");
+
+  const params = new URLSearchParams();
+  if (dateFrom) params.set("date_from", dateFrom);
+  if (dateTo)   params.set("date_to",   dateTo);
+
+  const { data, isLoading, isError } = useQuery<any>({
+    queryKey: ["/api/reports/equipment-repair", dateFrom, dateTo],
+    queryFn: () => fetch(`/api/reports/equipment-repair?${params}`, { credentials: "include" }).then(r => r.json()),
+  });
+
+  function exportCsv() {
+    if (!data?.by_asset) return;
+    downloadCsv(
+      data.by_asset.map((r: any) => ({
+        "Asset":         r.equipment_name,
+        "Asset ID":      r.asset_id ?? "",
+        "Type":          r.equipment_type,
+        "Service Count": r.service_count,
+        "Total Cost":    r.total_cost,
+      })),
+      "equipment-repair-cost"
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-base">Equipment Repair Cost</CardTitle>
+              <CardDescription>Maintenance and repair costs from service logs</CardDescription>
+            </div>
+            <Button size="sm" variant="outline" onClick={exportCsv} data-testid="button-export-equipment-repair">
+              <Download className="h-3.5 w-3.5 mr-1.5" /> Export CSV
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-3 mb-5">
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs">From</Label>
+              <Input type="date" className="h-8 text-sm w-36" value={dateFrom}
+                onChange={e => setDateFrom(e.target.value)} data-testid="input-repair-date-from" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs">To</Label>
+              <Input type="date" className="h-8 text-sm w-36" value={dateTo}
+                onChange={e => setDateTo(e.target.value)} data-testid="input-repair-date-to" />
+            </div>
+          </div>
+
+          {isLoading && <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}
+          {isError && <div className="text-destructive text-sm flex items-center gap-1"><AlertCircle className="h-4 w-4" /> Failed to load</div>}
+          {data && (
+            <div className="space-y-5">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <StatCard title="Total Repair Cost" value={fmt$(data.summary.total_cost)} icon={DollarSign} color="red" />
+                <StatCard title="Service Events"    value={String(data.summary.service_count)} icon={Briefcase} />
+                <StatCard title="Assets Serviced"   value={String(data.summary.asset_count)} icon={Briefcase} color="blue" />
+                <StatCard title="Avg Per Service"   value={fmt$(data.summary.avg_cost_per_service)} icon={TrendingUp} />
+              </div>
+
+              {data.by_month?.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-2"><CardTitle className="text-sm">Monthly Repair Costs</CardTitle></CardHeader>
+                  <CardContent className="pb-4">
+                    <ResponsiveContainer width="100%" height={180}>
+                      <BarChart data={data.by_month} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `$${Number(v / 1000).toFixed(0)}k`} width={42} />
+                        <Tooltip formatter={(v: any) => [fmt$(Number(v)), "Cost"]} />
+                        <Bar dataKey="total_cost" fill="hsl(var(--destructive))" radius={[3,3,0,0]} name="Cost" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              )}
+
+              {data.by_asset?.length > 0 && (
+                <div>
+                  <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Top Assets by Repair Cost</p>
+                  <div className="rounded-lg border overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Asset</TableHead>
+                          <TableHead className="text-right">Services</TableHead>
+                          <TableHead className="text-right">Total Cost</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {data.by_asset.map((r: any, i: number) => (
+                          <TableRow key={i} data-testid={`row-repair-asset-${i}`}>
+                            <TableCell>
+                              <div className="font-medium">{r.equipment_name}</div>
+                              <div className="text-xs text-muted-foreground">{r.asset_id ? `${r.asset_id} · ` : ""}{r.equipment_type}</div>
+                            </TableCell>
+                            <TableCell className="text-right">{r.service_count}</TableCell>
+                            <TableCell className="text-right font-medium">{fmt$(r.total_cost)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+
+              {data.by_asset?.length === 0 && (
+                <div className="text-center py-8">
+                  <Wrench className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-30" />
+                  <p className="text-sm text-muted-foreground">No maintenance logs found for this period</p>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ── Material Shortages ────────────────────────────────────────────────────────
+function MaterialShortagesReport() {
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo,   setDateTo]   = useState("");
+
+  const params = new URLSearchParams();
+  if (dateFrom) params.set("date_from", dateFrom);
+  if (dateTo)   params.set("date_to",   dateTo);
+
+  const { data, isLoading, isError } = useQuery<any>({
+    queryKey: ["/api/reports/material-shortages", dateFrom, dateTo],
+    queryFn: () => fetch(`/api/reports/material-shortages?${params}`, { credentials: "include" }).then(r => r.json()),
+  });
+
+  function exportCsv() {
+    if (!data?.items) return;
+    const rows: any[] = [];
+    for (const item of data.items) {
+      if (item.materials_logged.length === 0) {
+        rows.push({ Date: item.date?.slice(0,10), Job: item.job_title, Crew: item.crew_member, Material: "(note only)", Qty: "", Unit: "", Note: item.checklist_materials_note });
+      } else {
+        for (const m of item.materials_logged) {
+          rows.push({ Date: item.date?.slice(0,10), Job: item.job_title, Crew: item.crew_member, Material: m.material_name, Qty: m.quantity ?? "", Unit: m.unit ?? "", Note: m.notes ?? "" });
+        }
+      }
+    }
+    downloadCsv(rows, "material-shortages");
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-base">Material Shortages</CardTitle>
+              <CardDescription>Worksheets where crew flagged materials needed on-site</CardDescription>
+            </div>
+            <Button size="sm" variant="outline" onClick={exportCsv} data-testid="button-export-material-shortages">
+              <Download className="h-3.5 w-3.5 mr-1.5" /> Export CSV
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-3 mb-5">
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs">From</Label>
+              <Input type="date" className="h-8 text-sm w-36" value={dateFrom}
+                onChange={e => setDateFrom(e.target.value)} data-testid="input-shortage-date-from" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs">To</Label>
+              <Input type="date" className="h-8 text-sm w-36" value={dateTo}
+                onChange={e => setDateTo(e.target.value)} data-testid="input-shortage-date-to" />
+            </div>
+          </div>
+
+          {isLoading && <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}
+          {isError && <div className="text-destructive text-sm flex items-center gap-1"><AlertCircle className="h-4 w-4" /> Failed to load</div>}
+          {data && (
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">{data.total} flagged worksheet{data.total !== 1 ? "s" : ""}</p>
+              {data.total === 0 ? (
+                <div className="text-center py-8">
+                  <CheckCircle className="h-8 w-8 mx-auto mb-2 text-green-500 opacity-50" />
+                  <p className="text-sm text-muted-foreground">No material shortage flags found</p>
+                </div>
+              ) : (
+                data.items.map((item: any, idx: number) => (
+                  <div key={idx} className="rounded-lg border p-3 space-y-2" data-testid={`row-shortage-${idx}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold">{item.job_title || "Unlinked Worksheet"}</p>
+                        <p className="text-xs text-muted-foreground">{item.date?.slice(0,10)} · {item.crew_member}</p>
+                      </div>
+                      {item.division && (
+                        <Badge variant="outline" className="text-xs shrink-0">{item.division}</Badge>
+                      )}
+                    </div>
+                    {item.checklist_materials_note && (
+                      <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 italic">
+                        Note: {item.checklist_materials_note}
+                      </p>
+                    )}
+                    {item.materials_logged.length > 0 && (
+                      <div className="space-y-1 pt-1">
+                        {item.materials_logged.map((m: any, mi: number) => (
+                          <div key={mi} className="flex items-center gap-2 text-xs">
+                            <span className="w-2 h-2 rounded-full bg-orange-400 shrink-0" />
+                            <span className="font-medium">{m.material_name}</span>
+                            {m.quantity && <span className="text-muted-foreground">{m.quantity}{m.unit ? ` ${m.unit}` : ""}</span>}
+                            {m.notes && <span className="text-muted-foreground italic">— {m.notes}</span>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Main Reports Page
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1270,8 +1504,10 @@ const TABS: { id: Tab; label: string; icon: React.ElementType; desc: string }[] 
   { id: "invoice-aging",    label: "Invoice Aging",     icon: FileText,   desc: "Outstanding AR bucketed by days past due" },
   { id: "crew-hours",       label: "Crew Hours",        icon: Timer,      desc: "Employee hours, overtime, and weekly trends" },
   { id: "profitability",    label: "Job Profitability", icon: PieChart,   desc: "Actual labor + materials vs sold value, gross margin per job" },
-  { id: "time-by-division", label: "Time by Division",  icon: BarChart2,  desc: "Hours worked broken down by division and month" },
-  { id: "materials-spend",  label: "Materials Spend",   icon: Layers,     desc: "Materials cost from job records by item, division, and month" },
+  { id: "time-by-division",    label: "Time by Division",    icon: BarChart2,  desc: "Hours worked broken down by division and month" },
+  { id: "materials-spend",     label: "Materials Spend",     icon: Layers,     desc: "Materials cost from job records by item, division, and month" },
+  { id: "equipment-repair",    label: "Equipment Repair",    icon: Wrench,     desc: "Maintenance and repair costs per asset and by month" },
+  { id: "material-shortages",  label: "Material Shortages",  icon: AlertTriangle, desc: "Worksheets where crew flagged missing materials on-site" },
 ];
 
 export default function Reports() {
@@ -1316,8 +1552,10 @@ export default function Reports() {
           {activeTab === "invoice-aging"    && <InvoiceAging />}
           {activeTab === "crew-hours"       && <CrewHours />}
           {activeTab === "profitability"    && <ProfitabilityReport />}
-          {activeTab === "time-by-division" && <TimeByDivision />}
-          {activeTab === "materials-spend"  && <MaterialsSpend />}
+          {activeTab === "time-by-division"   && <TimeByDivision />}
+          {activeTab === "materials-spend"    && <MaterialsSpend />}
+          {activeTab === "equipment-repair"   && <EquipmentRepairReport />}
+          {activeTab === "material-shortages" && <MaterialShortagesReport />}
         </div>
       </div>
     </div>

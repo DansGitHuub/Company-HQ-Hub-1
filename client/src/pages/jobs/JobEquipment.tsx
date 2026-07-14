@@ -24,6 +24,7 @@ interface EquipmentItem {
   year: number | null;
   asset_id: string | null;
   status: string;
+  hourly_rate: number | null;
 }
 
 interface EquipConflict {
@@ -317,7 +318,7 @@ export default function JobEquipment({ jobId, isAdminOrManager }: { jobId: strin
                 <option value="">— Select equipment —</option>
                 {equipmentList.map(eq => (
                   <option key={eq.id} value={eq.id}>
-                    {eq.name}{eq.make ? ` (${[eq.year, eq.make, eq.model].filter(Boolean).join(" ")})` : ""}
+                    {eq.name}{eq.make ? ` (${[eq.year, eq.make, eq.model].filter(Boolean).join(" ")})` : ""}{eq.hourly_rate ? ` — $${Number(eq.hourly_rate).toFixed(0)}/hr` : ""}
                   </option>
                 ))}
               </select>
@@ -346,6 +347,15 @@ export default function JobEquipment({ jobId, isAdminOrManager }: { jobId: strin
               <Textarea value={notes} onChange={e => setNotes(e.target.value)}
                 rows={2} placeholder="Any notes…" className="resize-none mt-1" />
             </div>
+            {selectedEquipId && (() => {
+              const sel = equipmentList.find(e => e.id === selectedEquipId);
+              return sel && sel.status && sel.status !== "Active" ? (
+                <div className="flex items-center gap-1.5 text-amber-700 text-xs bg-amber-50 border border-amber-200 rounded p-2" data-testid="warning-equip-status">
+                  <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
+                  <span>This equipment is marked <strong>{sel.status}</strong> — confirm it&apos;s available before assigning.</span>
+                </div>
+              ) : null;
+            })()}
             {equipConflicts && equipConflicts.length > 0 && (
               <div
                 className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 p-3 space-y-1.5"
