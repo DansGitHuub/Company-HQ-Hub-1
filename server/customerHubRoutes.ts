@@ -66,7 +66,7 @@ export function registerCustomerHubRoutes(app: Express, requireAuth: RequestHand
 
       res.json({
         user: { name: req.user.name, email: req.user.email },
-        activeJob: activeJob || null,
+        activeJob: activeJob ? toCustomerJob(activeJob) : null,
         totalJobs: allJobs.length,
         unreadMessages: unreadCount,
         actionItems: actionItems.length,

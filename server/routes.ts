@@ -3975,6 +3975,10 @@ Make every field as detailed and accurate as possible. The goal is a COMPLETE, r
           supplierContact: null,
           supplierUrl: null,
           crewNotes: null,
+          cost: null,
+          taxRate: null,
+          overheadOverride: null,
+          profitMarginOverride: null,
         }));
         return res.json(filteredMaterials);
       }
@@ -4838,6 +4842,7 @@ Generate detailed information for this landscaping material.`;
 
   app.get("/api/jobs", requireAuth, async (req, res) => {
     try {
+      if ((req.user as any)?.role === "Customer") return res.status(403).json({ message: "Access denied" });
       const jobs = await storage.getJobs();
       res.json(jobs);
     } catch (err) {
@@ -4847,6 +4852,7 @@ Generate detailed information for this landscaping material.`;
 
   app.post("/api/jobs", requireAuth, async (req, res) => {
     try {
+      if ((req.user as any)?.role === "Customer") return res.status(403).json({ message: "Access denied" });
       const job = await storage.createJob(req.body);
       res.status(201).json(job);
     } catch (err) {
@@ -4856,6 +4862,7 @@ Generate detailed information for this landscaping material.`;
 
   app.patch("/api/jobs/:id", requireAuth, async (req, res) => {
     try {
+      if ((req.user as any)?.role === "Customer") return res.status(403).json({ message: "Access denied" });
       const job = await storage.updateJob(req.params.id as string, req.body);
       if (!job) return res.status(404).json({ message: "Job not found" });
       if (req.body.stage) {
@@ -4881,6 +4888,7 @@ Generate detailed information for this landscaping material.`;
 
   app.get("/api/jobs/:id", requireAuth, async (req, res) => {
     try {
+      if ((req.user as any)?.role === "Customer") return res.status(403).json({ message: "Access denied" });
       const job = await storage.getJob(req.params.id as string);
       if (!job) return res.status(404).json({ message: "Job not found" });
       // Attach first linked invoice so the client can replace "Generate Invoice" button with "View Invoice" link
@@ -4900,6 +4908,7 @@ Generate detailed information for this landscaping material.`;
 
   app.delete("/api/jobs/:id", requireAuth, async (req, res) => {
     try {
+      if ((req.user as any)?.role === "Customer") return res.status(403).json({ message: "Access denied" });
       const job = await storage.getJob(req.params.id as string);
       await storage.deleteJob(req.params.id as string);
       logActivity("job_deleted", `Work card "${job?.client || "Unknown"}" was deleted`, "/jobs", req.user?.id);
