@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { CatalogBrowser } from "@/components/CatalogBrowser";
 import type { CatalogItem } from "@/components/CatalogBrowser";
 import {
-  Plus, Trash2, ChevronDown, ChevronUp, Loader2, Calculator, Package, Hammer, Wrench, Search, BookOpen,
+  Plus, Trash2, ChevronDown, ChevronUp, Loader2, Calculator, Package, Hammer, Wrench, Search, BookOpen, AlertTriangle,
 } from "lucide-react";
 import CalculatorRunner from "@/components/calculator/CalculatorRunner";
 
@@ -177,6 +177,18 @@ export function EstimateFormModal({ open, onClose, existing, lockedCustomerId, l
   const [serviceType, setServiceType] = useState(existing?.service_type ?? "");
 
   // Queries
+  const { data: satisfactionData } = useQuery<{
+    avg_rating: number | null;
+    count: number;
+    recent: Array<{ rating: number; date: string; job_title: string }>;
+  }>({
+    queryKey: [`/api/customers/${customerId}/satisfaction-summary`],
+    queryFn: () =>
+      fetch(`/api/customers/${customerId}/satisfaction-summary`, { credentials: "include" }).then(r => r.json()),
+    enabled: !!customerId,
+    staleTime: 60_000,
+  });
+
   const { data: templates = [] } = useQuery<Template[]>({ queryKey: ["/api/estimate-templates"] });
   const { data: allStaff = [] } = useQuery<any[]>({ queryKey: ["/api/users"] });
   const { data: serviceTypes = [] } = useQuery<{ id: string; name: string; category: string }[]>({
@@ -563,6 +575,22 @@ export function EstimateFormModal({ open, onClose, existing, lockedCustomerId, l
                 </div>
               )}
             </div>
+
+            {customerId && satisfactionData && satisfactionData.count > 0 &&
+              satisfactionData.avg_rating !== null && Number(satisfactionData.avg_rating) <= 2 && (
+              <div
+                className="col-span-2 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 p-2.5"
+                data-testid="warning-low-satisfaction"
+              >
+                <AlertTriangle className="h-4 w-4 text-amber-700 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                <div className="text-xs text-amber-800 dark:text-amber-300">
+                  <span className="font-semibold">Low satisfaction alert</span>
+                  {" — "}avg rating {Number(satisfactionData.avg_rating).toFixed(1)}/5 across{" "}
+                  {satisfactionData.count} job{satisfactionData.count !== 1 ? "s" : ""}.
+                  Review past work before estimating.
+                </div>
+              </div>
+            )}
 
             <div>
               <Label className="text-xs">{t("estimateType")}</Label>

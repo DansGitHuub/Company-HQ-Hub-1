@@ -744,6 +744,36 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
   });
 
   // ── GET /api/customers/:id/messages ──────────────────────────────────────────
+  // ── GET /api/customers/:id/satisfaction-summary ──────────────────────────────
+  app.get("/api/customers/:id/satisfaction-summary", requireAuth, requireRole("Admin", "Manager"), async (req: any, res: any) => {
+    const { id } = req.params;
+    try {
+      const { rows } = await pool.query(
+        `SELECT
+           ROUND(AVG(jc.customer_satisfaction)::numeric, 1) AS avg_rating,
+           COUNT(jc.customer_satisfaction)::int             AS count,
+           COALESCE(
+             json_agg(
+               json_build_object(
+                 'rating',    jc.customer_satisfaction,
+                 'date',      jc.completed_at,
+                 'job_title', j.title
+               ) ORDER BY jc.completed_at DESC NULLS LAST
+             ) FILTER (WHERE jc.customer_satisfaction IS NOT NULL),
+             '[]'
+           ) AS recent
+         FROM job_closeouts jc
+         JOIN jobs j ON j.id = jc.job_id
+         WHERE j.customer_id = $1
+           AND jc.customer_satisfaction IS NOT NULL`,
+        [id]
+      );
+      return res.json(rows[0] ?? { avg_rating: null, count: 0, recent: [] });
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
   app.get("/api/customers/:id/messages", requireAuth, async (req: any, res: any) => {
     const { id } = req.params;
     try {

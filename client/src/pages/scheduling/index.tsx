@@ -30,12 +30,20 @@ interface ScheduledJob {
   property_address: string | null;
   assigned_crew: CrewMember[];
   sort_order?: number;
+  safety_notes: string | null;
+  restrictions_notes: string | null;
+  access_notes: string | null;
+  overdue_balance: number;
 }
 interface UnscheduledJob {
   id: string; title: string; status: string;
   division: string | null; color: string | null;
   customer_name: string | null;
   property_address: string | null;
+  safety_notes: string | null;
+  restrictions_notes: string | null;
+  access_notes: string | null;
+  overdue_balance: number;
 }
 interface Employee { id: string; first_name: string; last_name: string; position?: string; }
 
@@ -580,7 +588,7 @@ export default function SchedulingCalendar() {
                 {job.property_address && (
                   <div className="text-[10px] text-muted-foreground truncate">{job.property_address}</div>
                 )}
-                <div className="mt-1 flex items-center gap-1">
+                <div className="mt-1 flex items-center flex-wrap gap-1">
                   <span
                     className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${STATUS_CLS[job.status] ?? "bg-gray-100 text-gray-600"}`}
                   >
@@ -588,6 +596,11 @@ export default function SchedulingCalendar() {
                   </span>
                   {job.division && (
                     <span className="text-[10px] text-muted-foreground">{job.division}</span>
+                  )}
+                  {Number(job.overdue_balance) > 0 && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-amber-100 text-amber-700" data-testid={`overdue-badge-${job.id}`}>
+                      ⚠ ${Number(job.overdue_balance).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} overdue
+                    </span>
                   )}
                 </div>
                 {!isCrewReadOnly && (
@@ -887,13 +900,38 @@ export default function SchedulingCalendar() {
 
           {pendingJob && (
             <div className="space-y-4">
-              <div className="rounded-lg border p-3 bg-muted/30">
+              <div className="rounded-lg border p-3 bg-muted/30 space-y-1">
                 <div className="font-medium text-sm">{pendingJob.title}</div>
                 {pendingJob.customer_name && (
                   <div className="text-xs text-muted-foreground">{pendingJob.customer_name}</div>
                 )}
                 {pendingJob.property_address && (
                   <div className="text-xs text-muted-foreground">{pendingJob.property_address}</div>
+                )}
+                {Number(pendingJob.overdue_balance) > 0 && (
+                  <div className="flex items-center gap-1 text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-0.5 text-[11px] font-medium w-fit" data-testid="modal-overdue-badge">
+                    <AlertTriangle className="h-3 w-3 flex-shrink-0" />
+                    ${Number(pendingJob.overdue_balance).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} overdue balance
+                  </div>
+                )}
+                {(pendingJob.safety_notes || pendingJob.restrictions_notes || pendingJob.access_notes) && (
+                  <div className="mt-1 pt-1.5 border-t space-y-1">
+                    {pendingJob.safety_notes && (
+                      <div className="text-[11px] text-amber-700 dark:text-amber-400" data-testid="modal-safety-notes">
+                        ⚠ <span className="font-medium">Safety:</span> {pendingJob.safety_notes}
+                      </div>
+                    )}
+                    {pendingJob.restrictions_notes && (
+                      <div className="text-[11px] text-amber-700 dark:text-amber-400" data-testid="modal-restrictions-notes">
+                        ⚠ <span className="font-medium">Restrictions:</span> {pendingJob.restrictions_notes}
+                      </div>
+                    )}
+                    {pendingJob.access_notes && (
+                      <div className="text-[11px] text-muted-foreground" data-testid="modal-access-notes">
+                        🔑 <span className="font-medium">Access:</span> {pendingJob.access_notes}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
 

@@ -81,7 +81,17 @@ export function registerSchedulingRoutes(app: Express) {
                DISTINCT jsonb_build_object('id', e.id, 'first_name', e.first_name, 'last_name', e.last_name)
              ) FILTER (WHERE e.id IS NOT NULL),
              '[]'
-           ) AS assigned_crew
+           ) AS assigned_crew,
+           MIN(j.safety_notes)        AS safety_notes,
+           MIN(j.restrictions_notes)  AS restrictions_notes,
+           MIN(p.access_notes)        AS access_notes,
+           COALESCE((
+             SELECT SUM(inv.balance_due::numeric)
+             FROM invoices inv
+             WHERE inv.customer_id = j.customer_id
+               AND inv.status = 'overdue'
+               AND inv.balance_due::numeric > 0
+           ), 0) AS overdue_balance
          FROM jobs j
          LEFT JOIN customers c ON c.id = j.customer_id
          LEFT JOIN properties p ON p.id = j.property_id
@@ -108,7 +118,17 @@ export function registerSchedulingRoutes(app: Express) {
         `SELECT
            j.id, j.title, j.status, j.division, j.color,
            c.first_name || ' ' || c.last_name AS customer_name,
-           p.address AS property_address
+           p.address AS property_address,
+           j.safety_notes,
+           j.restrictions_notes,
+           p.access_notes,
+           COALESCE((
+             SELECT SUM(inv.balance_due::numeric)
+             FROM invoices inv
+             WHERE inv.customer_id = j.customer_id
+               AND inv.status = 'overdue'
+               AND inv.balance_due::numeric > 0
+           ), 0) AS overdue_balance
          FROM jobs j
          LEFT JOIN customers c ON c.id = j.customer_id
          LEFT JOIN properties p ON p.id = j.property_id
@@ -180,6 +200,16 @@ export function registerSchedulingRoutes(app: Express) {
            j.scheduled_start_time, j.scheduled_end_time,
            c.first_name || ' ' || c.last_name AS customer_name,
            p.address AS property_address,
+           MIN(j.safety_notes)        AS safety_notes,
+           MIN(j.restrictions_notes)  AS restrictions_notes,
+           MIN(p.access_notes)        AS access_notes,
+           COALESCE((
+             SELECT SUM(inv.balance_due::numeric)
+             FROM invoices inv
+             WHERE inv.customer_id = j.customer_id
+               AND inv.status = 'overdue'
+               AND inv.balance_due::numeric > 0
+           ), 0) AS overdue_balance,
            COALESCE(
              json_agg(DISTINCT jsonb_build_object('id', e.id, 'first_name', e.first_name, 'last_name', e.last_name))
              FILTER (WHERE e.id IS NOT NULL), '[]'

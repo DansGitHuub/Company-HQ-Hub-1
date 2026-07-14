@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   Plus, Pencil, Trash2, CalendarClock, DollarSign, CheckCircle, XCircle,
-  Loader2, Search, ExternalLink, Filter, LayoutGrid, List,
+  Loader2, Search, ExternalLink, Filter, LayoutGrid, List, Clock, Image as ImageIcon,
 } from "lucide-react";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -59,6 +59,8 @@ interface Consultation {
   permit_status: string | null;
   service_type: string | null;
   lost_reason: string | null;
+  desired_timeline: string | null;
+  photo_urls: string[] | null;
   created_at: string;
 }
 
@@ -407,6 +409,51 @@ function ConsultationModal({
               </Select>
             </div>
           </div>
+
+          {/* From Customer (inquiry) — read-only callout */}
+          {editing && (editing.desired_timeline || (editing.photo_urls && editing.photo_urls.length > 0)) && (
+            <div className="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 p-3 space-y-2">
+              <div className="text-xs font-semibold text-blue-800 dark:text-blue-300">
+                📋 From Customer (inquiry submission)
+              </div>
+              {editing.desired_timeline && (
+                <div className="flex items-center gap-2">
+                  <Clock className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+                  <span className="text-xs text-blue-700 dark:text-blue-300 font-medium">Timeline:</span>
+                  <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-0.5 rounded-full">
+                    {editing.desired_timeline}
+                  </span>
+                </div>
+              )}
+              {editing.photo_urls && editing.photo_urls.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <ImageIcon className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                    <span className="text-xs text-blue-700 dark:text-blue-300 font-medium">
+                      Photos ({editing.photo_urls.length})
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {editing.photo_urls.map((url, i) => (
+                      <a
+                        key={i}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        data-testid={`inquiry-photo-${i}`}
+                      >
+                        <img
+                          src={url}
+                          alt={`Inquiry photo ${i + 1}`}
+                          className="h-16 w-16 object-cover rounded border border-blue-200 hover:opacity-90 transition-opacity"
+                        />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Date / Time / Duration */}
           <div className="grid grid-cols-3 gap-3">

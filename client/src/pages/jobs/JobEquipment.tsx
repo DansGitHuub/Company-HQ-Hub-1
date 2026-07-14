@@ -311,17 +311,49 @@ export default function JobEquipment({ jobId, isAdminOrManager }: { jobId: strin
           <div className="space-y-3">
             <div>
               <Label>Equipment <span className="text-red-500">*</span></Label>
-              <select value={selectedEquipId}
-                onChange={e => { setSelectedEquipId(e.target.value); setEquipConflicts(null); }}
-                className="w-full h-9 mt-1 rounded-md border border-input bg-background px-2 text-sm"
-                data-testid="select-equipment">
-                <option value="">— Select equipment —</option>
-                {equipmentList.map(eq => (
-                  <option key={eq.id} value={eq.id}>
-                    {eq.name}{eq.make ? ` (${[eq.year, eq.make, eq.model].filter(Boolean).join(" ")})` : ""}{eq.hourly_rate ? ` — $${Number(eq.hourly_rate).toFixed(0)}/hr` : ""}
-                  </option>
-                ))}
-              </select>
+              <div
+                className="mt-1 max-h-44 overflow-y-auto rounded-md border border-input bg-background divide-y"
+                data-testid="select-equipment"
+              >
+                {equipmentList.length === 0 && (
+                  <div className="px-3 py-2 text-sm text-muted-foreground">No equipment on file</div>
+                )}
+                {equipmentList.map(eq => {
+                  const isNonActive = eq.status && eq.status !== "Active";
+                  const statusCls = isNonActive
+                    ? "bg-amber-100 text-amber-700"
+                    : "bg-green-100 text-green-700";
+                  const isSelected = selectedEquipId === eq.id;
+                  return (
+                    <button
+                      key={eq.id}
+                      type="button"
+                      onClick={() => { setSelectedEquipId(eq.id); setEquipConflicts(null); }}
+                      className={`w-full text-left px-3 py-1.5 text-sm transition-colors hover:bg-accent ${isSelected ? "bg-accent" : ""}`}
+                      data-testid={`equip-option-${eq.id}`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="flex-1 truncate">
+                          <span className={isSelected ? "font-medium" : ""}>{eq.name}</span>
+                          {eq.make && (
+                            <span className="text-muted-foreground text-xs ml-1">
+                              ({[eq.year, eq.make, eq.model].filter(Boolean).join(" ")})
+                            </span>
+                          )}
+                        </span>
+                        {eq.hourly_rate && (
+                          <span className="text-xs text-muted-foreground shrink-0">
+                            ${Number(eq.hourly_rate).toFixed(0)}/hr
+                          </span>
+                        )}
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${statusCls}`}>
+                          {eq.status ?? "Active"}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
