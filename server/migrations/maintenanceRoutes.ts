@@ -53,4 +53,17 @@ export async function runMaintenanceRoutesMigration() {
     )
   `);
   console.log("[migration] maintenance_route_visits table ready");
+
+  // Additive: unique constraint enables ON CONFLICT DO NOTHING deduplication
+  await pool.query(`
+    DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'mrv_route_date_unique'
+      ) THEN
+        ALTER TABLE maintenance_route_visits
+          ADD CONSTRAINT mrv_route_date_unique UNIQUE (route_id, visit_date);
+      END IF;
+    END $$
+  `);
+  console.log("[migration] maintenance_route_visits unique constraint ready");
 }

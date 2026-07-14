@@ -36,6 +36,7 @@ import {
   AlertTriangle,
   Users,
   Zap,
+  Route,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { useTranslation } from "react-i18next";
@@ -50,6 +51,27 @@ interface WorkArea {
   name: string;
   status: string | null;
   estimated_hours: number | null;
+}
+
+interface MaintenanceVisitStop {
+  id: string;
+  sequence_order: number;
+  expected_duration_minutes: number | null;
+  service_notes: string | null;
+  expected_services: string | null;
+  property_address: string | null;
+}
+
+interface MaintenanceVisit {
+  id: string;
+  visit_date: string;
+  status: string;
+  route_id: string;
+  route_name: string;
+  route_description: string | null;
+  assigned_crew_id: string | null;
+  assigned_crew_name: string | null;
+  stops: MaintenanceVisitStop[];
 }
 
 interface MyDayJob {
@@ -214,6 +236,17 @@ export default function MyDayPage() {
     refetchInterval: 60_000,
     staleTime: 300_000,
     networkMode: "offlineFirst",
+  });
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const { data: maintenanceVisits = [] } = useQuery<MaintenanceVisit[]>({
+    queryKey: ["/api/maintenance-visits", todayStr, "mine"],
+    queryFn: async () => {
+      const res = await fetch(`/api/maintenance-visits?date=${todayStr}&mine=true`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    refetchInterval: 60_000,
   });
 
   const { data: entries = [], isLoading: entriesLoading } = useQuery<TimeEntry[]>({
@@ -529,6 +562,52 @@ export default function MyDayPage() {
           </>
         )}
       </section>
+
+      {/* ── Maintenance Route Visits ─────────────────────────────────────── */}
+      {maintenanceVisits.length > 0 && (
+        <section>
+          <div className="flex items-center gap-2 mb-3">
+            <Route className="w-3.5 h-3.5 text-green-600" />
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400">
+              Maintenance Routes Today · {maintenanceVisits.length}
+            </h2>
+          </div>
+          <div className="space-y-3">
+            {maintenanceVisits.map((visit) => (
+              <Card key={visit.id} data-testid={`maintenance-visit-${visit.id}`}>
+                <CardContent className="p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Route className="h-4 w-4 text-green-600 shrink-0" />
+                      <span className="font-semibold text-sm">{visit.route_name}</span>
+                    </div>
+                    <Badge variant="outline" className="text-[10px] text-green-700 border-green-300 bg-green-50">
+                      Maintenance
+                    </Badge>
+                  </div>
+                  {visit.stops.length > 0 ? (
+                    <div className="space-y-1.5 mt-1">
+                      {visit.stops.map((stop, i) => (
+                        <div key={stop.id ?? i} className="flex items-start gap-2 text-xs text-gray-600">
+                          <MapPin className="h-3 w-3 mt-0.5 text-gray-400 shrink-0" />
+                          <span>
+                            {stop.property_address || "(address not set)"}
+                            {stop.expected_duration_minutes ? (
+                              <span className="text-gray-400 ml-1">· {stop.expected_duration_minutes} min</span>
+                            ) : null}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-400">No stops configured for this route.</p>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* ── My Time Log ────────────────────────────────────────────────── */}
       <section>

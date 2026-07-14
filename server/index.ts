@@ -90,6 +90,7 @@ import { startGpsPingCleanupScheduler } from "./gpsPingCleanupScheduler";
 import { startInvoiceOverdueScheduler } from "./invoiceOverdueScheduler";
 import { startWorksheetAlertScheduler } from "./worksheetAlertScheduler";
 import { startAutomationScheduler } from "./automationScheduler";
+import { startMaintenanceVisitScheduler } from "./maintenanceVisitScheduler";
 import { setupAuth } from "./auth";
 
 const app = express();
@@ -343,4 +344,5 @@ app.use((req, res, next) => {
   startInvoiceOverdueScheduler();
   startWorksheetAlertScheduler();
   startAutomationScheduler();
+  startMaintenanceVisitScheduler();
 })();

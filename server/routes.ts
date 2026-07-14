@@ -7,6 +7,7 @@ import { logAuditEvent, queryAuditLog } from "./securityAuditLog";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { registerCompanyCamRoutes } from "./companyCamRoutes";
 import { registerDuplicateCustomerRoutes } from "./duplicateCustomerRoutes";
+import { registerMaintenanceVisitRoutes } from "./maintenanceVisitRoutes";
 import { registerEstimateTranscriptRoutes } from "./estimateTranscriptRoutes";
 import { registerEstimateAiDraftRoutes } from "./estimateAiDraftRoutes";
 import { registerHiringRoutes } from "./hiringRoutes";
@@ -11009,6 +11010,8 @@ Provide accurate information based on publicly available documentation.`;
       res.status(404).json({ message: "Not found" });
     }
   });
+
+  registerMaintenanceVisitRoutes(app);
 
   // Catch-all for unmatched /api/* routes — must be registered AFTER all other
   // API handlers and BEFORE the SPA static-file / Vite fallback.

@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, ChevronLeft, ChevronRight, CalendarCheck, X, Users, Briefcase, RotateCcw, AlertTriangle } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, CalendarCheck, X, Users, Briefcase, RotateCcw, AlertTriangle, Route } from "lucide-react";
 import {
   format, addWeeks, subWeeks, startOfWeek, addDays, isToday,
   parseISO,
@@ -20,6 +20,28 @@ import { useAuth } from "@/hooks/use-auth";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface CrewMember { id: string; first_name: string; last_name: string; }
+
+interface MaintenanceVisitStop {
+  id: string;
+  sequence_order: number;
+  expected_duration_minutes: number | null;
+  service_notes: string | null;
+  expected_services: string | null;
+  property_address: string | null;
+}
+
+interface MaintenanceCalendarVisit {
+  id: string;
+  visit_date: string;
+  status: string;
+  route_id: string;
+  route_name: string;
+  assigned_crew_id: string | null;
+  assigned_crew_name: string | null;
+  cadence: string;
+  stops: MaintenanceVisitStop[];
+}
+
 interface ScheduledJob {
   id: string; title: string; status: string;
   division: string | null; color: string | null;
@@ -157,6 +179,15 @@ export default function SchedulingCalendar() {
     queryKey: ["/api/scheduling/employees"],
     queryFn: async () => {
       const res = await fetch("/api/scheduling/employees", { credentials: "include" });
+      return res.json();
+    },
+  });
+
+  const { data: calMaintenanceVisits = [] } = useQuery<MaintenanceCalendarVisit[]>({
+    queryKey: ["/api/maintenance-visits", rangeStart, rangeEnd],
+    queryFn: async () => {
+      const res = await fetch(`/api/maintenance-visits?start=${rangeStart}&end=${rangeEnd}`, { credentials: "include" });
+      if (!res.ok) return [];
       return res.json();
     },
   });
@@ -853,6 +884,57 @@ export default function SchedulingCalendar() {
         </DragDropContext>
         </div>{/* end horizontal-scroll wrapper */}
       </div>
+
+      {/* ── Maintenance Route Visits This Week ─────────────────────────── */}
+      {calMaintenanceVisits.length > 0 && (
+        <div className="mt-6 px-4 pb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Route className="h-4 w-4 text-green-600" />
+            <h2 className="text-sm font-semibold text-gray-700">
+              Maintenance Route Visits This Week
+            </h2>
+            <span className="text-xs text-gray-400 ml-1">({calMaintenanceVisits.length})</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {calMaintenanceVisits.map((visit) => (
+              <div
+                key={visit.id}
+                data-testid={`cal-visit-${visit.id}`}
+                className="rounded-lg border border-green-200 bg-green-50 p-3 space-y-1.5"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <Route className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                    <span className="text-sm font-semibold text-green-900 truncate">{visit.route_name}</span>
+                  </div>
+                  <span className="text-[10px] font-medium text-green-700 bg-green-100 border border-green-300 rounded px-1.5 py-0.5 shrink-0">
+                    {new Date(visit.visit_date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                  </span>
+                </div>
+                {visit.assigned_crew_name && (
+                  <div className="flex items-center gap-1 text-xs text-green-700">
+                    <Users className="h-3 w-3" />
+                    <span>{visit.assigned_crew_name}</span>
+                  </div>
+                )}
+                {visit.stops.length > 0 && (
+                  <div className="space-y-0.5">
+                    {visit.stops.slice(0, 3).map((stop, i) => (
+                      <div key={stop.id ?? i} className="flex items-start gap-1 text-[11px] text-green-800">
+                        <span className="text-green-400 shrink-0">{i + 1}.</span>
+                        <span className="truncate">{stop.property_address || "(address not set)"}</span>
+                      </div>
+                    ))}
+                    {visit.stops.length > 3 && (
+                      <div className="text-[11px] text-green-500">+{visit.stops.length - 3} more stops</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Floating Undo Button ── */}
       {undoAction && !isCrewReadOnly && (

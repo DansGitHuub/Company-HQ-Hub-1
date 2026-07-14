@@ -6,7 +6,7 @@ import {
 } from "@hello-pangea/dnd";
 import {
   Plus, Pencil, Trash2, Upload, GripVertical,
-  Route, CheckCircle2, XCircle, ChevronDown, ChevronUp, Search, X,
+  Route, CheckCircle2, XCircle, ChevronDown, ChevronUp, Search, X, RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -671,6 +671,19 @@ export default function MaintenanceRoutesPage() {
     setBuilderOpen(true);
   }
 
+  const generateVisitsMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/admin/maintenance-visits/generate").then((r: any) => r.json()),
+    onSuccess: (data: any) => {
+      toast({
+        title: "Visits generated",
+        description: data.message ?? "Done.",
+      });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message ?? "Failed to generate visits.", variant: "destructive" });
+    },
+  });
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       {/* Header */}
@@ -685,6 +698,17 @@ export default function MaintenanceRoutesPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => generateVisitsMutation.mutate()}
+            disabled={generateVisitsMutation.isPending}
+            data-testid="btn-generate-visits"
+          >
+            {generateVisitsMutation.isPending
+              ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" />Generating…</>
+              : <><RefreshCw className="h-4 w-4 mr-2" />Generate Visits</>
+            }
+          </Button>
           <Button variant="outline" onClick={() => navigate("/maintenance-routes/import")} data-testid="btn-import-csv">
             <Upload className="h-4 w-4 mr-2" />
             Import CSV
