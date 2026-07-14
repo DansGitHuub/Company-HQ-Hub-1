@@ -1140,6 +1140,81 @@ export default function DailyWorksheet() {
           </CardContent>
         </Card>
 
+        {/* ── Inline Photo Status Card (visible all day, not just at submit) ── */}
+        {photoSummary?.has_job && !isSubmitted && (
+          <Card
+            data-testid="photo-status-card"
+            className={`overflow-hidden border-2 ${
+              !photoSummary.has_sessions || photoSummary.before === 0 || photoSummary.after === 0
+                ? "border-red-200"
+                : "border-green-200"
+            }`}
+          >
+            <CardHeader
+              className="py-3 px-4 flex flex-row items-center gap-2"
+              style={{
+                background:
+                  !photoSummary.has_sessions || photoSummary.before === 0 || photoSummary.after === 0
+                    ? "#fef2f218"
+                    : "#f0fdf418",
+                borderBottom:
+                  !photoSummary.has_sessions || photoSummary.before === 0 || photoSummary.after === 0
+                    ? "2px solid #fecaca"
+                    : "2px solid #bbf7d0",
+              }}
+            >
+              <div
+                className={`p-1.5 rounded-md ${
+                  !photoSummary.has_sessions || photoSummary.before === 0 || photoSummary.after === 0
+                    ? "bg-red-500"
+                    : "bg-green-600"
+                }`}
+              >
+                <Camera className="h-3.5 w-3.5 text-white" />
+              </div>
+              <CardTitle
+                className={`text-sm font-semibold ${
+                  !photoSummary.has_sessions || photoSummary.before === 0 || photoSummary.after === 0
+                    ? "text-red-600"
+                    : "text-green-700"
+                }`}
+              >
+                Required Photos
+              </CardTitle>
+              {photoSummary.has_sessions && photoSummary.before > 0 && photoSummary.after > 0 && (
+                <Badge className="ml-auto bg-green-100 text-green-700 border border-green-200 text-xs">
+                  All good ✓
+                </Badge>
+              )}
+            </CardHeader>
+            <CardContent className="p-4 space-y-2">
+              {!photoSummary.has_sessions ? (
+                <div className="flex items-start gap-2 text-sm text-red-700" data-testid="photo-status-no-session">
+                  <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-red-500" />
+                  <span>
+                    No time entry for this job yet. Clock in and take Before/After photos from the{" "}
+                    <strong>Schedule</strong> board.
+                  </span>
+                </div>
+              ) : (
+                <>
+                  <PhotoStatusRow label="Before photo" count={photoSummary.before} required />
+                  <PhotoStatusRow label="After photo"  count={photoSummary.after}  required />
+                  {photoSummary.damage > 0 && (
+                    <PhotoStatusRow label="Damage photo" count={photoSummary.damage} required={false} />
+                  )}
+                  {(photoSummary.before === 0 || photoSummary.after === 0) && (
+                    <p className="text-xs text-red-600 pt-1 leading-snug" data-testid="photo-status-hint">
+                      Photos are required before you can submit. Open the job from the{" "}
+                      <strong>Schedule</strong> view to add them.
+                    </p>
+                  )}
+                </>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Section 1 — Materials Used */}
         <Section icon={PackageOpen} title={t("materialsUsed")} count={ws.materials.length} color="#2563eb">
           {ws.materials.length > 0 && (
@@ -1649,6 +1724,24 @@ function ChecklistDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function PhotoStatusRow({ label, count, required }: { label: string; count: number; required: boolean }) {
+  const ok = count > 0;
+  return (
+    <div className="flex items-center gap-2 text-sm" data-testid={`photo-status-row-${label.replace(/\s+/g, "-").toLowerCase()}`}>
+      {ok
+        ? <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
+        : <XCircle      className="w-4 h-4 text-red-500  shrink-0" />
+      }
+      <span className={ok ? "text-green-800" : required ? "text-red-700 font-medium" : "text-gray-600"}>
+        {label}{required && !ok ? " (required)" : ""}
+      </span>
+      <span className="ml-auto text-xs text-gray-400">
+        {count} photo{count !== 1 ? "s" : ""}
+      </span>
+    </div>
   );
 }
 
