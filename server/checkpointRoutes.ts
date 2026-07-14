@@ -22,7 +22,7 @@ export function registerCheckpointRoutes(app: Express, requireAuth: any) {
     try {
       const { rows } = await pool.query(
         `SELECT jc.*,
-                u.first_name || ' ' || u.last_name AS completed_by_name
+                u.name AS completed_by_name
          FROM job_checkpoints jc
          LEFT JOIN users u ON u.id = jc.completed_by
          WHERE jc.job_id = $1

@@ -81,7 +81,7 @@ export function registerArchiveRoutes(app: Express, requireAuth: any, requireRol
 
       // Check for active clock-ins (clock_out is null) in date range
       const activeCheck = await client.query(
-        `SELECT te.id, COALESCE(u.first_name || ' ' || u.last_name, u.username) AS employee_name
+        `SELECT te.id, COALESCE(u.name, u.username) AS employee_name
          FROM time_entries te
          JOIN users u ON u.id = te.user_id
          WHERE te.clock_out IS NULL
@@ -150,14 +150,14 @@ export function registerArchiveRoutes(app: Express, requireAuth: any, requireRol
         `SELECT
            date_trunc('minute', tea.archived_at) AS batch_time,
            tea.archived_by,
-           COALESCE(u.first_name || ' ' || u.last_name, u.username) AS archived_by_name,
+           COALESCE(u.name, u.username) AS archived_by_name,
            COUNT(*)::int AS entry_count,
            COALESCE(SUM(tea.duration_minutes), 0)::int AS total_minutes,
            MIN(tea.clock_in) AS range_start,
            MAX(tea.clock_in) AS range_end
          FROM time_entries_archive tea
          LEFT JOIN users u ON u.id = tea.archived_by
-         GROUP BY date_trunc('minute', tea.archived_at), tea.archived_by, u.first_name, u.last_name, u.username
+         GROUP BY date_trunc('minute', tea.archived_at), tea.archived_by, u.name, u.username
          ORDER BY batch_time DESC
          LIMIT $1 OFFSET $2`,
         [limit, offset]
@@ -208,7 +208,7 @@ export function registerArchiveRoutes(app: Express, requireAuth: any, requireRol
           tea.entry_type, tea.work_area_name,
           tea.archived_at, tea.qbo_exported_at,
           u.id AS user_id,
-          COALESCE(u.first_name || ' ' || u.last_name, u.username) AS employee_name,
+          COALESCE(u.name, u.username) AS employee_name,
           COALESCE(j.title, j.client) AS job_title,
           j.id AS job_id
         FROM time_entries_archive tea

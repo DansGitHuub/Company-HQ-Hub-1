@@ -673,7 +673,7 @@ export function registerReportRoutes(app: Express, requireAuth: any) {
             w.job_id,
             j.title AS job_title,
             j.division,
-            u.first_name || ' ' || u.last_name AS crew_member,
+            u.name AS crew_member,
             u.id AS user_id
           FROM worksheets w
           LEFT JOIN jobs j ON j.id = w.job_id

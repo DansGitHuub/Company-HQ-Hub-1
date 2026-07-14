@@ -86,7 +86,7 @@ export function registerWorkOrderRoutes(app: any, requireAuth: any) {
     if (row.job_id) {
       const te = await pool.query(
         `SELECT te.id, te.clock_in, te.clock_out, te.duration_minutes, te.entry_type, te.notes,
-                u.username, u.first_name, u.last_name
+                u.username, u.name
          FROM time_entries te
          JOIN users u ON u.id = te.user_id
          WHERE te.job_id = $1
