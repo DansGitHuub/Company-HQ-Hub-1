@@ -223,12 +223,16 @@ export default function PlowSiteMapper({ onClose }: { onClose?: () => void } = {
               ))}
             </div>
             {canEdit && (
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <Button size="sm" onClick={() => setIsCreateSiteOpen(true)} className="flex-1" data-testid="new-site-btn">
                   <Plus className="h-4 w-4 mr-1" /> New Site
                 </Button>
                 <Button size="sm" variant="outline" onClick={() => setIsCreateGroupOpen(true)} data-testid="new-group-btn">
                   <FolderPlus className="h-4 w-4" />
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => { window.location.href = "/plow-sites/import"; }}
+                  data-testid="btn-import-plow-sites" className="flex-1">
+                  <Upload className="h-4 w-4 mr-1" /> Import CSV
                 </Button>
               </div>
             )}

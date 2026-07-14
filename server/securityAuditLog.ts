@@ -5,7 +5,8 @@ export type AuditEventType =
   | "login_failure"
   | "permission_change"
   | "settings_change"
-  | "password_reset";
+  | "password_reset"
+  | "data_export";
 
 export interface LogAuditEventParams {
   eventType: AuditEventType;

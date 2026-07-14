@@ -12,11 +12,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, ShieldAlert, LogIn, LogOut, Settings, UserCog } from "lucide-react";
+import { Loader2, ShieldAlert, LogIn, LogOut, Settings, UserCog, Download } from "lucide-react";
 
 type AuditLogRow = {
   id: string;
-  event_type: "login_success" | "login_failure" | "permission_change" | "settings_change";
+  event_type: "login_success" | "login_failure" | "permission_change" | "settings_change" | "data_export";
   actor_user_id: string | null;
   actor_name: string | null;
   actor_user_name: string | null;
@@ -31,10 +31,11 @@ type AuditLogRow = {
 };
 
 const EVENT_TYPE_META: Record<string, { label: string; icon: any; className: string }> = {
-  login_success: { label: "Login Success", icon: LogIn, className: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300" },
-  login_failure: { label: "Login Failure", icon: LogOut, className: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300" },
-  permission_change: { label: "Permission Change", icon: UserCog, className: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300" },
-  settings_change: { label: "Settings Change", icon: Settings, className: "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300" },
+  login_success:    { label: "Login Success",    icon: LogIn,    className: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300" },
+  login_failure:    { label: "Login Failure",    icon: LogOut,   className: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300" },
+  permission_change:{ label: "Permission Change",icon: UserCog,  className: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300" },
+  settings_change:  { label: "Settings Change",  icon: Settings, className: "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300" },
+  data_export:      { label: "Data Export",      icon: Download, className: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300" },
 };
 
 function formatValue(value: any): string {
@@ -76,7 +77,7 @@ export default function SecurityAuditLogPanel() {
           Security Audit Log
         </h3>
         <p className="text-sm text-muted-foreground">
-          Read-only record of logins, failed logins, permission changes, and settings changes.
+          Read-only record of logins, failed logins, permission changes, settings changes, and data exports.
         </p>
       </div>
 
@@ -95,6 +96,7 @@ export default function SecurityAuditLogPanel() {
                   <SelectItem value="login_failure">Login Failure</SelectItem>
                   <SelectItem value="permission_change">Permission Change</SelectItem>
                   <SelectItem value="settings_change">Settings Change</SelectItem>
+                  <SelectItem value="data_export">Data Export</SelectItem>
                 </SelectContent>
               </Select>
             </div>

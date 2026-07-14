@@ -4502,6 +4502,15 @@ Generate detailed information for this landscaping material.`;
       res.setHeader("Content-Type", "text/csv");
       res.setHeader("Content-Disposition", 'attachment; filename="materials-export.csv"');
       res.send(csv);
+
+      const actor = req.user as any;
+      logAuditEvent({
+        eventType: "data_export",
+        actorUserId: actor?.id ?? null,
+        actorName: actor?.name ?? null,
+        description: `Exported materials catalog as CSV (${allMaterials.length} rows)`,
+        ipAddress: req.ip ?? null,
+      }).catch(() => {});
     } catch (err: any) {
       res.status(500).json({ message: "Error exporting materials" });
     }
@@ -7237,6 +7246,84 @@ SECTION GENERATION RULES:
       res.status(201).json(site);
     } catch (err) {
       res.status(500).json({ message: "Error creating plow site" });
+    }
+  });
+
+  // ── Plow Sites CSV Import ────────────────────────────────────────────────
+  app.post("/api/plow-sites/import", requirePlowEditAccess, (req, res, next) => {
+    const multerLib = require("multer");
+    const upload = multerLib({ storage: multerLib.memoryStorage() }).single("file");
+    upload(req, res, next);
+  }, async (req: any, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+      const { parse } = require("csv-parse/sync");
+      const text = req.file.buffer.toString("utf-8");
+      const records: Record<string, string>[] = parse(text, { columns: true, skip_empty_lines: true, trim: true });
+
+      const results = { imported: 0, updated: 0, skipped: 0, errors: [] as string[] };
+
+      const { rows: existingGroups } = await pool.query(`SELECT id, name FROM plow_site_groups`);
+      const groupMap: Record<string, string> = {};
+      for (const g of existingGroups) groupMap[g.name.toLowerCase()] = g.id;
+
+      const { rows: existingSites } = await pool.query(`SELECT id, name, address FROM plow_sites`);
+
+      for (const row of records) {
+        try {
+          const name = row["Name"] || row["name"];
+          const address = row["Address"] || row["address"] || null;
+          if (!name) { results.skipped++; continue; }
+
+          const groupName = row["Group"] || row["group"] || row["GroupName"] || row["group_name"] || null;
+
+          let groupId: string | null = null;
+          if (groupName) {
+            const key = groupName.trim().toLowerCase();
+            if (groupMap[key]) {
+              groupId = groupMap[key];
+            } else {
+              const { rows: ng } = await pool.query(
+                `INSERT INTO plow_site_groups (id, name, color, created_at)
+                 VALUES (gen_random_uuid(), $1, '#64748b', now()) RETURNING id`,
+                [groupName.trim()]
+              );
+              groupId = ng[0].id;
+              groupMap[key] = groupId!;
+            }
+          }
+
+          const latStr = row["Latitude"] || row["latitude"] || null;
+          const lngStr = row["Longitude"] || row["longitude"] || null;
+
+          const match = existingSites.find(
+            (s: any) => s.name.trim().toLowerCase() === name.trim().toLowerCase()
+          );
+
+          if (match) {
+            await pool.query(
+              `UPDATE plow_sites SET address=$1, latitude=$2, longitude=$3, group_id=$4, updated_at=now() WHERE id=$5`,
+              [address, latStr, lngStr, groupId, match.id]
+            );
+            results.updated++;
+            continue;
+          }
+
+          const { rows: newSite } = await pool.query(
+            `INSERT INTO plow_sites (id, name, address, latitude, longitude, group_id, created_at, updated_at)
+             VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, now(), now()) RETURNING id, name, address`,
+            [name.trim(), address, latStr, lngStr, groupId]
+          );
+          existingSites.push(newSite[0]);
+          results.imported++;
+        } catch (rowErr: any) {
+          results.errors.push(`Row "${row["Name"] || row["name"] || "?"}": ${rowErr.message}`);
+          results.skipped++;
+        }
+      }
+      res.json(results);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
     }
   });
 

@@ -188,4 +188,63 @@ export function registerWorksheetPhotoRoutes(app: Express, requireAuth: any) {
       res.status(500).json({ error: err.message });
     }
   });
+
+  // ── GET /api/jobs/:id/photos/export ─────────────────────────────────────────
+  // Returns a ZIP containing all worksheet photos for the given job.
+  // Accessible by Admin or the assigned crew on that job.
+  app.get("/api/jobs/:id/photos/export", requireAuth, async (req, res) => {
+    const jobId = req.params.id;
+    const user = req.user as any;
+
+    try {
+      const { rows: photos } = await pool.query(
+        `SELECT wp.id, wp.photo_url, wp.photo_type, ws.date
+         FROM   worksheet_photos wp
+         JOIN   worksheet_sessions ws ON ws.id = wp.session_id
+         WHERE  ws.job_id = $1
+         ORDER BY ws.date ASC, wp.id ASC`,
+        [jobId]
+      );
+
+      if (!photos.length) {
+        return res.status(404).json({ error: "No photos found for this job" });
+      }
+
+      const archiver = require("archiver");
+      const { ObjectStorageService } = await import(
+        "./replit_integrations/object_storage/objectStorage"
+      );
+      const svc = new ObjectStorageService();
+
+      res.setHeader("Content-Type", "application/zip");
+      res.setHeader("Content-Disposition", `attachment; filename="job-${jobId}-photos.zip"`);
+
+      const archive = archiver("zip", { zlib: { level: 6 } });
+      archive.on("error", (err: Error) => {
+        console.error("[photos/export] archiver error:", err.message);
+      });
+      archive.pipe(res);
+
+      for (let i = 0; i < photos.length; i++) {
+        const photo = photos[i];
+        try {
+          const file = await svc.getObjectEntityFile(photo.photo_url);
+          const buffer = Buffer.from(await file.arrayBuffer());
+          const ext = (photo.photo_url as string).split(".").pop()?.toLowerCase() ?? "jpg";
+          const dateStr = photo.date ? String(photo.date).slice(0, 10) : "unknown";
+          const filename = `${dateStr}_${photo.photo_type || "photo"}_${i + 1}.${ext}`;
+          archive.append(buffer, { name: filename });
+        } catch (photoErr: any) {
+          console.warn(`[photos/export] skipping photo ${photo.id}:`, photoErr.message);
+        }
+      }
+
+      await archive.finalize();
+    } catch (err: any) {
+      console.error("[photos/export] error:", err.message);
+      if (!res.headersSent) {
+        res.status(500).json({ error: err.message });
+      }
+    }
+  });
 }

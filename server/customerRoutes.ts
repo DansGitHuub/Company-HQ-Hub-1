@@ -5,8 +5,12 @@ import { findCustomerDuplicates } from "./lib/customerDuplicates";
 import crypto from "crypto";
 import { getAppUrl } from "./emailService";
 import { customerArchiveEligibility } from "./services/archiveEligibility";
+import multer from "multer";
+import { parse as csvParse } from "csv-parse/sync";
 
 import { requireRole } from "./auth";
+
+const customerImportUpload = multer({ storage: multer.memoryStorage() });
 
 // ── Wave 2: fire-and-forget CompanyCam project creation for a new customer ────
 async function createCCProjectForCustomer(customer: {
@@ -793,6 +797,185 @@ export function registerCustomerRoutes(app: Express, requireAuth: any) {
         }
       } catch (err: any) {
         return res.status(500).json({ message: err.message });
+      }
+    }
+  );
+
+  // ── POST /api/customers/import ──────────────────────────────────────────────
+  // Dedupe by primary email. New rows also create customer_emails/phones rows.
+  app.post(
+    "/api/customers/import",
+    requireRole("Admin", "Manager"),
+    customerImportUpload.single("file"),
+    async (req: any, res) => {
+      try {
+        if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+        const text = req.file.buffer.toString("utf-8");
+        const records: Record<string, string>[] = csvParse(text, {
+          columns: true, skip_empty_lines: true, trim: true,
+        });
+
+        const results = { imported: 0, updated: 0, skipped: 0, errors: [] as string[] };
+
+        for (const row of records) {
+          try {
+            const firstName  = row["FirstName"]   || row["first_name"]   || row["First Name"]  || "";
+            const lastName   = row["LastName"]    || row["last_name"]    || row["Last Name"]   || "";
+            const companyName = row["CompanyName"] || row["company_name"] || row["Company"]     || null;
+            const email      = (row["Email"] || row["email"] || "").trim().toLowerCase();
+            const phone      = row["Phone"] || row["phone"] || null;
+            const address    = row["BillingAddress"] || row["billing_address"] || row["Address"] || null;
+            const city       = row["BillingCity"]    || row["billing_city"]    || row["City"]    || null;
+            const state      = row["BillingState"]   || row["billing_state"]   || row["State"]   || null;
+            const zip        = row["BillingZip"]     || row["billing_zip"]     || row["Zip"]     || null;
+            const source     = row["Source"] || row["source"] || null;
+            const notes      = row["Notes"]  || row["notes"]  || null;
+
+            if (!firstName && !lastName && !companyName) { results.skipped++; continue; }
+
+            let customerId: string | null = null;
+
+            if (email) {
+              const { rows: existing } = await pool.query(
+                `SELECT c.id FROM customers c
+                 JOIN customer_emails ce ON ce.customer_id = c.id
+                 WHERE ce.email = $1 LIMIT 1`,
+                [email]
+              );
+              if (existing.length) {
+                customerId = existing[0].id;
+                await pool.query(
+                  `UPDATE customers SET first_name=$1, last_name=$2, company_name=$3,
+                   billing_address=$4, billing_city=$5, billing_state=$6, billing_zip=$7,
+                   source=$8, notes=$9 WHERE id=$10`,
+                  [firstName, lastName, companyName, address, city, state, zip, source, notes, customerId]
+                );
+                results.updated++;
+                continue;
+              }
+            }
+
+            const { rows: newC } = await pool.query(
+              `INSERT INTO customers (id, first_name, last_name, company_name,
+               billing_address, billing_city, billing_state, billing_zip, source, notes,
+               is_active, created_at, updated_at)
+               VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, true, now(), now())
+               RETURNING id`,
+              [firstName, lastName, companyName, address, city, state, zip, source, notes]
+            );
+            customerId = newC[0].id;
+
+            if (email) {
+              await pool.query(
+                `INSERT INTO customer_emails (id, customer_id, email, email_type, is_primary, created_at)
+                 VALUES (gen_random_uuid(), $1, $2, 'primary', true, now())
+                 ON CONFLICT DO NOTHING`,
+                [customerId, email]
+              );
+            }
+            if (phone) {
+              await pool.query(
+                `INSERT INTO customer_phones (id, customer_id, phone, phone_type, is_primary, created_at)
+                 VALUES (gen_random_uuid(), $1, $2, 'mobile', true, now())
+                 ON CONFLICT DO NOTHING`,
+                [customerId, phone]
+              );
+            }
+
+            results.imported++;
+          } catch (rowErr: any) {
+            const label = row["Email"] || row["FirstName"] || "?";
+            results.errors.push(`Row "${label}": ${rowErr.message}`);
+            results.skipped++;
+          }
+        }
+
+        res.json(results);
+      } catch (err: any) {
+        res.status(500).json({ message: err.message });
+      }
+    }
+  );
+
+  // ── POST /api/properties/import ─────────────────────────────────────────────
+  // CSV must include customer_email to resolve customer_id. Dedupe by customer_id + address.
+  app.post(
+    "/api/properties/import",
+    requireRole("Admin", "Manager"),
+    customerImportUpload.single("file"),
+    async (req: any, res) => {
+      try {
+        if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+        const text = req.file.buffer.toString("utf-8");
+        const records: Record<string, string>[] = csvParse(text, {
+          columns: true, skip_empty_lines: true, trim: true,
+        });
+
+        const results = { imported: 0, updated: 0, skipped: 0, errors: [] as string[] };
+
+        for (const row of records) {
+          try {
+            const customerEmail = (row["CustomerEmail"] || row["customer_email"] || row["Email"] || "").trim().toLowerCase();
+            const address       = row["Address"]  || row["address"]  || "";
+            const city          = row["City"]     || row["city"]     || null;
+            const state         = row["State"]    || row["state"]    || null;
+            const zip           = row["Zip"]      || row["zip"]      || null;
+            const propertyType  = row["PropertyType"] || row["property_type"] || row["Type"] || null;
+            const notes         = row["Notes"]    || row["notes"]    || null;
+            const accessNotes   = row["AccessNotes"] || row["access_notes"] || null;
+            const gateCode      = row["GateCode"] || row["gate_code"] || null;
+            const hasPets       = (row["HasPets"] || row["has_pets"] || "").toLowerCase() === "true";
+
+            if (!address) { results.skipped++; continue; }
+
+            let customerId: string | null = null;
+            if (customerEmail) {
+              const { rows: cr } = await pool.query(
+                `SELECT c.id FROM customers c
+                 JOIN customer_emails ce ON ce.customer_id = c.id
+                 WHERE ce.email = $1 LIMIT 1`,
+                [customerEmail]
+              );
+              if (cr.length) customerId = cr[0].id;
+            }
+            if (!customerId) {
+              results.errors.push(`Row "${address}": customer email "${customerEmail}" not found — skipped`);
+              results.skipped++;
+              continue;
+            }
+
+            const { rows: existing } = await pool.query(
+              `SELECT id FROM properties WHERE customer_id=$1 AND address=$2 LIMIT 1`,
+              [customerId, address]
+            );
+            if (existing.length) {
+              await pool.query(
+                `UPDATE properties SET city=$1, state=$2, zip=$3, property_type=$4,
+                 notes=$5, access_notes=$6, gate_code=$7, has_pets=$8, updated_at=now()
+                 WHERE id=$9`,
+                [city, state, zip, propertyType, notes, accessNotes, gateCode, hasPets, existing[0].id]
+              );
+              results.updated++;
+              continue;
+            }
+
+            await pool.query(
+              `INSERT INTO properties (id, customer_id, address, city, state, zip,
+               property_type, notes, access_notes, gate_code, has_pets, created_at, updated_at)
+               VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now(), now())`,
+              [customerId, address, city, state, zip, propertyType, notes, accessNotes, gateCode, hasPets]
+            );
+            results.imported++;
+          } catch (rowErr: any) {
+            const label = row["Address"] || "?";
+            results.errors.push(`Row "${label}": ${rowErr.message}`);
+            results.skipped++;
+          }
+        }
+
+        res.json(results);
+      } catch (err: any) {
+        res.status(500).json({ message: err.message });
       }
     }
   );

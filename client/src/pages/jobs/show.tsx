@@ -19,7 +19,7 @@ import {
   Plus, Trash2, HardHat, MessageSquare, ShieldCheck, GitMerge, CheckSquare, ClipboardCheck, Award, Truck, Users, Package,
   TrendingUp, TrendingDown, Camera, Image, ExternalLink, ClipboardList, Phone,
   LayoutDashboard, BookOpen, Activity, StickyNote, Wrench, AlertTriangle,
-  Link2, Upload, Mail, X, Eye,
+  Link2, Upload, Mail, X, Eye, Download,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -595,7 +595,19 @@ function FilesPhotosTab({ jobId }: { jobId: string }) {
           <CardTitle className="text-sm font-semibold flex items-center gap-2">
             <Image className="h-4 w-4 text-muted-foreground" />
             Worksheet Photos
-            <span className="ml-auto text-xs font-normal text-muted-foreground">{wsPhotos.length} photo{wsPhotos.length !== 1 ? "s" : ""}</span>
+            <span className="text-xs font-normal text-muted-foreground">{wsPhotos.length} photo{wsPhotos.length !== 1 ? "s" : ""}</span>
+            {wsPhotos.length > 0 && (
+              <a
+                href={`/api/jobs/${jobId}/photos/export`}
+                download
+                className="ml-auto"
+                data-testid="btn-export-photos-zip"
+              >
+                <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5">
+                  <Download className="h-3 w-3" /> Download ZIP
+                </Button>
+              </a>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent className="px-5 pb-4">

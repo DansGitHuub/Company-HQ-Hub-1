@@ -118,6 +118,9 @@ import ConsultationsPage from "@/pages/Consultations";
 import MorsBudget from "@/pages/MorsBudget";
 import CustomerList from "@/pages/customers/index";
 import CustomerDetail from "@/pages/customers/show";
+import CustomersImport from "@/pages/CustomersImport";
+import PropertiesImport from "@/pages/PropertiesImport";
+import PlowSitesImport from "@/pages/PlowSitesImport";
 import PlowSiteMapper from "@/pages/PlowSiteMapper";
 import ProcessAuditor from "@/pages/ProcessAuditor";
 import IntegrationWizard from "@/pages/IntegrationWizard";
@@ -291,6 +294,9 @@ function AppRoutes() {
         <ProtectedRoute path="/employees" component={Employees} allowedRoles={ADMIN_OR_MANAGER} />
         <ProtectedRoute path="/vendors/import" component={VendorsImport} allowedRoles={ADMIN_OR_MANAGER} />
         <ProtectedRoute path="/vendors" component={Vendors} allowedRoles={ADMIN_OR_MANAGER} />
+        <ProtectedRoute path="/customers/import" component={CustomersImport} allowedRoles={ADMIN_OR_MANAGER} />
+        <ProtectedRoute path="/properties/import" component={PropertiesImport} allowedRoles={ADMIN_OR_MANAGER} />
+        <ProtectedRoute path="/plow-sites/import" component={PlowSitesImport} allowedRoles={ADMIN_OR_MANAGER} />
         <Route path="/onboarding-forms/:formType?/:submissionId?" component={FormHub} />
         <Route path="/employee" component={EmployeePortal} />
         <Route path="/employee-portal" component={EmployeePortal} />

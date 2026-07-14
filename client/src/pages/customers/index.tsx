@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Plus, Search, Users, Pencil } from "lucide-react";
+import { Plus, Search, Users, Pencil, Upload } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -78,10 +78,20 @@ export default function CustomerList() {
             {customers.length} {t("customer")}{customers.length !== 1 ? "s" : ""} {status === "all" ? "total" : status}
           </p>
         </div>
-        <Button className="bg-green-600 hover:bg-green-700 text-white"
-          onClick={openAdd} data-testid="button-add-customer">
-          <Plus className="h-4 w-4 mr-2" /> {t("addCustomer")}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setLocation("/customers/import")}
+            data-testid="btn-import-customers">
+            <Upload className="h-4 w-4 mr-2" /> Import CSV
+          </Button>
+          <Button variant="outline" onClick={() => setLocation("/properties/import")}
+            data-testid="btn-import-properties">
+            <Upload className="h-4 w-4 mr-2" /> Import Properties
+          </Button>
+          <Button className="bg-green-600 hover:bg-green-700 text-white"
+            onClick={openAdd} data-testid="button-add-customer">
+            <Plus className="h-4 w-4 mr-2" /> {t("addCustomer")}
+          </Button>
+        </div>
       </div>
 
       {/* Status filter chips */}
