@@ -107,15 +107,15 @@ export async function notifyStaff(payload: StaffNotificationPayload): Promise<vo
     }
   }
 
-  // 3. SMS
+  // 3. SMS — staff are employees; use the employee channel (440 number w/ customer fallback)
   if (
     channels.includes("sms") &&
     user?.phone &&
     user?.smsNotifications !== false &&
-    isSmsConfigured("customer")
+    isSmsConfigured("employee")
   ) {
     try {
-      await sendSms(user.phone, smsBody || message, "customer");
+      await sendSms(user.phone, smsBody || message, "employee");
     } catch (err: any) {
       log(`[notify] SMS notification failed for user ${userId}: ${err.message}`, "notify");
     }
