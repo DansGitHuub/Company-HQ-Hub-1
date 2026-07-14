@@ -121,6 +121,8 @@ import CustomerDetail from "@/pages/customers/show";
 import CustomersImport from "@/pages/CustomersImport";
 import PropertiesImport from "@/pages/PropertiesImport";
 import PlowSitesImport from "@/pages/PlowSitesImport";
+import MaintenanceRoutes from "@/pages/maintenance-routes/index";
+import MaintenanceRoutesImport from "@/pages/MaintenanceRoutesImport";
 import PlowSiteMapper from "@/pages/PlowSiteMapper";
 import ProcessAuditor from "@/pages/ProcessAuditor";
 import IntegrationWizard from "@/pages/IntegrationWizard";
@@ -297,6 +299,8 @@ function AppRoutes() {
         <ProtectedRoute path="/customers/import" component={CustomersImport} allowedRoles={ADMIN_OR_MANAGER} />
         <ProtectedRoute path="/properties/import" component={PropertiesImport} allowedRoles={ADMIN_OR_MANAGER} />
         <ProtectedRoute path="/plow-sites/import" component={PlowSitesImport} allowedRoles={ADMIN_OR_MANAGER} />
+        <ProtectedRoute path="/maintenance-routes/import" component={MaintenanceRoutesImport} allowedRoles={ADMIN_OR_MANAGER} />
+        <ProtectedRoute path="/maintenance-routes" component={MaintenanceRoutes} allowedRoles={ADMIN_OR_MANAGER} />
         <Route path="/onboarding-forms/:formType?/:submissionId?" component={FormHub} />
         <Route path="/employee" component={EmployeePortal} />
         <Route path="/employee-portal" component={EmployeePortal} />

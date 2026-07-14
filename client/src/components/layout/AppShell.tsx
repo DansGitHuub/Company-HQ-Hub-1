@@ -58,6 +58,7 @@ import {
   MessageSquare,
   Leaf,
   CalendarDays,
+  Route,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -421,6 +422,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     budget_settings: { icon: DollarSign, label: t("nav.budgetPricing"), href: "/mors-budget" },
     tools: { icon: Snowflake, label: t("nav.tools"), href: "/tools" },
   plow_mapper: { icon: Snowflake, label: t("nav.plowMapper"), href: "/tools/plow-mapper" },
+  maintenance_routes: { icon: Route, label: "Maintenance Routes", href: "/maintenance-routes" },
   manager_dashboard: { icon: BarChart2, label: "Manager Dashboard", href: "/manager-dashboard" },
   daily_plan: { icon: CalendarDays, label: "Daily Plan", href: "/daily-plan" },
   };
@@ -438,7 +440,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const sidebarSections: NavSection[] = [
     { label: "MY SPACE", items: ["hq", "dashboard", "my_hours", "my_day", "messages"] },
     { label: "SALES", items: ["customers", "consultations", "estimates", "jobs"] },
-    { label: "OPERATIONS", items: ["manager_dashboard", "todos", "work_orders", "daily_plan", "scheduling", "time_tracking", "equipment"] },
+    { label: "OPERATIONS", items: ["manager_dashboard", "todos", "work_orders", "daily_plan", "scheduling", "maintenance_routes", "time_tracking", "equipment"] },
     { label: "RESOURCES", items: ["sops", "education", "testing", "tools"] },
     { label: "ADMIN", items: ["admin", "employees", "vendors", "hiring", "invoices", "reports", "budget_settings", "customer_messages", "customer_blasts"] },
   ];

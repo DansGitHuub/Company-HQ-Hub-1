@@ -80,6 +80,8 @@ import { runSkippedWorkNotesMigration } from "./migrations/skippedWorkNotes";
 import { runCrewNotesCustomerVisibleMigration } from "./migrations/crewNotesCustomerVisible";
 import { runCustomerSatisfactionMigration } from "./migrations/customerSatisfaction";
 import { runMessageBlastsMigration, runMessageBlastsConstraintsMigration } from "./migrations/messageBlasts";
+import { runMaintenanceRoutesMigration } from "./migrations/maintenanceRoutes";
+import { registerMaintenanceRouteRoutes } from "./maintenanceRouteRoutes";
 import { syncCCProjectsFromApi } from "./companyCamRoutes";
 import { registerPublicPages } from "./publicPages";
 import { startLeadAlertScheduler } from "./consultationRoutes";
@@ -259,6 +261,7 @@ app.use((req, res, next) => {
   await runCustomerSatisfactionMigration();
   await runMessageBlastsMigration();
   await runMessageBlastsConstraintsMigration();
+  await runMaintenanceRoutesMigration();
 
   // ── Step 3: Register routes and seeds ──────────────────────────────────────
   // Public pages must come before registerRoutes (which sets up the catch-all).
@@ -284,6 +287,7 @@ app.use((req, res, next) => {
   }, 6 * 60 * 60 * 1000);
 
   registerNotificationPreferenceRoutes(app);
+  registerMaintenanceRouteRoutes(app);
   await registerRoutes(httpServer, app);
 
   await seedUsers();
