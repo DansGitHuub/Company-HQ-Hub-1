@@ -29,7 +29,7 @@ export default function InquiryPage() {
     property_address: "", best_time_to_reach: "", how_heard: "",
     service_type: "", project_type: "new_project",
     project_description: "", desired_timeline: "", budget_range: "",
-    additional_notes: "", agreement_accepted: false,
+    additional_notes: "", agreement_accepted: false, sms_consent: false,
   });
 
   const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
@@ -74,6 +74,10 @@ export default function InquiryPage() {
     }
     if (!form.agreement_accepted) {
       setError("Please accept the agreement to continue.");
+      return;
+    }
+    if (form.sms_consent && !form.phone.trim()) {
+      setError("Please enter your phone number to receive text messages.");
       return;
     }
 
@@ -347,7 +351,31 @@ export default function InquiryPage() {
                 )}
               </div>
 
-              {/* Agreement */}
+              {/* SMS Consent — optional, unchecked by default (TCPA/A2P 10DLC compliance) */}
+              <div className="rounded-lg border bg-gray-50 p-4">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.sms_consent}
+                    onChange={e => f("sms_consent", e.target.checked)}
+                    className="mt-1 h-4 w-4 flex-shrink-0"
+                    data-testid="checkbox-sms-consent"
+                  />
+                  <span className="text-sm text-gray-600 leading-relaxed">
+                    I agree to receive text messages from Chapin Landscapes about my inquiry, estimates, scheduling, job status, and payment confirmations. Message frequency varies. Message and data rates may apply. Reply STOP to opt out or HELP for help. See our{" "}
+                    <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-green-700 underline hover:text-green-800">Privacy Policy</a>
+                    {" "}and{" "}
+                    <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-green-700 underline hover:text-green-800">Terms of Service</a>.
+                  </span>
+                </label>
+                {form.sms_consent && !form.phone.trim() && (
+                  <p className="mt-2 text-xs text-amber-700 pl-7">
+                    ⚠ Please enter your phone number above to receive text messages.
+                  </p>
+                )}
+              </div>
+
+              {/* Agreement — required to submit */}
               <div className="rounded-lg border bg-gray-50 p-4">
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input

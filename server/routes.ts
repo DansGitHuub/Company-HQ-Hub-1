@@ -10518,6 +10518,7 @@ Provide accurate information based on publicly available documentation.`;
 
       // Read sms_consent from the top-level body (not inside data blob)
       const smsConsent = req.body.smsConsent === true;
+      const submitterIp = (req.headers["x-forwarded-for"] as string)?.split(",")[0].trim() || req.ip || null;
 
       // Mark as submitted
       const updated = await storage.updateJobApplication(app.id, {
@@ -10531,6 +10532,14 @@ Provide accurate information based on publicly available documentation.`;
         smsConsent,
         smsConsentAt: smsConsent ? new Date() : null,
       } as any);
+
+      // Persist IP separately (column not in Drizzle schema; additive raw SQL)
+      if (smsConsent) {
+        await pool.query(
+          `UPDATE job_applications SET sms_consent_ip = $1 WHERE id = $2`,
+          [submitterIp, app.id]
+        );
+      }
 
       // Auto-create candidate in "Application Received"
       let newCandidate: any = null;

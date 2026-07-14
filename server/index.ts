@@ -81,6 +81,7 @@ import { runCrewNotesCustomerVisibleMigration } from "./migrations/crewNotesCust
 import { runCustomerSatisfactionMigration } from "./migrations/customerSatisfaction";
 import { runMessageBlastsMigration, runMessageBlastsConstraintsMigration } from "./migrations/messageBlasts";
 import { runMaintenanceRoutesMigration } from "./migrations/maintenanceRoutes";
+import { runSmsConsentMigration } from "./migrations/smsConsent";
 import { registerMaintenanceRouteRoutes } from "./maintenanceRouteRoutes";
 import { syncCCProjectsFromApi } from "./companyCamRoutes";
 import { registerPublicPages } from "./publicPages";
@@ -262,6 +263,7 @@ app.use((req, res, next) => {
   await runMessageBlastsMigration();
   await runMessageBlastsConstraintsMigration();
   await runMaintenanceRoutesMigration();
+  await runSmsConsentMigration();
 
   // ── Step 3: Register routes and seeds ──────────────────────────────────────
   // Public pages must come before registerRoutes (which sets up the catch-all).

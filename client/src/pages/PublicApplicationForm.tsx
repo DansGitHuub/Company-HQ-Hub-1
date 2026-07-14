@@ -575,7 +575,10 @@ export default function PublicApplicationForm() {
               />
               <span className="text-xs text-gray-600 leading-relaxed">
                 <span className="font-semibold text-gray-700">SMS Text Message Consent (Optional) — </span>
-                I agree to receive SMS text messages from Chapin Landscapes regarding my application status, interview scheduling, and hiring decisions. Message and data rates may apply. Reply STOP to opt out at any time.
+                I agree to receive text messages from Chapin Landscapes about my application, interview scheduling, and hiring updates. Message frequency varies. Message and data rates may apply. Reply STOP to opt out or HELP for help. See our{" "}
+                <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-green-700 underline hover:text-green-800">Privacy Policy</a>
+                {" "}and{" "}
+                <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-green-700 underline hover:text-green-800">Terms of Service</a>.
               </span>
             </label>
           </div>

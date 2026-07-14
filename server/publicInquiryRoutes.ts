@@ -22,7 +22,7 @@ export async function registerPublicInquiryRoutes(app: Express) {
         first_name, last_name, email, phone, property_address,
         best_time_to_reach, how_heard, service_type, project_type,
         project_description, desired_timeline, budget_range,
-        additional_notes, photo_urls, agreement_accepted,
+        additional_notes, photo_urls, agreement_accepted, sms_consent,
       } = req.body;
 
       if (!first_name || !last_name || !email) {
@@ -34,8 +34,14 @@ export async function registerPublicInquiryRoutes(app: Express) {
       if (!agreement_accepted) {
         return res.status(400).json({ error: "Agreement must be accepted" });
       }
+      // If SMS consent is given, a phone number is required to receive texts
+      if (sms_consent && !phone?.trim()) {
+        return res.status(400).json({ error: "A phone number is required when you opt in to text messages." });
+      }
 
       const contactName = `${first_name} ${last_name}`;
+      const smsConsentGiven = sms_consent === true;
+      const submitterIp = (req.headers["x-forwarded-for"] as string)?.split(",")[0].trim() || req.ip || null;
 
       // Create consultation
       const { rows } = await pool.query(`
@@ -43,14 +49,18 @@ export async function registerPublicInquiryRoutes(app: Express) {
           contact_name, contact_phone, contact_email, address,
           pipeline_stage, service_type, best_time_to_reach, how_heard,
           project_type, project_description, desired_timeline, budget_range,
-          additional_notes, photo_urls, status
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb,'scheduled')
+          additional_notes, photo_urls, status,
+          sms_consent, sms_consent_at, sms_consent_ip
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb,'scheduled',$15,$16,$17)
         RETURNING *
       `, [
         contactName, phone || null, email, property_address || null,
         "new_lead", service_type || null, best_time_to_reach || null, how_heard || null,
         project_type || null, project_description, desired_timeline || null, budget_range || null,
         additional_notes || null, JSON.stringify(photo_urls || []),
+        smsConsentGiven,
+        smsConsentGiven ? new Date() : null,
+        smsConsentGiven ? submitterIp : null,
       ]);
 
       const created = rows[0];
