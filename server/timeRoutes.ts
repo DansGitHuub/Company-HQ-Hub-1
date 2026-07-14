@@ -683,7 +683,9 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
            te.clock_in_lat,
            te.clock_in_lng,
            te.clock_out_lat,
-           te.clock_out_lng
+           te.clock_out_lng,
+           te.qbo_exported_at,
+           te.updated_at
          FROM time_entries te
          LEFT JOIN users u ON u.id = te.user_id
          LEFT JOIN jobs  j ON j.id = te.job_id

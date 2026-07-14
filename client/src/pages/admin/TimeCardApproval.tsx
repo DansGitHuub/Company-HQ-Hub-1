@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/table";
 import {
   Loader2, CheckCircle2, XCircle, Clock, RotateCcw, ChevronDown, ChevronRight, Pencil, MapPin,
+  Users, Tag, AlertCircle,
 } from "lucide-react";
 import { format, parseISO, startOfWeek, endOfWeek } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -46,6 +47,8 @@ interface TimeEntry {
   clock_in_lng: number | null;
   clock_out_lat: number | null;
   clock_out_lng: number | null;
+  qbo_exported_at: string | null;
+  updated_at: string | null;
 }
 
 interface Employee { id: string; name: string | null; username: string; }
@@ -116,6 +119,7 @@ export default function TimeCardApproval() {
   const [selected,     setSelected]     = useState<Set<string>>(new Set());
   const [collapsed,    setCollapsed]    = useState<Record<string, boolean>>({});
   const [loadingIds,   setLoadingIds]   = useState<Set<string>>(new Set());
+  const [groupBy,      setGroupBy]      = useState<"employee" | "work_area">("employee");
 
   // Reject dialog state
   const [rejectDialog, setRejectDialog] = useState<{
@@ -146,14 +150,23 @@ export default function TimeCardApproval() {
   const grouped = useMemo(() => {
     const map = new Map<string, { key: string; label: string; entries: TimeEntry[]; totalMins: number }>();
     for (const e of data?.entries ?? []) {
-      if (!map.has(e.user_id))
-        map.set(e.user_id, { key: e.user_id, label: e.employee_name || e.username, entries: [], totalMins: 0 });
-      const g = map.get(e.user_id)!;
+      let key: string;
+      let label: string;
+      if (groupBy === "work_area") {
+        key   = e.work_area_name ?? "__none__";
+        label = e.work_area_name ?? "No Work Area";
+      } else {
+        key   = e.user_id;
+        label = e.employee_name || e.username;
+      }
+      if (!map.has(key))
+        map.set(key, { key, label, entries: [], totalMins: 0 });
+      const g = map.get(key)!;
       g.entries.push(e);
       g.totalMins += Number(e.duration_minutes) || 0;
     }
-    return Array.from(map.values());
-  }, [data?.entries]);
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [data?.entries, groupBy]);
 
   const counts = data?.counts ?? { pending: 0, approved: 0, rejected: 0 };
 
@@ -305,7 +318,34 @@ export default function TimeCardApproval() {
             Approve or reject employee time entries
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Group By toggle */}
+          <div className="flex items-center gap-1 border border-gray-200 rounded-lg p-0.5 bg-gray-50">
+            <button
+              onClick={() => setGroupBy("employee")}
+              data-testid="button-group-by-employee"
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                groupBy === "employee"
+                  ? "bg-white shadow-sm text-gray-900"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <Users className="w-3.5 h-3.5" />
+              By Employee
+            </button>
+            <button
+              onClick={() => setGroupBy("work_area")}
+              data-testid="button-group-by-work-area"
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                groupBy === "work_area"
+                  ? "bg-white shadow-sm text-gray-900"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <Tag className="w-3.5 h-3.5" />
+              By Work Area
+            </button>
+          </div>
           {allPendingIds.length > 0 && (
             <Button
               size="sm"
@@ -586,10 +626,23 @@ export default function TimeCardApproval() {
                                   </span>
                                 </TableCell>
                                 <TableCell>
-                                  <span data-testid={`status-${entry.id}`}
-                                    className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${cfg.pill}`}>
-                                    {cfg.label}
-                                  </span>
+                                  <div className="flex flex-col gap-1">
+                                    <span data-testid={`status-${entry.id}`}
+                                      className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${cfg.pill}`}>
+                                      {cfg.label}
+                                    </span>
+                                    {entry.qbo_exported_at && entry.updated_at &&
+                                      new Date(entry.updated_at) > new Date(entry.qbo_exported_at) && (
+                                      <span
+                                        data-testid={`badge-modified-after-export-${entry.id}`}
+                                        title={`Exported ${new Date(entry.qbo_exported_at).toLocaleString()} · Last edited ${new Date(entry.updated_at).toLocaleString()}`}
+                                        className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-0.5 w-fit"
+                                      >
+                                        <AlertCircle className="w-2.5 h-2.5" />
+                                        Modified after export
+                                      </span>
+                                    )}
+                                  </div>
                                 </TableCell>
                                 <TableCell className="max-w-[180px]">
                                   {entry.rejection_note ? (
