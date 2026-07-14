@@ -27,7 +27,7 @@ import {
   User, Bell, BellOff, Globe, Shield, Save, Loader2, Lock, Eye, EyeOff, Check,
   Settings as SettingsIcon, Mail, Monitor, Sun, Moon, Layers, Tag, FileText, Building2,
   Plus, Pencil, Trash2, Link2, Link2Off, RefreshCw, CheckCircle, XCircle, AlertCircle,
-  ArrowLeftRight, Info, Calendar, Clock, Camera, Briefcase,
+  ArrowLeftRight, Info, Calendar, Clock, Camera, Briefcase, Smartphone,
 } from "lucide-react";
 type SettingsSection = "profile" | "notifications" | "language" | "work-areas" | "divisions" | "estimate-templates" | "company" | "quickbooks" | "terms" | "availability" | "job-templates";
 
@@ -399,6 +399,7 @@ export default function Settings() {
               <OperationalDefaultsSection />
               <RegionalSeasonalSection />
               <JobDefaultsSection />
+              <SmsNumbersSection />
               <CompanyCamSettingsCard />
             </div>
           )}
@@ -1581,6 +1582,82 @@ function JobDefaultsSection() {
         <div className="pt-2">
           <Button data-testid="btn-save-job-defaults" onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
             {saveMut.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving…</> : <><Save className="h-4 w-4 mr-2" />Save Job Defaults</>}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── SMS Numbers Section ───────────────────────────────────────────────────────
+function SmsNumbersSection() {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+
+  const { data: custSetting } = useQuery<{ key: string; value: string } | null>({
+    queryKey: ["/api/settings/sms_customer_number"],
+    queryFn: () => apiRequest("GET", "/api/settings/sms_customer_number").then(r => r.ok ? r.json() : null).catch(() => null),
+  });
+  const { data: empSetting } = useQuery<{ key: string; value: string } | null>({
+    queryKey: ["/api/settings/sms_employee_number"],
+    queryFn: () => apiRequest("GET", "/api/settings/sms_employee_number").then(r => r.ok ? r.json() : null).catch(() => null),
+  });
+
+  const [custNum, setCustNum] = useState("");
+  const [empNum, setEmpNum] = useState("");
+
+  useEffect(() => { if (custSetting?.value) setCustNum(custSetting.value); }, [custSetting?.value]);
+  useEffect(() => { if (empSetting?.value) setEmpNum(empSetting.value); }, [empSetting?.value]);
+
+  const saveMut = useMutation({
+    mutationFn: () => Promise.all([
+      apiRequest("PUT", "/api/settings/sms_customer_number", { value: custNum.trim() }),
+      apiRequest("PUT", "/api/settings/sms_employee_number", { value: empNum.trim() }),
+    ]),
+    onSuccess: () => {
+      toast({ title: "SMS numbers saved" });
+      qc.invalidateQueries({ queryKey: ["/api/settings/sms_customer_number"] });
+      qc.invalidateQueries({ queryKey: ["/api/settings/sms_employee_number"] });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  return (
+    <Card className="max-w-2xl">
+      <CardHeader className="py-4">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Smartphone className="h-5 w-5" /> SMS Phone Numbers
+        </CardTitle>
+        <CardDescription>Twilio numbers used for outbound SMS. Change only when you get a new number approved.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-1">
+          <Label htmlFor="sms-cust">Customer SMS number</Label>
+          <Input
+            id="sms-cust"
+            type="tel"
+            data-testid="input-sms-customer-number"
+            value={custNum}
+            placeholder="+18444409258"
+            onChange={e => setCustNum(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">Used for customer-facing messages (inquiries, job status, invoices).</p>
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="sms-emp">Employee / Hiring SMS number</Label>
+          <Input
+            id="sms-emp"
+            type="tel"
+            data-testid="input-sms-employee-number"
+            value={empNum}
+            placeholder="+14402764144"
+            onChange={e => setEmpNum(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">Used for hiring and internal employee notifications.</p>
+        </div>
+        <div className="flex justify-end">
+          <Button data-testid="btn-save-sms-numbers" onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
+            {saveMut.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving…</> : <><Save className="h-4 w-4 mr-2" />Save SMS Numbers</>}
           </Button>
         </div>
       </CardContent>

@@ -31,6 +31,16 @@ export async function runAppSettingsMigration() {
       VALUES ('hiring_notification_emails', '["dan@chapinlandscapes.com"]')
       ON CONFLICT (key) DO NOTHING
     `);
+    await client.query(`
+      INSERT INTO app_settings (key, value)
+      VALUES ('sms_customer_number', '+18444409258')
+      ON CONFLICT (key) DO NOTHING
+    `);
+    await client.query(`
+      INSERT INTO app_settings (key, value)
+      VALUES ('sms_employee_number', '+14402764144')
+      ON CONFLICT (key) DO NOTHING
+    `);
     await client.query("COMMIT");
     console.log("[migration] app_settings table ready");
   } catch (err) {
