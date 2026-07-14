@@ -27,7 +27,7 @@ import {
   User, Bell, BellOff, Globe, Shield, Save, Loader2, Lock, Eye, EyeOff, Check,
   Settings as SettingsIcon, Mail, Monitor, Sun, Moon, Layers, Tag, FileText, Building2,
   Plus, Pencil, Trash2, Link2, Link2Off, RefreshCw, CheckCircle, XCircle, AlertCircle,
-  ArrowLeftRight, Info, Calendar, Clock, Camera,
+  ArrowLeftRight, Info, Calendar, Clock, Camera, Briefcase,
 } from "lucide-react";
 type SettingsSection = "profile" | "notifications" | "language" | "work-areas" | "divisions" | "estimate-templates" | "company" | "quickbooks" | "terms" | "availability" | "job-templates";
 
@@ -395,6 +395,10 @@ export default function Settings() {
           {activeSection === "company" && isAdminOrManager && (
             <div className="space-y-4">
               <CompanyInfoSection />
+              <LegalInsuranceSection />
+              <OperationalDefaultsSection />
+              <RegionalSeasonalSection />
+              <JobDefaultsSection />
               <CompanyCamSettingsCard />
             </div>
           )}
@@ -1201,6 +1205,382 @@ function CompanyInfoSection() {
         <div className="pt-2">
           <Button data-testid="btn-save-company" onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
             {saveMut.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving…</> : <><Save className="h-4 w-4 mr-2" />{t("settings.saveCompanyInfo")}</>}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Legal & Insurance Section
+// ═══════════════════════════════════════════════════════════════════════════════
+interface CompanyLegal {
+  ein: string;
+  workers_comp_rate: string;
+  insurance_carrier: string;
+  insurance_policy_number: string;
+}
+function LegalInsuranceSection() {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const empty: CompanyLegal = { ein: "", workers_comp_rate: "", insurance_carrier: "", insurance_policy_number: "" };
+  const [form, setForm] = useState<CompanyLegal>(empty);
+
+  const { data: setting } = useQuery<{ key: string; value: string }>({
+    queryKey: ["/api/settings/company_legal"],
+    queryFn: () => apiRequest("GET", "/api/settings/company_legal").then(r => r.ok ? r.json() : null).catch(() => null),
+  });
+  useEffect(() => {
+    if (setting?.value) { try { setForm({ ...empty, ...JSON.parse(setting.value) }); } catch {} }
+  }, [setting?.value]);
+
+  const saveMut = useMutation({
+    mutationFn: () => apiRequest("PUT", "/api/settings/company_legal", { value: JSON.stringify(form) }),
+    onSuccess: () => { toast({ title: "Legal & insurance info saved" }); qc.invalidateQueries({ queryKey: ["/api/settings/company_legal"] }); },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  return (
+    <Card className="max-w-2xl">
+      <CardHeader className="py-4">
+        <CardTitle className="flex items-center gap-2 text-base"><Shield className="h-5 w-5" /> Legal &amp; Insurance</CardTitle>
+        <CardDescription>EIN and insurance details used on contracts and compliance documents</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <Label htmlFor="cl-ein">EIN (Employer ID #)</Label>
+            <Input id="cl-ein" data-testid="input-cl-ein" value={form.ein} placeholder="12-3456789"
+              onChange={e => setForm(f => ({ ...f, ein: e.target.value }))} />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="cl-wc">Workers' Comp Rate (%)</Label>
+            <Input id="cl-wc" type="number" min="0" max="100" step="0.01" data-testid="input-cl-workers-comp-rate"
+              value={form.workers_comp_rate} placeholder="2.50"
+              onChange={e => setForm(f => ({ ...f, workers_comp_rate: e.target.value }))} />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <Label htmlFor="cl-carrier">Insurance Carrier</Label>
+            <Input id="cl-carrier" data-testid="input-cl-insurance-carrier" value={form.insurance_carrier}
+              placeholder="Acme Insurance Co." onChange={e => setForm(f => ({ ...f, insurance_carrier: e.target.value }))} />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="cl-policy">Policy Number</Label>
+            <Input id="cl-policy" data-testid="input-cl-insurance-policy-number" value={form.insurance_policy_number}
+              placeholder="POL-000000" onChange={e => setForm(f => ({ ...f, insurance_policy_number: e.target.value }))} />
+          </div>
+        </div>
+        <div className="pt-2">
+          <Button data-testid="btn-save-legal" onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
+            {saveMut.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving…</> : <><Save className="h-4 w-4 mr-2" />Save Legal &amp; Insurance</>}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Operational Defaults Section
+// ═══════════════════════════════════════════════════════════════════════════════
+const TIMEZONES = [
+  "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles",
+  "America/Phoenix", "America/Anchorage", "Pacific/Honolulu", "America/Puerto_Rico",
+];
+const DATE_FORMATS = ["MM/DD/YYYY", "DD/MM/YYYY", "YYYY-MM-DD"];
+const WEEK_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+interface CompanyOperational {
+  time_zone: string;
+  currency: string;
+  measurement_system: "imperial" | "metric";
+  date_format: string;
+  business_hours_open: string;
+  business_hours_close: string;
+  business_days: string[];
+}
+function OperationalDefaultsSection() {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const empty: CompanyOperational = {
+    time_zone: "America/New_York", currency: "USD", measurement_system: "imperial",
+    date_format: "MM/DD/YYYY", business_hours_open: "07:00", business_hours_close: "17:00",
+    business_days: ["Mon", "Tue", "Wed", "Thu", "Fri"],
+  };
+  const [form, setForm] = useState<CompanyOperational>(empty);
+
+  const { data: setting } = useQuery<{ key: string; value: string }>({
+    queryKey: ["/api/settings/company_operational"],
+    queryFn: () => apiRequest("GET", "/api/settings/company_operational").then(r => r.ok ? r.json() : null).catch(() => null),
+  });
+  useEffect(() => {
+    if (setting?.value) { try { setForm({ ...empty, ...JSON.parse(setting.value) }); } catch {} }
+  }, [setting?.value]);
+
+  const saveMut = useMutation({
+    mutationFn: () => apiRequest("PUT", "/api/settings/company_operational", { value: JSON.stringify(form) }),
+    onSuccess: () => { toast({ title: "Operational defaults saved" }); qc.invalidateQueries({ queryKey: ["/api/settings/company_operational"] }); },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const toggleDay = (day: string) => {
+    setForm(f => ({
+      ...f,
+      business_days: f.business_days.includes(day)
+        ? f.business_days.filter(d => d !== day)
+        : [...f.business_days, day],
+    }));
+  };
+
+  return (
+    <Card className="max-w-2xl">
+      <CardHeader className="py-4">
+        <CardTitle className="flex items-center gap-2 text-base"><Globe className="h-5 w-5" /> Operational Defaults</CardTitle>
+        <CardDescription>Time zone, regional format, and business hours used across the platform</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <Label>Time Zone</Label>
+            <Select value={form.time_zone} onValueChange={v => setForm(f => ({ ...f, time_zone: v }))}>
+              <SelectTrigger data-testid="select-time-zone"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {TIMEZONES.map(tz => <SelectItem key={tz} value={tz}>{tz}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>Currency</Label>
+            <Select value={form.currency} onValueChange={v => setForm(f => ({ ...f, currency: v }))}>
+              <SelectTrigger data-testid="select-currency"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="USD">USD — US Dollar ($)</SelectItem>
+                <SelectItem value="CAD">CAD — Canadian Dollar</SelectItem>
+                <SelectItem value="EUR">EUR — Euro</SelectItem>
+                <SelectItem value="GBP">GBP — British Pound</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <Label>Measurement System</Label>
+            <Select value={form.measurement_system} onValueChange={v => setForm(f => ({ ...f, measurement_system: v as "imperial" | "metric" }))}>
+              <SelectTrigger data-testid="select-measurement-system"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="imperial">Imperial (ft, mi, lbs)</SelectItem>
+                <SelectItem value="metric">Metric (m, km, kg)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>Date Format</Label>
+            <Select value={form.date_format} onValueChange={v => setForm(f => ({ ...f, date_format: v }))}>
+              <SelectTrigger data-testid="select-date-format"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {DATE_FORMATS.map(fmt => <SelectItem key={fmt} value={fmt}>{fmt}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <Separator />
+        <div className="space-y-2">
+          <Label>Business Hours</Label>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label htmlFor="op-open" className="text-xs text-muted-foreground">Opens</Label>
+              <Input id="op-open" type="time" data-testid="input-business-hours-open" value={form.business_hours_open}
+                onChange={e => setForm(f => ({ ...f, business_hours_open: e.target.value }))} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="op-close" className="text-xs text-muted-foreground">Closes</Label>
+              <Input id="op-close" type="time" data-testid="input-business-hours-close" value={form.business_hours_close}
+                onChange={e => setForm(f => ({ ...f, business_hours_close: e.target.value }))} />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Working Days</Label>
+            <div className="flex gap-1.5 flex-wrap" data-testid="business-days-picker">
+              {WEEK_DAYS.map(day => (
+                <button key={day} type="button" data-testid={`day-toggle-${day}`}
+                  onClick={() => toggleDay(day)}
+                  className={`px-3 py-1 text-xs font-medium rounded-md border transition-colors ${
+                    form.business_days.includes(day)
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-muted text-muted-foreground border-border hover:bg-muted/80"
+                  }`}>
+                  {day}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="pt-2">
+          <Button data-testid="btn-save-operational" onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
+            {saveMut.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving…</> : <><Save className="h-4 w-4 mr-2" />Save Operational Defaults</>}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Regional & Seasonal Section
+// ═══════════════════════════════════════════════════════════════════════════════
+interface CompanyRegional {
+  usda_zone: string;
+  frost_date_spring: string;
+  frost_date_fall: string;
+  winter_shutdown_start: string;
+  winter_shutdown_end: string;
+}
+function RegionalSeasonalSection() {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const empty: CompanyRegional = { usda_zone: "", frost_date_spring: "", frost_date_fall: "", winter_shutdown_start: "", winter_shutdown_end: "" };
+  const [form, setForm] = useState<CompanyRegional>(empty);
+
+  const { data: setting } = useQuery<{ key: string; value: string }>({
+    queryKey: ["/api/settings/company_regional"],
+    queryFn: () => apiRequest("GET", "/api/settings/company_regional").then(r => r.ok ? r.json() : null).catch(() => null),
+  });
+  useEffect(() => {
+    if (setting?.value) { try { setForm({ ...empty, ...JSON.parse(setting.value) }); } catch {} }
+  }, [setting?.value]);
+
+  const saveMut = useMutation({
+    mutationFn: () => apiRequest("PUT", "/api/settings/company_regional", { value: JSON.stringify(form) }),
+    onSuccess: () => { toast({ title: "Regional settings saved" }); qc.invalidateQueries({ queryKey: ["/api/settings/company_regional"] }); },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  return (
+    <Card className="max-w-2xl">
+      <CardHeader className="py-4">
+        <CardTitle className="flex items-center gap-2 text-base"><Sun className="h-5 w-5" /> Regional &amp; Seasonal</CardTitle>
+        <CardDescription>Climate zone, frost dates, and winter shutdown window for scheduling and estimates</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-1">
+          <Label htmlFor="reg-zone">USDA Hardiness Zone</Label>
+          <Select value={form.usda_zone} onValueChange={v => setForm(f => ({ ...f, usda_zone: v }))}>
+            <SelectTrigger data-testid="select-usda-zone" id="reg-zone"><SelectValue placeholder="Select zone…" /></SelectTrigger>
+            <SelectContent>
+              {["3a","3b","4a","4b","5a","5b","6a","6b","7a","7b","8a","8b","9a","9b","10a","10b","11a","11b"].map(z => (
+                <SelectItem key={z} value={z}>Zone {z}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <Label htmlFor="reg-frost-spring">Last Spring Frost (avg)</Label>
+            <Input id="reg-frost-spring" type="date" data-testid="input-frost-date-spring"
+              value={form.frost_date_spring} onChange={e => setForm(f => ({ ...f, frost_date_spring: e.target.value }))} />
+            <p className="text-xs text-muted-foreground">Typical last frost date in spring (e.g. May 1)</p>
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="reg-frost-fall">First Fall Frost (avg)</Label>
+            <Input id="reg-frost-fall" type="date" data-testid="input-frost-date-fall"
+              value={form.frost_date_fall} onChange={e => setForm(f => ({ ...f, frost_date_fall: e.target.value }))} />
+            <p className="text-xs text-muted-foreground">Typical first frost date in fall (e.g. Oct 15)</p>
+          </div>
+        </div>
+        <Separator />
+        <div className="space-y-1">
+          <Label>Winter Shutdown Window</Label>
+          <p className="text-xs text-muted-foreground">Date range when outdoor work is suspended each year</p>
+          <div className="grid grid-cols-2 gap-4 mt-1">
+            <div className="space-y-1">
+              <Label htmlFor="reg-ws-start" className="text-xs text-muted-foreground">Shutdown Start</Label>
+              <Input id="reg-ws-start" type="date" data-testid="input-winter-shutdown-start"
+                value={form.winter_shutdown_start} onChange={e => setForm(f => ({ ...f, winter_shutdown_start: e.target.value }))} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="reg-ws-end" className="text-xs text-muted-foreground">Shutdown End (resume date)</Label>
+              <Input id="reg-ws-end" type="date" data-testid="input-winter-shutdown-end"
+                value={form.winter_shutdown_end} onChange={e => setForm(f => ({ ...f, winter_shutdown_end: e.target.value }))} />
+            </div>
+          </div>
+        </div>
+        <div className="pt-2">
+          <Button data-testid="btn-save-regional" onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
+            {saveMut.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving…</> : <><Save className="h-4 w-4 mr-2" />Save Regional Settings</>}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Job Defaults Section
+// ═══════════════════════════════════════════════════════════════════════════════
+interface CompanyJobDefaults {
+  default_workday_hours: string;
+  default_start_time: string;
+  default_crew_size: string;
+  default_warranty_months: string;
+}
+function JobDefaultsSection() {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const empty: CompanyJobDefaults = { default_workday_hours: "8", default_start_time: "07:00", default_crew_size: "3", default_warranty_months: "12" };
+  const [form, setForm] = useState<CompanyJobDefaults>(empty);
+
+  const { data: setting } = useQuery<{ key: string; value: string }>({
+    queryKey: ["/api/settings/company_job_defaults"],
+    queryFn: () => apiRequest("GET", "/api/settings/company_job_defaults").then(r => r.ok ? r.json() : null).catch(() => null),
+  });
+  useEffect(() => {
+    if (setting?.value) { try { setForm({ ...empty, ...JSON.parse(setting.value) }); } catch {} }
+  }, [setting?.value]);
+
+  const saveMut = useMutation({
+    mutationFn: () => apiRequest("PUT", "/api/settings/company_job_defaults", { value: JSON.stringify(form) }),
+    onSuccess: () => { toast({ title: "Job defaults saved" }); qc.invalidateQueries({ queryKey: ["/api/settings/company_job_defaults"] }); },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  return (
+    <Card className="max-w-2xl">
+      <CardHeader className="py-4">
+        <CardTitle className="flex items-center gap-2 text-base"><Briefcase className="h-5 w-5" /> Job Defaults</CardTitle>
+        <CardDescription>Default values pre-filled when creating or scheduling new jobs</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <Label htmlFor="jd-hours">Default Workday (hours)</Label>
+            <Input id="jd-hours" type="number" min="1" max="24" step="0.5" data-testid="input-default-workday-hours"
+              value={form.default_workday_hours} onChange={e => setForm(f => ({ ...f, default_workday_hours: e.target.value }))} />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="jd-start">Default Start Time</Label>
+            <Input id="jd-start" type="time" data-testid="input-default-start-time"
+              value={form.default_start_time} onChange={e => setForm(f => ({ ...f, default_start_time: e.target.value }))} />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <Label htmlFor="jd-crew">Default Crew Size</Label>
+            <Input id="jd-crew" type="number" min="1" max="50" step="1" data-testid="input-default-crew-size"
+              value={form.default_crew_size} onChange={e => setForm(f => ({ ...f, default_crew_size: e.target.value }))} />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="jd-warranty">Default Warranty (months)</Label>
+            <Input id="jd-warranty" type="number" min="0" max="120" step="1" data-testid="input-default-warranty-months"
+              value={form.default_warranty_months} onChange={e => setForm(f => ({ ...f, default_warranty_months: e.target.value }))} />
+            <p className="text-xs text-muted-foreground">Used as the default on job closeout/warranty creation</p>
+          </div>
+        </div>
+        <div className="pt-2">
+          <Button data-testid="btn-save-job-defaults" onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
+            {saveMut.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving…</> : <><Save className="h-4 w-4 mr-2" />Save Job Defaults</>}
           </Button>
         </div>
       </CardContent>
