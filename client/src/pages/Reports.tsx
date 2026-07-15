@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,8 +15,10 @@ import {
   AlertCircle, AlertTriangle, BarChart2, Layers, FileText, Timer, PieChart, ChevronDown, ChevronUp,
   Download, Wrench, CheckCircle,
 } from "lucide-react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Star } from "lucide-react";
 import { downloadCsv } from "@/lib/csv-export";
+import { useFavorites } from "@/hooks/use-favorites";
+import { cn } from "@/lib/utils";
 
 type Tab = "revenue" | "invoice-aging" | "crew-hours" | "profitability" | "time-by-division" | "materials-spend" | "equipment-repair" | "material-shortages";
 
@@ -1512,6 +1514,7 @@ const TABS: { id: Tab; label: string; icon: React.ElementType; desc: string }[] 
 
 export default function Reports() {
   const [activeTab, setActiveTab] = useState<Tab>("revenue");
+  const { isFavorited, toggleFavorite } = useFavorites("report");
 
   return (
     <div className="container max-w-6xl mx-auto py-6 px-4" data-testid="reports-page">
@@ -1529,19 +1532,31 @@ export default function Reports() {
         <nav className="md:w-56 shrink-0">
           <div className="flex md:flex-col gap-1 overflow-x-auto md:overflow-visible pb-2 md:pb-0">
             {TABS.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                data-testid={`reports-tab-${tab.id}`}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-                  activeTab === tab.id
-                    ? "bg-primary text-primary-foreground"
-                    : "hover:bg-muted text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <tab.icon className="h-4 w-4 shrink-0" />
-                {tab.label}
-              </button>
+              <div key={tab.id} className="flex items-center group">
+                <button
+                  onClick={() => setActiveTab(tab.id)}
+                  data-testid={`reports-tab-${tab.id}`}
+                  className={`flex-1 flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+                    activeTab === tab.id
+                      ? "bg-primary text-primary-foreground"
+                      : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <tab.icon className="h-4 w-4 shrink-0" />
+                  {tab.label}
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); toggleFavorite("report", tab.id); }}
+                  className={cn(
+                    "p-1 rounded opacity-0 group-hover:opacity-100 transition-all shrink-0 ml-0.5",
+                    isFavorited("report", tab.id) ? "opacity-100 text-amber-500 hover:text-amber-600" : "text-muted-foreground hover:text-amber-500"
+                  )}
+                  data-testid={`button-star-report-${tab.id}`}
+                  title={isFavorited("report", tab.id) ? "Unstar report" : "Star report"}
+                >
+                  <Star className={cn("h-3.5 w-3.5", isFavorited("report", tab.id) && "fill-current")} />
+                </button>
+              </div>
             ))}
           </div>
         </nav>

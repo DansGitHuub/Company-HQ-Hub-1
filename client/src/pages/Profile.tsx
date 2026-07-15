@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Camera, Save, User, Mail, Phone, FileText, Palette, Check, Lock, Eye, EyeOff, Bell, BellOff, Volume2, VolumeX, Mic, Play, Globe } from "lucide-react";
+import { Loader2, Camera, Save, User, Mail, Phone, FileText, Palette, Check, Lock, Eye, EyeOff, Bell, BellOff, Volume2, VolumeX, Mic, Play, Globe, Accessibility } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
@@ -704,6 +704,83 @@ export default function Profile() {
 
       <VoiceSettingsSection />
 
+      <AccessibilitySettingsSection profile={profile} />
+
     </div>
+  );
+}
+
+function AccessibilitySettingsSection({ profile }: { profile: any }) {
+  const { toast } = useToast();
+  const [largerText, setLargerText] = useState(false);
+  const [highContrast, setHighContrast] = useState(false);
+
+  useEffect(() => {
+    setLargerText(profile?.largerText ?? false);
+    setHighContrast(profile?.highContrast ?? false);
+  }, [profile?.largerText, profile?.highContrast]);
+
+  function save(key: "largerText" | "highContrast", value: boolean) {
+    const html = document.documentElement;
+    if (key === "largerText") {
+      setLargerText(value);
+      if (value) html.classList.add("larger-text");
+      else html.classList.remove("larger-text");
+    } else {
+      setHighContrast(value);
+      if (value) html.classList.add("high-contrast");
+      else html.classList.remove("high-contrast");
+    }
+    apiRequest("PATCH", "/api/profile", { [key]: value }).then(() => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
+      toast({ title: "Accessibility preference saved" });
+    });
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Accessibility className="h-5 w-5" />
+          Accessibility
+        </CardTitle>
+        <CardDescription>Display options saved to your account and applied across all devices.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="border rounded-lg p-4 space-y-2 bg-muted/30">
+          <Label className="flex items-center gap-2 font-medium">Larger text</Label>
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">Increases the base font size by ~12% for easier reading.</p>
+            <Button
+              type="button"
+              variant={largerText ? "default" : "outline"}
+              size="sm"
+              className="gap-2 shrink-0"
+              onClick={() => save("largerText", !largerText)}
+              data-testid="button-toggle-larger-text"
+            >
+              {largerText ? "On" : "Off"}
+            </Button>
+          </div>
+        </div>
+        <div className="border rounded-lg p-4 space-y-2 bg-muted/30">
+          <Label className="flex items-center gap-2 font-medium">High-contrast mode</Label>
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">Increases text and border contrast for improved visibility.</p>
+            <Button
+              type="button"
+              variant={highContrast ? "default" : "outline"}
+              size="sm"
+              className="gap-2 shrink-0"
+              onClick={() => save("highContrast", !highContrast)}
+              data-testid="button-toggle-high-contrast"
+            >
+              {highContrast ? "On" : "Off"}
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

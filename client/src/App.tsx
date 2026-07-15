@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { VoiceProvider } from "@/hooks/use-voice";
+import { useAccessibility } from "@/hooks/use-accessibility";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import AppShell from "@/components/layout/AppShell";
 import { Loader2 } from "lucide-react";
@@ -49,6 +50,11 @@ const ROUTE_TITLES: Record<string, string> = {
   "/overdue": "Overdue Items",
   "/daily-plan": "Daily Plan",
 };
+
+function AccessibilityApplicator() {
+  useAccessibility();
+  return null;
+}
 
 function DocumentTitleSetter() {
   const [location] = useLocation();
@@ -393,6 +399,7 @@ function App() {
         <TooltipProvider>
           <AuthProvider>
             <VoiceProvider>
+              <AccessibilityApplicator />
               <Toaster />
               <AppRoutes />
             </VoiceProvider>

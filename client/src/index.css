@@ -151,6 +151,26 @@
   --card-border: 1px solid hsl(var(--border));
 }
 
+html.larger-text {
+  font-size: 112.5%;
+}
+
+html.high-contrast {
+  --foreground: 0 0% 4%;
+  --muted-foreground: 0 0% 18%;
+  --border: 0 0% 42%;
+  --input: 0 0% 42%;
+  --card-foreground: 0 0% 4%;
+}
+
+html.dark.high-contrast {
+  --foreground: 0 0% 98%;
+  --muted-foreground: 0 0% 82%;
+  --border: 0 0% 58%;
+  --input: 0 0% 58%;
+  --card-foreground: 0 0% 98%;
+}
+
 @layer base {
   * {
     @apply border-border;

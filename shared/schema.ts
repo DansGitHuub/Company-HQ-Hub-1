@@ -33,6 +33,8 @@ export const users = pgTable("users", {
   voiceSelection: text("voice_selection").default("alloy"),
   language: text("language").default("en"),
   dashboardWidgets: jsonb("dashboard_widgets"),
+  largerText: boolean("larger_text").notNull().default(false),
+  highContrast: boolean("high_contrast").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -1233,6 +1235,7 @@ export const companySettings = pgTable("company_settings", {
   aiImagesWatermarkDefault: boolean("ai_images_watermark_default").default(true),
   companySignature: text("company_signature"),
   hqContent: jsonb("hq_content").$type<{ vision?: string; mission?: string; goals?: Array<{ text: string; target: string; status: string }> }>(),
+  measurementUnit: text("measurement_unit").default("imperial"),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 

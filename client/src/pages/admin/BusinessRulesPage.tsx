@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Loader2, SlidersHorizontal, DollarSign, CalendarClock, GitMerge } from "lucide-react";
+import { Loader2, SlidersHorizontal, DollarSign, CalendarClock, GitMerge, Ruler } from "lucide-react";
 import { Redirect } from "wouter";
 
 interface BusinessRule {
@@ -130,6 +130,7 @@ function RuleRow({ rule, onSaved }: { rule: BusinessRule; onSaved: () => void })
 export default function BusinessRulesPage() {
   const { effectiveRole } = useAuth();
   const qc = useQueryClient();
+  const { toast } = useToast();
 
   if (!["Admin", "Master Admin"].includes(effectiveRole ?? "")) {
     return <Redirect to="/" />;
@@ -138,6 +139,25 @@ export default function BusinessRulesPage() {
   const { data: rules = [], isLoading } = useQuery<BusinessRule[]>({
     queryKey: ["/api/business-rules"],
     queryFn: () => fetch("/api/business-rules", { credentials: "include" }).then(r => r.json()),
+  });
+
+  const { data: companySettings } = useQuery<any>({
+    queryKey: ["/api/company-settings"],
+    queryFn: () => fetch("/api/company-settings", { credentials: "include" }).then(r => r.json()),
+  });
+
+  const [measurementUnit, setMeasurementUnit] = useState<"imperial" | "metric">("imperial");
+  useEffect(() => {
+    if (companySettings?.measurementUnit) setMeasurementUnit(companySettings.measurementUnit as any);
+  }, [companySettings?.measurementUnit]);
+
+  const measurementMut = useMutation({
+    mutationFn: (value: string) => apiRequest("PATCH", "/api/company-settings", { measurementUnit: value }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/company-settings"] });
+      toast({ title: "Measurement unit updated" });
+    },
+    onError: () => toast({ title: "Could not save", variant: "destructive" }),
   });
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["/api/business-rules"] });
@@ -163,6 +183,42 @@ export default function BusinessRulesPage() {
       </div>
 
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        {/* ── Regional & Units ──────────────────────────────────────────────── */}
+        <Card data-testid="card-measurement-unit">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <Ruler className="h-4 w-4 text-primary" />
+              <span className="text-sm font-semibold">Regional &amp; Units</span>
+            </div>
+            <p className="text-xs text-muted-foreground">Company-wide measurement system used across estimates, jobs, and inventory.</p>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="flex items-center justify-between py-3">
+              <div className="min-w-0 flex-1 mr-4">
+                <p className="text-sm font-medium">Measurement System</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Sets the default unit system for measurements entered app-wide (sq ft / ft vs m² / m).
+                </p>
+              </div>
+              <Select
+                value={measurementUnit}
+                onValueChange={(v) => {
+                  setMeasurementUnit(v as "imperial" | "metric");
+                  measurementMut.mutate(v);
+                }}
+              >
+                <SelectTrigger className="w-36" data-testid="select-measurement-unit">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="imperial">Imperial (ft / sq ft)</SelectItem>
+                  <SelectItem value="metric">Metric (m / m²)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />

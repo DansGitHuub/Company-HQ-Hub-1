@@ -15,13 +15,15 @@ import {
 } from "@/components/ui/table";
 import {
   Plus, Search, Briefcase, ChevronRight, Calendar,
-  Mail, MessageSquare, Send, Loader2, AlertCircle, CheckCircle2, Download,
+  Mail, MessageSquare, Send, Loader2, AlertCircle, CheckCircle2, Download, Pin,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { JobFormModal, EMPTY_JOB } from "./JobFormModal";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { downloadCsv } from "@/lib/csv-export";
+import { useFavorites } from "@/hooks/use-favorites";
+import { cn } from "@/lib/utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface JobRow {
@@ -251,6 +253,7 @@ export default function JobsPage() {
 
   const STATUS_TABS = [
     { value: "all",             label: tJobs("all") },
+    { value: "pinned",          label: "📌 Pinned" },
     { value: "lead",            label: "Not Accepted" },
     { value: "scheduled",       label: tJobs("scheduled") },
     { value: "in_progress",     label: tJobs("inProgress") },
@@ -271,12 +274,13 @@ export default function JobsPage() {
   const [dateTo, setDateTo] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [contactJob, setContactJob] = useState<JobRow | null>(null);
+  const { isFavorited, toggleFavorite, favoritedIds } = useFavorites("job");
 
   // Build query params
   const params = new URLSearchParams();
   if (activeTab === "behind_schedule") {
     params.set("behind_schedule", "true");
-  } else if (activeTab !== "all") {
+  } else if (activeTab !== "all" && activeTab !== "pinned") {
     params.set("status", activeTab);
   }
   if (search.trim()) params.set("search", search.trim());
@@ -290,6 +294,11 @@ export default function JobsPage() {
       return res.json();
     },
   });
+
+  const pinnedIds = favoritedIds("job");
+  const displayedJobs = activeTab === "pinned"
+    ? jobs.filter((j) => pinnedIds.has(String(j.id)))
+    : jobs;
 
   function handleExportCsv() {
     const headers = [
@@ -449,7 +458,7 @@ export default function JobsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {jobs.map((job) => (
+                {displayedJobs.map((job) => (
                   <TableRow
                     key={job.id}
                     className="cursor-pointer hover:bg-muted/50"
@@ -498,8 +507,18 @@ export default function JobsPage() {
                         </Button>
                       </TableCell>
                     )}
-                    <TableCell>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    <TableCell className="w-16 text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); toggleFavorite("job", String(job.id)); }}
+                          className={cn("p-1.5 rounded transition-colors", isFavorited("job", String(job.id)) ? "text-primary" : "text-muted-foreground hover:text-primary")}
+                          data-testid={`button-pin-job-${job.id}`}
+                          title={isFavorited("job", String(job.id)) ? "Unpin job" : "Pin job"}
+                        >
+                          <Pin className={cn("h-3.5 w-3.5", isFavorited("job", String(job.id)) && "fill-current")} />
+                        </button>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

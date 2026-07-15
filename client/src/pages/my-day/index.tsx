@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -37,6 +37,7 @@ import {
   Users,
   Zap,
   Route,
+  Pin,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { useTranslation } from "react-i18next";
@@ -44,6 +45,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DailyAgenda from "@/pages/DailyAgenda";
 import DailyWorksheet from "@/pages/DailyWorksheet";
 import RoutePage from "@/pages/Route/index";
+import { useFavorites } from "@/hooks/use-favorites";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface WorkArea {
@@ -214,6 +216,52 @@ const QUICK_CHIPS = [
   { labelKey: "chipShopTime",  entryType: "shop_time",  icon: Wrench },
   { labelKey: "chipBreak",     entryType: "break",      icon: Coffee },
 ];
+
+// ─── Pinned Jobs mini-section ────────────────────────────────────────────────
+function PinnedJobsSection() {
+  const [, navigate] = useLocation();
+  const { favoritedIds } = useFavorites("job");
+  const pinnedIds = favoritedIds("job");
+
+  const { data: allJobs = [] } = useQuery<{ id: string; title: string; client: string; status: string; scheduled_date: string | null }[]>({
+    queryKey: ["/api/jobs", "pinned-section"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/jobs");
+      return res.json();
+    },
+    enabled: pinnedIds.size > 0,
+  });
+
+  const pinned = allJobs.filter((j) => pinnedIds.has(String(j.id)));
+  if (pinned.length === 0) return null;
+
+  return (
+    <section data-testid="pinned-jobs-section">
+      <div className="flex items-center gap-2 mb-2">
+        <Pin className="w-3.5 h-3.5 text-primary" />
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400">Pinned Jobs</h2>
+      </div>
+      <div className="space-y-1.5">
+        {pinned.map((job) => (
+          <button
+            key={job.id}
+            className="w-full flex items-center justify-between gap-3 bg-primary/5 border border-primary/20 rounded-xl px-3 py-2 hover:bg-primary/10 transition-colors text-left"
+            onClick={() => navigate(`/jobs/${job.id}`)}
+            data-testid={`pinned-job-${job.id}`}
+          >
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground truncate">{job.title || job.client || "Untitled Job"}</p>
+              {job.scheduled_date && (
+                <p className="text-xs text-muted-foreground mt-0.5">{new Date(job.scheduled_date).toLocaleDateString()}</p>
+              )}
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function MyDayPage() {
@@ -463,6 +511,9 @@ export default function MyDayPage() {
         </p>
         <p className="text-sm text-gray-500 mt-0.5">{formatDate(new Date())}</p>
       </div>
+
+      {/* ── Pinned Jobs Section ─────────────────────────────────────────── */}
+      <PinnedJobsSection />
 
       {/* ── Active Entry Banner ─────────────────────────────────────────── */}
       {activeEntry && (

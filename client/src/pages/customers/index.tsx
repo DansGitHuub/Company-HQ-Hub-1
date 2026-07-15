@@ -8,11 +8,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Plus, Search, Users, Pencil, Upload } from "lucide-react";
+import { Plus, Search, Users, Pencil, Upload, Star } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { CustomerFormModal } from "./CustomerFormModal";
+import { useFavorites } from "@/hooks/use-favorites";
 
 interface Customer {
   id: string;
@@ -26,12 +27,13 @@ interface Customer {
   primary_email: string | null;
 }
 
-type StatusFilter = "active" | "archived" | "all";
+type StatusFilter = "active" | "archived" | "all" | "favorites";
 
 const STATUS_CHIPS: { value: StatusFilter; label: string }[] = [
-  { value: "active",   label: "Active" },
-  { value: "archived", label: "Archived" },
-  { value: "all",      label: "All" },
+  { value: "active",    label: "Active" },
+  { value: "archived",  label: "Archived" },
+  { value: "all",       label: "All" },
+  { value: "favorites", label: "★ Favorites" },
 ];
 
 export default function CustomerList() {
@@ -41,26 +43,31 @@ export default function CustomerList() {
   const [showForm, setShowForm] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [, setLocation] = useLocation();
+  const { isFavorited, toggleFavorite, favoritedIds } = useFavorites("customer");
 
+  const apiStatus = status === "favorites" ? "all" : status;
   const { data: customers = [], isLoading } = useQuery<Customer[]>({
-    queryKey: ["/api/customers", { status }],
+    queryKey: ["/api/customers", { status: apiStatus }],
     queryFn: async () => {
-      const res = await apiRequest("GET", `/api/customers?status=${status}`);
+      const res = await apiRequest("GET", `/api/customers?status=${apiStatus}`);
       return res.json();
     },
   });
 
-  const filtered = customers.filter((c) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      `${c.first_name} ${c.last_name}`.toLowerCase().includes(q) ||
-      (c.company_name?.toLowerCase().includes(q) ?? false) ||
-      (c.primary_phone?.includes(q) ?? false) ||
-      (c.primary_email?.toLowerCase().includes(q) ?? false) ||
-      (c.source?.toLowerCase().includes(q) ?? false)
-    );
-  });
+  const pinnedIds = favoritedIds("customer");
+  const filtered = customers
+    .filter((c) => status !== "favorites" || pinnedIds.has(String(c.id)))
+    .filter((c) => {
+      if (!search) return true;
+      const q = search.toLowerCase();
+      return (
+        `${c.first_name} ${c.last_name}`.toLowerCase().includes(q) ||
+        (c.company_name?.toLowerCase().includes(q) ?? false) ||
+        (c.primary_phone?.includes(q) ?? false) ||
+        (c.primary_email?.toLowerCase().includes(q) ?? false) ||
+        (c.source?.toLowerCase().includes(q) ?? false)
+      );
+    });
 
   const openAdd = () => { setEditingCustomer(null); setShowForm(true); };
   const openEdit = (e: React.MouseEvent, c: Customer) => {
@@ -179,12 +186,22 @@ export default function CustomerList() {
                     <TableCell className="text-muted-foreground">
                       {format(new Date(customer.created_at), "MMM d, yyyy")}
                     </TableCell>
-                    <TableCell>
-                      <button onClick={(e) => openEdit(e, customer)}
-                        className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                        data-testid={`button-edit-customer-${customer.id}`} title={t("editCustomer")}>
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
+                    <TableCell className="w-20 text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); toggleFavorite("customer", String(customer.id)); }}
+                          className={cn("p-1.5 rounded transition-colors", isFavorited("customer", String(customer.id)) ? "text-amber-500 hover:text-amber-600" : "text-muted-foreground hover:text-amber-500")}
+                          data-testid={`button-star-customer-${customer.id}`}
+                          title={isFavorited("customer", String(customer.id)) ? "Remove from favorites" : "Add to favorites"}
+                        >
+                          <Star className={cn("h-3.5 w-3.5", isFavorited("customer", String(customer.id)) && "fill-current")} />
+                        </button>
+                        <button onClick={(e) => openEdit(e, customer)}
+                          className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                          data-testid={`button-edit-customer-${customer.id}`} title={t("editCustomer")}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

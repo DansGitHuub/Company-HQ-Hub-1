@@ -45,6 +45,7 @@ import { registerBusinessRulesRoutes } from "./businessRulesRoutes";
 import { registerAutomationRoutes } from "./automationRoutes";
 import { registerFeatureFlagsRoutes } from "./featureFlagsRoutes";
 import { registerFeedbackReportsRoutes } from "./feedbackReportsRoutes";
+import { registerFavoritesRoutes } from "./favoritesRoutes";
 import { registerPricingRoutes } from "./pricingRoutes";
 import { registerCalculatorRoutes } from "./calculatorRoutes";
 import { registerUserAvailabilityRoutes } from "./userAvailabilityRoutes";
@@ -6902,7 +6903,7 @@ SECTION GENERATION RULES:
 
   app.patch("/api/profile", requireAuth, async (req, res) => {
     try {
-      const { name, email, bio, phone, profilePicture, theme, emailNotifications, language, currentPassword, newPassword } = req.body;
+      const { name, email, bio, phone, profilePicture, theme, emailNotifications, language, largerText, highContrast, currentPassword, newPassword } = req.body;
       const updates: any = { updatedAt: new Date() };
       if (name !== undefined) updates.name = name;
       if (email !== undefined) updates.email = email;
@@ -6912,6 +6913,8 @@ SECTION GENERATION RULES:
       if (theme !== undefined) updates.theme = theme;
       if (emailNotifications !== undefined) updates.emailNotifications = emailNotifications;
       if (language !== undefined) updates.language = language;
+      if (largerText !== undefined) updates.largerText = largerText;
+      if (highContrast !== undefined) updates.highContrast = highContrast;
       
       // Self-service password change
       if (newPassword) {
@@ -10166,6 +10169,7 @@ Provide accurate information based on publicly available documentation.`;
   registerWorksheetPhotoRoutes(app, requireAuth);
   registerDailyLogRoutes(app, requireAuth);
   registerSettingsRoutes(app, requireAuth, requireRole);
+  await registerFavoritesRoutes(app, requireAuth);
   registerPricingRoutes(app, requireAuth);
   registerCalculatorRoutes(app, requireAuth);
   setInterval(runNoteReminderScheduler, 60 * 1000);
