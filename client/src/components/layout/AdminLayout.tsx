@@ -40,6 +40,7 @@ import {
   FlagTriangleRight,
   MessageSquareWarning,
   Library,
+  HeartPulse,
 } from "lucide-react";
 
 type AdminNavItem = {
@@ -152,6 +153,7 @@ const ADMIN_GROUPS: AdminNavGroup[] = [
       { value: "customer-duplicates", label: "Customer Duplicates", icon: GitMerge, href: "/admin/customer-duplicates" },
       { value: "app-testing", label: "App Testing", icon: Eye, tab: "app-testing" },
       { value: "system-status", label: "System Status", icon: AlertCircle, tab: "system-status" },
+      { value: "system-health", label: "System Health", icon: HeartPulse, href: "/admin/system-health" },
       { value: "security-audit-log", label: "Security Audit Log", icon: AlertTriangle, tab: "security-audit-log" },
       { value: "diagnostics", label: "Diagnostics", icon: Wrench, tab: "diagnostics" },
     ],

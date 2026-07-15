@@ -91,6 +91,7 @@ import { startInvoiceOverdueScheduler } from "./invoiceOverdueScheduler";
 import { startWorksheetAlertScheduler } from "./worksheetAlertScheduler";
 import { startAutomationScheduler } from "./automationScheduler";
 import { startMaintenanceVisitScheduler } from "./maintenanceVisitScheduler";
+import { recordRequest } from "./systemHealthRoutes";
 import { setupAuth } from "./auth";
 
 const app = express();
@@ -148,6 +149,12 @@ app.use((req, res, next) => {
       }
 
       log(logLine);
+
+      // Feed ring buffer (no I/O — in-memory only)
+      const errMsg = res.statusCode >= 500
+        ? (capturedJsonResponse?.message ?? `HTTP ${res.statusCode}`)
+        : undefined;
+      recordRequest(req.method, path, res.statusCode, duration, errMsg);
     }
   });
 
