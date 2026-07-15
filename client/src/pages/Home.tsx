@@ -39,6 +39,7 @@ import {
   type WidgetSize,
 } from "@/components/dashboard/widgetRegistry";
 import { WIDGET_COMPONENTS } from "@/components/dashboard/widgets";
+import { PinnedReportsSection } from "@/components/dashboard/PinnedReportMiniWidget";
 
 export default function Home() {
   const { user } = useAuth();
@@ -245,6 +246,8 @@ export default function Home() {
           </Button>
         </div>
       </div>
+
+      <PinnedReportsSection />
 
       {widgets.length === 0 ? (
         <Card className="border-dashed">

@@ -1513,7 +1513,12 @@ const TABS: { id: Tab; label: string; icon: React.ElementType; desc: string }[] 
 ];
 
 export default function Reports() {
-  const [activeTab, setActiveTab] = useState<Tab>("revenue");
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    const sp = new URLSearchParams(window.location.search);
+    const t = sp.get("tab") as Tab | null;
+    if (t && ["revenue","invoice-aging","crew-hours","profitability","time-by-division","materials-spend","equipment-repair","material-shortages"].includes(t)) return t;
+    return "revenue";
+  });
   const { isFavorited, toggleFavorite } = useFavorites("report");
 
   return (
@@ -1552,7 +1557,7 @@ export default function Reports() {
                     isFavorited("report", tab.id) ? "opacity-100 text-amber-500 hover:text-amber-600" : "text-muted-foreground hover:text-amber-500"
                   )}
                   data-testid={`button-star-report-${tab.id}`}
-                  title={isFavorited("report", tab.id) ? "Unstar report" : "Star report"}
+                  title={isFavorited("report", tab.id) ? "Unpin from dashboard" : "Pin to dashboard"}
                 >
                   <Star className={cn("h-3.5 w-3.5", isFavorited("report", tab.id) && "fill-current")} />
                 </button>
