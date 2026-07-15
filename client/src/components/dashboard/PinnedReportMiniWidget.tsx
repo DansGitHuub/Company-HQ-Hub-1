@@ -9,8 +9,7 @@ import {
   TrendingUp, Wrench, Loader2, Star, ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { apiRequest } from "@/lib/queryClient";
-import { useFavorites } from "@/hooks/use-favorites";
+import { useFavorites, type Favorite } from "@/hooks/use-favorites";
 import type { LucideIcon } from "lucide-react";
 
 // ── Report metadata ───────────────────────────────────────────────────────────
@@ -53,6 +52,14 @@ function MiniTooltip({ active, payload, label, formatter }: any) {
 }
 
 // ── Per-report mini chart renderer ────────────────────────────────────────────
+function EmptyChart() {
+  return (
+    <div className="flex items-center justify-center h-[72px] text-[10px] text-muted-foreground">
+      No data yet
+    </div>
+  );
+}
+
 function MiniChartContent({ reportId, data }: { reportId: string; data: any }) {
   const meta = REPORT_META[reportId];
   const color = meta.color;
@@ -224,27 +231,14 @@ function MiniChartContent({ reportId, data }: { reportId: string; data: any }) {
   return <EmptyChart />;
 }
 
-function EmptyChart() {
-  return (
-    <div className="flex items-center justify-center h-[72px] text-[10px] text-muted-foreground">
-      No data yet
-    </div>
-  );
-}
-
 // ── Single mini card ──────────────────────────────────────────────────────────
 function PinnedReportCard({ reportId, onUnpin }: { reportId: string; onUnpin: () => void }) {
   const [, navigate] = useLocation();
   const meta = REPORT_META[reportId];
 
-  const { data, isLoading } = useQuery({
-    queryKey: [meta.endpoint, "mini-widget"],
-    queryFn: async () => {
-      const res = await apiRequest("GET", meta.endpoint);
-      if (!res.ok) return null;
-      return res.json();
-    },
-    staleTime: 5 * 60 * 1000,
+  // Standard app query pattern: URL-only key, default getQueryFn handles the fetch
+  const { data, isLoading } = useQuery<any>({
+    queryKey: [meta.endpoint],
   });
 
   const Icon = meta.icon;
@@ -267,7 +261,9 @@ function PinnedReportCard({ reportId, onUnpin }: { reportId: string; onUnpin: ()
         </button>
         <button
           onClick={onUnpin}
-          className="p-1 rounded text-amber-500 hover:text-muted-foreground transition-colors shrink-0 ml-1"
+          className={cn(
+            "p-1 rounded text-amber-500 hover:text-muted-foreground transition-colors shrink-0 ml-1"
+          )}
           title="Unpin from dashboard"
           data-testid={`button-unpin-report-${reportId}`}
         >
@@ -289,6 +285,7 @@ function PinnedReportCard({ reportId, onUnpin }: { reportId: string; onUnpin: ()
 
 // ── Section — rendered in Home.tsx ────────────────────────────────────────────
 export function PinnedReportsSection() {
+  // Standard app pattern: URL-only key lets the default getQueryFn fetch /api/favorites
   const { favorites, toggleFavorite } = useFavorites("report");
   const pinnedReports = favorites.filter((f) => REPORT_META[f.entity_id]);
 

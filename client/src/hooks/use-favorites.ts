@@ -1,5 +1,4 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
 
 export interface Favorite {
   id: number;
@@ -9,40 +8,46 @@ export interface Favorite {
   created_at: string;
 }
 
-const ALL_KEY = ["/api/favorites", "all"] as const;
+const FAV_KEY = ["/api/favorites"] as const;
 
 export function useFavorites(entityType?: "report" | "customer" | "job") {
   const qc = useQueryClient();
 
-  const { data: favorites = [] } = useQuery<Favorite[]>({
-    queryKey: ALL_KEY,
-    queryFn: async () => {
-      const res = await apiRequest("GET", "/api/favorites");
-      return res.json();
-    },
+  const { data: allFavorites = [] } = useQuery<Favorite[]>({
+    queryKey: FAV_KEY,
   });
 
   const filtered = entityType
-    ? favorites.filter((f) => f.entity_type === entityType)
-    : favorites;
+    ? allFavorites.filter((f) => f.entity_type === entityType)
+    : allFavorites;
 
   const addMut = useMutation({
-    mutationFn: (vars: { entity_type: string; entity_id: string }) =>
-      apiRequest("POST", "/api/favorites", vars),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ALL_KEY }),
+    mutationFn: async (vars: { entity_type: string; entity_id: string }) => {
+      const res = await fetch("/api/favorites", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(vars),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: FAV_KEY }),
   });
 
   const removeMut = useMutation({
-    mutationFn: (vars: { entity_type: string; entity_id: string }) =>
-      apiRequest(
-        "DELETE",
-        `/api/favorites/by-entity?entity_type=${vars.entity_type}&entity_id=${encodeURIComponent(vars.entity_id)}`
-      ),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ALL_KEY }),
+    mutationFn: async (vars: { entity_type: string; entity_id: string }) => {
+      const res = await fetch(
+        `/api/favorites/by-entity?entity_type=${vars.entity_type}&entity_id=${encodeURIComponent(vars.entity_id)}`,
+        { method: "DELETE", credentials: "include" }
+      );
+      if (!res.ok) throw new Error(await res.text());
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: FAV_KEY }),
   });
 
   function isFavorited(type: string, id: string): boolean {
-    return favorites.some((f) => f.entity_type === type && f.entity_id === id);
+    return allFavorites.some((f) => f.entity_type === type && f.entity_id === id);
   }
 
   function toggleFavorite(type: "report" | "customer" | "job", id: string) {
@@ -54,8 +59,8 @@ export function useFavorites(entityType?: "report" | "customer" | "job") {
   }
 
   function favoritedIds(type: string): Set<string> {
-    return new Set(favorites.filter((f) => f.entity_type === type).map((f) => f.entity_id));
+    return new Set(allFavorites.filter((f) => f.entity_type === type).map((f) => f.entity_id));
   }
 
-  return { favorites: filtered, allFavorites: favorites, isFavorited, toggleFavorite, favoritedIds };
+  return { favorites: filtered, allFavorites, isFavorited, toggleFavorite, favoritedIds };
 }
