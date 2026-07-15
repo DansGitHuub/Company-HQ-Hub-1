@@ -66,4 +66,30 @@ export async function runMaintenanceRoutesMigration() {
     END $$
   `);
   console.log("[migration] maintenance_route_visits unique constraint ready");
+
+  // ── Stage 3: completion capture columns (additive only) ───────────────────
+  await pool.query(`ALTER TABLE maintenance_route_visits ADD COLUMN IF NOT EXISTS completed_at           TIMESTAMPTZ`);
+  await pool.query(`ALTER TABLE maintenance_route_visits ADD COLUMN IF NOT EXISTS actual_duration_minutes INTEGER`);
+  await pool.query(`ALTER TABLE maintenance_route_visits ADD COLUMN IF NOT EXISTS stops_completed         INTEGER`);
+  await pool.query(`ALTER TABLE maintenance_route_visits ADD COLUMN IF NOT EXISTS stops_total             INTEGER`);
+  console.log("[migration] maintenance_route_visits stage-3 columns ready");
+
+  // ── Stage 3: per-stop completion table ────────────────────────────────────
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS maintenance_route_visit_stops (
+      id            UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
+      visit_id      UUID    NOT NULL REFERENCES maintenance_route_visits(id) ON DELETE CASCADE,
+      route_stop_id UUID    REFERENCES maintenance_route_stops(id) ON DELETE SET NULL,
+      property_id   UUID    REFERENCES properties(id) ON DELETE SET NULL,
+      completed     BOOLEAN NOT NULL DEFAULT false,
+      notes         TEXT,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS mrvs_visit_stop_unique
+      ON maintenance_route_visit_stops (visit_id, route_stop_id)
+      WHERE route_stop_id IS NOT NULL
+  `);
+  console.log("[migration] maintenance_route_visit_stops table ready");
 }

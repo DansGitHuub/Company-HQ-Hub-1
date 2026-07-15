@@ -11,6 +11,7 @@ import {
   Upload,
   Archive,
   AlertTriangle,
+  BarChart2,
   Users,
   Megaphone,
   FileSignature,
@@ -70,6 +71,7 @@ const ADMIN_GROUPS: AdminNavGroup[] = [
       { value: "worksheet-review", label: "Worksheet Review", icon: ClipboardCheck, href: "/admin/time?tab=worksheet" },
       { value: "qbo-export", label: "QuickBooks Export", icon: Upload, href: "/admin/qbo-export" },
       { value: "archive", label: "Time Archive", icon: Archive, href: "/admin/archive" },
+      { value: "maintenance-reports", label: "Maintenance Reports", icon: BarChart2, href: "/admin/maintenance-reports" },
     ],
   },
   {

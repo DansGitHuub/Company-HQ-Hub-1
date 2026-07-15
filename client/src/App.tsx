@@ -163,6 +163,7 @@ import CompanyCamReconciliation from "@/pages/admin/CompanyCamReconciliation";
 import CustomerDuplicates from "@/pages/admin/CustomerDuplicates";
 import CompanyCamHealth from "@/pages/admin/CompanyCamHealth";
 import SystemHealthPage from "@/pages/admin/SystemHealth";
+import MaintenanceReportsPage from "@/pages/admin/MaintenanceReports";
 import InquiryPage from "@/pages/Inquiry";
 import InquirySuccess from "@/pages/InquirySuccess";
 import BookingPage from "@/pages/BookingPage";
@@ -345,6 +346,7 @@ function AppRoutes() {
         <ProtectedRoute path="/admin/customer-duplicates" component={CustomerDuplicates} allowedRoles={ADMIN_ONLY} />
         <ProtectedRoute path="/admin/companycam-health" component={CompanyCamHealth} allowedRoles={ADMIN_ONLY} />
         <ProtectedRoute path="/admin/system-health" component={SystemHealthPage} allowedRoles={ADMIN_ONLY} />
+        <ProtectedRoute path="/admin/maintenance-reports" component={MaintenanceReportsPage} allowedRoles={ADMIN_OR_MANAGER} />
         <Route path="/budget-settings"><Redirect to="/mors-budget?tab=mark-up" /></Route>
         <Route path="/time" component={TimeTracking} />
         <ProtectedRoute path="/manager-dashboard" component={ManagerDashboard} allowedRoles={ADMIN_OR_MANAGER} />
