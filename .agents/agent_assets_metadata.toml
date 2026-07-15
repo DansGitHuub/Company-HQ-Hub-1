@@ -234,3 +234,9 @@ id = "2ss-SZGQC7bcEJnOc6Wxl"
 uri = "file://attached_assets/CompanyHQ_Alpha_Audit_YesNo.md"
 type = "text"
 title = "CompanyHQ Alpha Audit — Yes/No Answers"
+
+[[outputs]]
+id = "RAdtveJxLbpAhOFUhPCzk"
+uri = "file://attached_assets/CompanyHQ_Alpha_Audit_Answers.txt"
+type = "text"
+title = "CompanyHQ Alpha Audit — YES/NO Answers"

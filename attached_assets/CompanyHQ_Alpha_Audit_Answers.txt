@@ -1,0 +1,857 @@
+CompanyHQ — Alpha Workflow & Usability Audit
+Yes / No Verification Answers
+Chapin Landscapes | Prepared: July 2026
+========================================
+
+
+PART A — Detailed Workflow Checklist (25 Sections)
+
+========================================
+Section 1: Crew Member Daily Use — Starting the Day
+========================================
+
+1.  Can a crew member open the app and instantly know what they are supposed to do today? — YES
+2.  Is there one obvious "Start My Day" button? — YES
+3.  Does the app automatically send them to the correct route, job, or work order? — NO
+4.  Can they see the job address, customer name, contact, gate code, pets, hazards, and parking/access notes quickly? — YES
+5.  Can they open navigation/map directions without digging? — YES
+6.  Can they see who else is assigned to the job? — YES
+7.  Can they see the crew lead? — YES
+8.  Can they see what equipment or materials are expected? — NO
+9.  Can they see whether the job is ready to start? — NO
+10. Are they blocked from starting a job that is missing critical info? — NO
+
+--- Clock-In / Time Tracking ---
+
+11. Is clocking in obvious and fast? — YES
+12. Can a crew lead clock in the whole crew if needed? — NO
+13. Can a user switch from drive time to job time easily? — YES
+14. Can a user switch from one job to another easily? — YES
+15. Can a user switch from one work area to another easily? — NO
+16. Does the app prevent duplicate clock-ins? — YES
+17. Does the app warn if someone forgot to clock out? — YES
+18. Does the app ask for a reason if time looks unusual? — NO
+19. Can a crew member see their current active clock-in status clearly? — YES
+20. Can the office trust that time records are accurate enough for payroll? — YES
+
+--- Job Continuation ---
+
+21. Can a crew see what was done the previous day or previous week? — YES
+22. Can they see notes from the last crew? — YES
+23. Can they see photos from the last visit? — YES
+24. Can they see what work areas are complete vs. incomplete? — YES
+25. Can they tell what still needs done without calling the office? — YES
+26. Can they see open issues or blockers? — YES
+27. Can they see pending change orders? — YES
+28. Can they see customer-specific instructions? — YES
+29. Can they see safety concerns? — NO
+30. Can they tell what should not be touched? — NO
+
+========================================
+Section 2: Daily Worksheet / Field Reporting
+========================================
+
+1.  Is the daily worksheet naturally part of ending the day? — YES
+2.  Does the app auto-fill crew, job, date, time, and work areas? — YES
+3.  Does the crew avoid re-entering information already known by the system? — YES
+4.  Does the worksheet pull actual clocked time automatically? — YES
+5.  Does it ask what materials were used? — YES
+6.  Does it pull materials from the correct catalog? — YES
+7.  Does it allow quick notes by voice? — YES
+8.  Does it ask for photos before submission? — YES
+9.  Does it require completion photos when needed? — YES
+10. Does it ask whether anything changed from the work order? — NO
+11. Does it ask whether more materials are needed? — NO
+12. Does it ask whether a change order may be needed? — NO
+13. Does it ask whether there was damage, delay, or customer issue? — NO
+14. Can the foreman submit the worksheet in under 2 minutes? — YES
+15. Can admin review the worksheet without calling the crew? — YES
+
+========================================
+Section 3: Photo Capture / Proof of Work
+========================================
+
+1.  Does the app automatically remind crews to take before photos? — YES
+2.  Does it remind them to take progress photos at checkpoints? — YES
+3.  Does it remind them to take final photos? — YES
+4.  Does it require damage photos when a damage issue is reported? — NO
+5.  Are photos automatically attached to the correct job? — YES
+6.  Are photos automatically attached to the correct property? — YES
+7.  Are photos connected to the right worksheet, work order, or checkpoint? — YES
+8.  Can office find job photos in one place? — YES
+9.  Can office tell when the photo was taken? — YES
+10. Can office tell who took the photo? — YES
+11. Can office tell where the photo came from: CompanyCam, worksheet, upload, customer, etc.? — YES
+12. Can photos prove what was done if a customer disputes service? — YES
+13. Can photos prove when the crew was there? — YES
+14. Are customer-visible photos separated from internal photos? — YES
+15. Is it almost impossible for crews to forget required photos? — NO
+
+========================================
+Section 4: Work Orders
+========================================
+
+1.  Can a crew understand the work order without calling the office? — YES
+2.  Is the work order written in simple field language? — YES
+3.  Can crews see the scope by work area? — YES
+4.  Can crews see materials needed by work area? — YES
+5.  Can crews see equipment needed? — NO
+6.  Can crews see drawings, photos, or diagrams? — YES
+7.  Can crews check off completed items? — YES
+8.  Can crews flag unclear instructions? — YES
+9.  Can crews request more information? — YES
+10. Can crews report that the work order does not match field conditions? — YES
+11. Can work order progress update the job automatically? — NO
+12. Can managers see what is complete without asking the crew? — YES
+13. Is the work order different from the job record, or is it duplicate clutter? — YES
+14. Does every job that needs a work order have one? — NO
+
+========================================
+Section 5: Manager Daily Oversight
+========================================
+
+1.  Can a manager see what every crew is doing today? — YES
+2.  Can a manager see who is clocked in right now? — YES
+3.  Can a manager see what job each crew is on? — YES
+4.  Can a manager see whether crews are behind schedule? — NO
+5.  Can a manager see which jobs have missing photos? — YES
+6.  Can a manager see which worksheets are missing? — YES
+7.  Can a manager see which jobs have open issues? — YES
+8.  Can a manager see pending change orders? — YES
+9.  Can a manager see blocked jobs? — YES
+10. Can a manager quickly reassign a crew? — YES
+11. Can a manager approve time quickly? — YES
+12. Can a manager review daily progress without reading long notes? — YES
+13. Can a manager identify problem jobs early? — YES
+14. Can a manager see tomorrow's schedule and readiness? — YES
+15. Can a manager tell which jobs should not start yet? — YES
+
+========================================
+Section 6: Office / Admin Daily Use
+========================================
+
+1.  Can office staff open one screen and see what needs attention today? — YES
+2.  Can they see unapproved time? — YES
+3.  Can they see missing worksheets? — YES
+4.  Can they see overdue customer follow-ups? — NO
+5.  Can they see new leads? — YES
+6.  Can they see customer messages? — YES
+7.  Can they see work requests? — YES
+8.  Can they see jobs ready for invoicing? — YES
+9.  Can they see jobs stuck because of missing information? — YES
+10. Can they see pending schedule issues? — YES
+11. Can they see overdue tasks? — YES
+12. Can they see failed syncs? — YES
+13. Can they see incomplete job packets? — YES
+14. Can they act from the dashboard, or do they have to hunt through pages? — YES
+15. Is the admin dashboard useful or just busy? — YES
+
+========================================
+Section 7: Payroll / Time Approval
+========================================
+
+1.  Can office review all employee hours quickly? — YES
+2.  Can office review hours by employee? — YES
+3.  Can office review hours by job? — YES
+4.  Can office review hours by work area? — NO
+5.  Can office see regular time, drive time, shop time, breaks, and overtime separately? — YES
+6.  Can office see missing clock-outs? — YES
+7.  Can office see edited time? — YES
+8.  Can office see rejected time? — NO
+9.  Can office approve time in batches? — NO
+10. Can office prevent unapproved time from exporting? — YES
+11. Can office export payroll quickly? — YES
+12. Can office be confident payroll is correct? — YES
+13. Can office see what was exported to QuickBooks? — YES
+14. Can office see failed exports? — YES
+15. Can office retry failed exports? — YES
+16. Can office see if time was changed after export? — NO
+17. Can office answer an employee payroll question with proof? — YES
+18. Can payroll be done without spreadsheets? — YES
+
+========================================
+Section 8: Customer Service / Proof Questions
+========================================
+
+1.  Can office answer, "When were we last there?" in seconds? — YES
+2.  Can office answer, "Who was there?" in seconds? — YES
+3.  Can office answer, "What did they do?" in seconds? — YES
+4.  Can office show photos from that visit? — YES
+5.  Can office show timestamps? — YES
+6.  Can office show crew notes? — YES
+7.  Can office show completed checklist items? — YES
+8.  Can office show skipped work and why? — NO
+9.  Can office show weather/delay notes if relevant? — YES
+10. Can office answer without calling the crew? — YES
+11. Can office send a customer a clear update from the job record? — YES
+12. Can office find all history for one property? — YES
+13. Can office find all history for one customer? — YES
+14. Can office find all warranty history? — YES
+15. Can office prove service was completed if challenged? — YES
+
+========================================
+Section 9: Customer Communication
+========================================
+
+1.  Can staff message one customer easily? — YES
+2.  Can staff message a group of customers easily? — NO
+3.  Can staff filter customers by route, service type, overdue invoice, job stage, or schedule date? — NO
+4.  Can staff send "mowing delayed one day" to the right group? — NO
+5.  Can staff send weather delay messages to affected jobs? — NO
+6.  Can staff send overdue invoice reminders if invoice visibility exists? — NO
+7.  Can staff send job start reminders? — NO
+8.  Can staff send job completion messages? — NO
+9.  Can staff send review requests after closeout? — NO
+10. Can staff see whether a message was sent? — YES
+11. Can staff see message history? — YES
+12. Are internal notes protected from customers? — YES
+13. Can customer replies come back into the right place? — YES
+14. Can a customer message create a task? — NO
+15. Can the AI draft routine messages for staff approval? — YES
+
+========================================
+Section 10: Sales / Lead Workflow
+========================================
+
+1.  Can a new lead enter the app from every intended source? — YES
+2.  Does a website inquiry become a lead? — YES
+3.  Does a customer work request become a lead? — YES
+4.  Does a Lead Qualifier result become a lead? — YES
+5.  Is every lead assigned to someone? — NO
+6.  Is every lead given a next follow-up date? — NO
+7.  Can staff see leads that need attention today? — YES
+8.  Can staff see stale leads? — YES
+9.  Can staff see why a lead was lost? — NO
+10. Can a lead become an estimate without retyping everything? — YES
+11. Can an estimate become a job without retyping everything? — YES
+12. Does the job remember the original estimate? — YES
+13. Does the customer record show the full sales history? — YES
+14. Can sales staff see photos, notes, and property history before meeting a customer? — YES
+15. Can the office tell where leads are coming from? — NO
+
+========================================
+Section 11: Estimate / Proposal Workflow
+========================================
+
+1.  Can staff create an estimate simply? — YES
+2.  Can staff use work areas? — YES
+3.  Can staff use catalog items? — YES
+4.  Can staff use calculators? — YES
+5.  Can staff add options or phases? — YES
+6.  Can staff preview the proposal clearly? — YES
+7.  Can the customer sign digitally? — YES
+8.  Can the signed estimate become a job? — YES
+9.  Does scope transfer to the job? — YES
+10. Do materials transfer where needed? — YES
+11. Does the job value match the approved estimate? — YES
+12. Can change orders update the job value later? — YES
+13. Can old estimates still be viewed? — YES
+14. Is there only one official estimate workflow? — YES
+15. Is the estimate system simple enough to train someone else on? — YES
+
+========================================
+Section 12: Change Orders
+========================================
+
+1.  Can crews or managers flag a possible change order from the field? — YES
+2.  Can photos be attached to the change order? — YES
+3.  Can the change order use catalog items? — YES
+4.  Can added labor be included? — YES
+5.  Can added equipment or subcontractor cost be included? — YES
+6.  Can customer approval be recorded? — YES
+7.  Can verbal approval be recorded with notes? — YES
+8.  Can digital approval be collected? — YES
+9.  Does an approved change order update job value? — YES
+10. Does it appear in closeout? — YES
+11. Does it appear for invoicing? — YES
+12. Are unapproved changes clearly separate from approved changes? — YES
+13. Can staff prove who approved the change and when? — YES
+
+========================================
+Section 13: Job Packet / Readiness Gate
+========================================
+
+1.  Can the app stop a job from starting when critical info is missing? — YES
+2.  Does it check for signed estimate? — YES
+3.  Does it check customer? — YES
+4.  Does it check property? — YES
+5.  Does it check contact? — YES
+6.  Does it check scope? — YES
+7.  Does it check work order? — YES
+8.  Does it check assigned crew? — YES
+9.  Does it check scheduled date? — YES
+10. Does it check materials? — YES
+11. Does it check CompanyCam/project photos? — YES
+12. Does it check permits/811/OUPS if needed? — YES
+13. Does it check access notes? — YES
+14. Does it check pet/dog notes? — YES
+15. Can a manager bypass with a reason? — YES
+16. Is bypass history logged? — YES
+17. Does the gate help rather than annoy? — YES
+
+========================================
+Section 14: Job Progress / Checkpoints
+========================================
+
+1.  Can jobs have required checkpoints? — YES
+2.  Can checkpoints vary by job type? — YES
+3.  Can checkpoints require photos? — YES
+4.  Can checkpoints require notes? — YES
+5.  Can checkpoints require manager approval? — YES
+6.  Can checkpoints trigger customer updates? — NO
+7.  Can checkpoints expose problems before the job is finished? — YES
+8.  Can staff see incomplete checkpoints easily? — YES
+9.  Can crew complete checkpoints quickly? — YES
+10. Can checkpoints feed into closeout? — YES
+11. Can the app prove when each checkpoint was completed? — YES
+12. Can managers customize checkpoints without development help? — YES
+
+========================================
+Section 15: Closeout Workflow
+========================================
+
+1.  Can a manager see jobs ready for closeout? — YES
+2.  Does closeout pull in final photos? — YES
+3.  Does closeout pull in actual time? — YES
+4.  Does closeout pull in materials used? — YES
+5.  Does closeout pull in change orders? — YES
+6.  Does closeout show incomplete items? — YES
+7.  Does closeout create warranty records? — YES
+8.  Does closeout create invoice task/sync? — YES
+9.  Does closeout create review request? — YES
+10. Does closeout create follow-up task? — YES
+11. Can customer walkthrough/sign-off be recorded? — YES
+12. Can internal closeout notes stay internal? — YES
+13. Can office see that a job is truly finished? — YES
+14. Does closeout prevent jobs from disappearing unfinished? — YES
+
+========================================
+Section 16: Job Reporting / Profitability
+========================================
+
+1.  Can we see actual hours vs. estimated hours? — YES
+2.  Can we see labor cost by job? — YES
+3.  Can we see material cost by job? — YES
+4.  Can we see equipment cost by job if tracked? — NO
+5.  Can we see change order revenue? — YES
+6.  Can we see gross profit? — YES
+7.  Can we see margin? — YES
+8.  Can we see what went over budget? — YES
+9.  Can we see which work area went over budget? — NO
+10. Can we see which crew or job type performs best? — YES
+11. Can we compare similar jobs? — NO
+12. Can we identify jobs that should have been priced higher? — YES
+13. Can we see why a job went well? — NO
+14. Can we see why a job went badly? — NO
+15. Can reports help improve estimating, not just summarize history? — YES
+
+========================================
+Section 17: Maintenance Route Workflow
+========================================
+
+1.  Can maintenance crews see their route clearly? — YES
+2.  Can they see stops in order? — YES
+3.  Can they open directions for each stop? — YES
+4.  Can they clock into each stop easily? — YES
+5.  Can they mark a stop complete? — YES
+6.  Can they skip a stop with reason? — YES
+7.  Can they take before/after/damage photos? — YES
+8.  Can they record what was done? — YES
+9.  Can they record issues noticed on the property? — YES
+10. Can issues create tasks or sales opportunities? — YES
+11. Can office see the last visit for a maintenance customer? — YES
+12. Can office prove service was performed? — YES
+13. Can route completion update customer/property history? — YES
+14. Can customers be notified of delays in batches? — NO
+15. Can the route page work with bad signal? — NO
+
+========================================
+Section 18: Equipment Workflow
+========================================
+
+1.  Can crew report equipment damage quickly? — YES
+2.  Can crew attach photos? — YES
+3.  Can crew mark equipment unavailable? — YES
+4.  Does manager get notified? — YES
+5.  Can manager see open equipment issues? — YES
+6.  Can equipment be linked to a job? — YES
+7.  Can equipment hours be tracked? — YES
+8.  Can maintenance schedules be viewed? — YES
+9.  Can upcoming maintenance be flagged? — YES
+10. Can unavailable equipment affect scheduling? — NO
+11. Can office see repair history? — YES
+12. Can repair cost feed reports? — NO
+13. Is equipment tracking useful to daily operations, not just a list? — YES
+
+========================================
+Section 19: Inventory / Materials Reality Check
+========================================
+
+1.  Are we trying to track inventory now, or not? — NO
+2.  If not, is inventory hidden to avoid confusion? — NO
+3.  If yes, does material used reduce stock? — NO
+4.  Can crews record material used simply? — YES
+5.  Can managers see material shortages? — NO
+6.  Can material lists be created from estimates? — YES
+7.  Can material needs be shown before scheduling? — NO
+8.  Can substitutes be tracked? — NO
+9.  Can purchasing needs be created without a full PO system? — YES
+10. Can job material usage be trusted for reporting? — YES
+
+========================================
+Section 20: Warranty / Service Issues
+========================================
+
+1.  Can a closed job automatically create warranty records? — YES
+2.  Can warranty type vary by service? — YES
+3.  Can customers submit warranty issues? — YES
+4.  Can staff create warranty issues? — YES
+5.  Can photos be attached? — YES
+6.  Can warranty claims create tasks? — YES
+7.  Can warranty visits be scheduled? — YES
+8.  Can warranty resolutions be documented? — YES
+9.  Can denied warranty claims include a reason? — YES
+10. Can office quickly see if something is under warranty? — YES
+11. Can warranty cost be tracked? — YES
+12. Can warranty history show up under property history? — YES
+13. Can the app protect the company during disputes? — YES
+
+========================================
+Section 21: Admin Dashboard / Control Center
+========================================
+
+1.  Does admin have one control center? — YES
+2.  Does it show urgent problems first? — YES
+3.  Does it show missing time? — YES
+4.  Does it show unapproved time? — YES
+5.  Does it show missing worksheets? — YES
+6.  Does it show unread customer messages? — YES
+7.  Does it show overdue tasks? — YES
+8.  Does it show jobs ready for closeout? — YES
+9.  Does it show jobs ready for invoice? — YES
+10. Does it show failed integrations? — YES
+11. Does it show equipment issues? — YES
+12. Does it show new leads? — YES
+13. Does it show customer work requests? — YES
+14. Does it avoid vanity metrics? — YES
+15. Can admin act directly from the dashboard? — YES
+
+========================================
+Section 22: Manager Dashboard
+========================================
+
+1.  Can managers see their crews? — YES
+2.  Can managers see active jobs? — YES
+3.  Can managers see job progress? — YES
+4.  Can managers see blocked jobs? — YES
+5.  Can managers see upcoming work? — YES
+6.  Can managers see overdue worksheets? — YES
+7.  Can managers approve or reject time? — YES
+8.  Can managers review photos? — YES
+9.  Can managers see change order needs? — YES
+10. Can managers message crews? — YES
+11. Can managers reassign work? — YES
+12. Can managers see problems without digging? — YES
+13. Is the dashboard simpler than the admin dashboard? — YES
+
+========================================
+Section 23: Customer Portal
+========================================
+
+1.  Can customers see only their own information? — YES
+2.  Can they see their properties? — YES
+3.  Can they see active jobs? — YES
+4.  Can they see job status? — YES
+5.  Can they see approved documents? — YES
+6.  Can they submit work requests? — YES
+7.  Can they submit photos? — YES
+8.  Can they message staff? — YES
+9.  Can they see warranty info? — YES
+10. Can they see service history if intended? — YES
+11. Can they see invoice status if intended? — YES
+12. Is the portal simple enough for non-technical customers? — YES
+13. Is anything internal accidentally exposed? — NO
+14. Does the portal reduce calls to the office? — YES
+
+========================================
+Section 24: AI Assistant / Voice
+========================================
+
+1.  Can a crew member ask, "What am I doing today?" — YES
+2.  Can a crew member ask, "What was done here last time?" — YES
+3.  Can a crew member ask, "What materials are needed?" — YES
+4.  Can a crew member dictate job notes? — YES
+5.  Can a crew member create a task by voice? — YES
+6.  Can a crew member report equipment damage by voice? — YES
+7.  Can a manager ask, "Who is clocked in right now?" — YES
+8.  Can a manager ask, "Which jobs are over hours?" — YES
+9.  Can admin ask, "What time is unapproved?" — YES
+10. Can office ask, "When were we last at Smith's?" — YES
+11. Can the AI answer only using allowed records? — YES
+12. Does the AI respect role permissions? — YES
+13. Does the AI require confirmation before making changes? — YES
+14. Does the AI log what it did? — YES
+15. Can the AI show the record it used? — YES
+16. Can the AI avoid guessing when data is missing? — YES
+17. Can voice commands be corrected before saving? — YES
+18. Can AI actions create tasks, notes, messages, or work requests safely? — YES
+19. Are dangerous actions blocked? — YES
+20. Does the assistant make the app simpler, or does it become another confusing tool? — YES
+
+========================================
+Section 25: Navigation / Simplicity
+========================================
+
+1.  Can a new crew member understand where to go? — YES
+2.  Can a new office person understand where to go? — YES
+3.  Can a manager understand where to go? — YES
+4.  Are there too many main menu tabs? — NO
+5.  Are old pages hidden? — YES
+6.  Are placeholder pages hidden? — YES
+7.  Are admin-only tools hidden from crew? — YES
+8.  Are customer-only tools hidden from staff unless needed? — YES
+9.  Are related items grouped logically? — YES
+10. Does each screen have a clear next action? — YES
+11. Are there too many ways to do the same thing? — NO
+12. Can a user complete common work in fewer clicks? — YES
+13. Does the app feel like one system or many tools glued together? — YES
+14. Can labels be simplified? — YES
+15. Would a new employee need a manual, or is the app mostly self-explanatory? — YES
+
+
+========================================
+PART B — System & Platform Audit (20 Sections)
+========================================
+
+========================================
+B.1: System Settings — Company Settings
+========================================
+
+1.  Is there a dedicated Company / Business Settings screen where company-wide information is stored? — YES
+2.  Can company identity be configured and saved: logo, address, phone, email, website? — YES
+3.  Can legal & financial fields be configured: EIN, tax rate, workers' comp, insurance? — NO
+4.  Can operational defaults be set: time zone, default currency, measurement system, date format, default language, business hours? — NO
+
+--- Regional Settings ---
+
+5.  Is there a Regional Settings area? — NO
+6.  Is the weather source configurable? — NO
+7.  Are local holidays configurable? — NO
+8.  Is a winter shutdown period configurable? — NO
+9.  Is the growing / USDA zone configurable? — NO
+10. Are frost dates configurable? — NO
+11. Are salt application defaults configurable? — NO
+12. Are fertilizer blackout dates configurable? — NO
+
+--- Job Defaults ---
+
+13. Is there a Job Defaults area? — NO
+14. Are default workday and start time configurable? — NO
+15. Is default crew size configurable? — NO
+16. Are default overtime rules configurable? — NO
+17. Is a default break configurable? — NO
+18. Is a default closeout checklist configurable? — YES
+19. Are default photo requirements configurable? — YES
+20. Is a default warranty configurable? — NO
+21. Is a default work order template configurable? — YES
+
+========================================
+B.2: Notification Center
+========================================
+
+1.  Is there a central Notification Center? — YES
+2.  Does the system define which events generate notifications? — YES
+3.  Can each notification specify a recipient by role or user? — YES
+4.  Can each notification specify a channel: push, email, in-app, SMS? — NO
+5.  Can cadence be set per notification: immediate, daily summary, weekly, never? — NO
+6.  Can users customize their own notifications? — YES
+7.  New Lead -> notifies salesperson / office? — YES
+8.  Missing worksheet -> notifies crew lead / manager? — YES
+9.  Job over budget -> notifies manager / owner? — NO
+10. Equipment breakdown -> notifies mechanic / manager? — YES
+11. Weather delay -> notifies affected customers? — NO
+12. Payroll ready -> notifies office? — NO
+13. Customer message -> notifies assigned rep? — YES
+14. Warranty claim -> notifies warranty manager? — YES
+15. Missing photo -> notifies crew lead? — YES
+
+========================================
+B.3: User Preferences
+========================================
+
+1.  Does every user have a personal preferences screen? — YES
+2.  Theme / dark mode? — YES
+3.  Language? — YES
+4.  Personal notification settings? — YES
+5.  Default dashboard and default landing page? — YES
+6.  Home screen widgets configurable? — YES
+7.  Favorite reports, favorite customers, pinned jobs? — NO
+8.  Preferred map app? — NO
+9.  Measurement units and clock format? — NO
+10. Voice enabled and default AI voice? — YES
+11. Accessibility options? — NO
+
+========================================
+B.4: Dashboard Customization
+========================================
+
+1.  Do different roles get different default dashboards (admin is not the same as crew)? — YES
+2.  Can users hide widgets? — YES
+3.  Can users rearrange widgets? — YES
+4.  Can users resize widgets? — NO
+5.  Can users pin reports? — NO
+6.  Can users save layouts? — YES
+7.  Can users reset layouts? — YES
+
+========================================
+B.5: Global Search — Searchable Records
+========================================
+
+1.  Is there a single global search? — YES
+2.  Can search find customers, properties, contacts, addresses, phone numbers? — YES
+3.  Can search find jobs, estimates, invoices, work orders, change orders? — YES
+4.  Can search find employees, equipment, materials? — YES
+5.  Can search find SOPs, forms, documents, photos, messages, tasks, warranties, CompanyCam projects? — YES
+
+--- Advanced Search ---
+
+6.  OCR on PDFs? — NO
+7.  OCR on photos? — NO
+8.  Voice search? — YES
+9.  AI search? — YES
+10. Recent searches? — NO
+11. Saved searches? — NO
+
+========================================
+B.6: Global Command Bar
+========================================
+
+1.  Is there a global command bar (Ctrl+K or /)? — NO
+2.  Can it trigger actions by typing, e.g. Create Job, Find Smith, Clock Out, Open Equipment, Today's Schedule, Call Customer, Create Change Order? — NO
+3.  Does it combine search, AI, and actions in one bar? — NO
+4.  Is it available on both desktop and mobile? — NO
+
+========================================
+B.7: Help System
+========================================
+
+1.  Is there an in-app help system? — YES
+2.  Can users search help? — YES
+3.  Can users watch how-to videos? — NO
+4.  Can users open SOPs from help? — YES
+5.  Can users see walkthroughs / guided tours? — NO
+6.  Can users see FAQs? — YES
+7.  Can users contact support? — NO
+8.  Can users report bugs from help? — YES
+9.  Can users suggest improvements? — YES
+
+========================================
+B.8: Feedback System (alpha-critical)
+========================================
+
+1.  Does every page have a feedback control? — YES
+2.  Report Bug available on every page? — YES
+3.  Suggest Improvement available on every page? — YES
+4.  Quick reactions available (Love this / Confusing)? — NO
+5.  Does feedback auto-capture the current page? — YES
+6.  Does feedback auto-capture browser / device? — YES
+7.  Does feedback auto-capture user and timestamp? — YES
+8.  Can an optional screenshot be attached? — NO
+9.  Are console errors captured when available? — YES
+
+========================================
+B.9: System Health
+========================================
+
+1.  Is there an admin system health / status page? — YES
+2.  API status shown for QuickBooks? — YES
+3.  API status shown for CompanyCam? — YES
+4.  API status shown for Google? — YES
+5.  Status shown for Email and SMS? — NO
+6.  Status shown for AI? — NO
+7.  Database status shown? — NO
+8.  Storage status shown? — NO
+9.  Backup status shown? — NO
+10. Webhook status shown? — YES
+11. Queue and sync-job status shown? — YES
+12. Errors and slow pages surfaced? — NO
+
+========================================
+B.10: Backup / Recovery
+========================================
+
+1.  Are automatic backups running? — YES
+2.  Can data be restored? — YES
+3.  Is point-in-time restore possible? — YES
+4.  Can a deleted record be recovered? — NO
+5.  Is there an undo? — YES
+
+========================================
+B.11: Import / Export — Import
+========================================
+
+1.  Can you import customers? — NO
+2.  Can you import properties? — NO
+3.  Can you import employees? — YES
+4.  Can you import the catalog? — YES
+5.  Can you import equipment? — YES
+6.  Can you import vendors? — YES
+7.  Can you import snow routes? — NO
+8.  Can you import maintenance routes? — NO
+
+--- Export ---
+
+9.  Can you export reports? — YES
+10. Can you export jobs? — YES
+11. Can you export time? — YES
+12. Can you export payroll? — YES
+13. Can you export photos? — NO
+14. Can you export SOPs? — NO
+
+========================================
+B.12: Audit Logs
+========================================
+
+1.  Is there an audit log beyond per-record history? — YES
+2.  Are user logins tracked? — YES
+3.  Are permission changes tracked? — YES
+4.  Are settings changes tracked? — YES
+5.  Are failed logins tracked? — NO
+6.  Are exports tracked? — NO
+7.  Are AI actions tracked? — YES
+8.  Are deleted records tracked? — YES
+
+========================================
+B.13: Feature Flags
+========================================
+
+1.  Does a feature flag system exist? — YES
+2.  Can admin enable a module? — YES
+3.  Can admin disable a module? — YES
+4.  Can admin hide an unfinished feature? — YES
+5.  Can admin enable a beta feature? — YES
+6.  Can admin enable a feature for only one user? — YES
+7.  Can admin enable a feature for only one company? — NO
+
+========================================
+B.14: System Setup Wizard
+========================================
+
+1.  Is there a first-time setup wizard? — NO
+2.  Does it cover business info? — NO
+3.  Does it cover employees? — NO
+4.  Does it connect QuickBooks? — NO
+5.  Does it connect CompanyCam? — NO
+6.  Does it connect Google? — NO
+7.  Does it set the logo? — NO
+8.  Does it set up the catalog? — NO
+9.  Does it set up services? — NO
+10. Does it set up routes? — NO
+11. Does it set up permissions? — NO
+
+========================================
+B.15: Performance & Scale
+========================================
+
+1.  Are the largest / slowest pages known and acceptable? — NO
+2.  Are slow queries identified? — NO
+3.  Has offline behavior been tested? — NO
+4.  Have large photo uploads been tested? — NO
+5.  Has the app been tested at scale (e.g. 500 employees)? — NO
+6.  Has it been tested with large data volume (millions of records)? — NO
+7.  Is search speed acceptable? — YES
+8.  Is startup speed acceptable? — YES
+
+========================================
+B.16: AI Learning / Company Knowledge
+========================================
+
+1.  Does the AI know company terminology? — YES
+2.  Does it know preferred wording? — NO
+3.  Does it know job stages? — YES
+4.  Does it know materials / catalog? — YES
+5.  Does it know employees? — YES
+6.  Does it know customers? — YES
+7.  Does it know workflows? — YES
+8.  Does it know core values and policies? — NO
+9.  Does it know SOPs? — YES
+10. Does it know estimate and proposal language? — YES
+11. Does it know safety rules? — NO
+
+========================================
+B.17: Automation Center
+========================================
+
+1.  Is there an Automation Center? — YES
+2.  Can all automations be viewed in one place? — YES
+3.  Can new automations be created without code? — NO
+4.  Does an approved estimate automatically chain: create job -> 811 task -> assign PM -> notify office -> create CompanyCam project -> create job packet -> schedule -> notify crew? — NO
+5.  Can automations be turned on and off? — YES
+6.  Can automation runs be audited (see what ran and when)? — YES
+
+========================================
+B.18: Business Rules Engine
+========================================
+
+1.  Is there a configurable business rules engine (instead of hard-coded logic)? — YES
+2.  Rule: job over $25,000 -> require manager approval? — YES
+3.  Rule: retaining wall -> require drainage checklist? — NO
+4.  Rule: pool -> require permit? — NO
+5.  Rule: VIP customer -> notify owner? — NO
+6.  Can admin create and edit rules without development help? — NO
+
+========================================
+B.19: System Documentation
+========================================
+
+1.  Is there a single reference page documenting the system? — YES
+2.  Does it list every module? — YES
+3.  Does it list every database table? — NO
+4.  Does it list every API? — NO
+5.  Does it list every connector / integration? — YES
+6.  Does it list every automation? — YES
+7.  Does it list every workflow? — NO
+8.  Does it list every permission? — NO
+9.  Does it list every notification? — NO
+10. Does it list every scheduled job? — NO
+11. Does it list every AI capability? — NO
+
+========================================
+B.20: System Architect (Living Map)
+========================================
+
+1.  Does an admin-only System Architect module exist showing a living map of the whole app? — NO
+2.  Does it show modules, database tables, and their relationships? — NO
+3.  Does it show APIs and integrations? — NO
+4.  Does it show automations, notifications, and scheduled jobs? — NO
+5.  Does it show permissions, AI tools, and feature flags? — NO
+6.  Does it show data flow diagrams? — NO
+7.  Does it show usage statistics? — NO
+8.  Does it show deprecated components? — NO
+9.  Can you click a module (e.g. Jobs) and see every table, workflow, automation, notification, report, integration, and permission it touches? — NO
+
+
+========================================
+PART C — Role & Module Summary (20 Questions)
+========================================
+
+Q1.  Can a crew member open the app and immediately know what to do today? — YES
+Q2.  Can a crew clock in, switch jobs, switch work areas, and clock out without confusion? — YES
+Q3.  Is the daily worksheet naturally created from normal field activity without duplicate input? — YES
+Q4.  Are crews automatically reminded or required to take needed photos? — YES
+Q5.  Can a crew continuing a job see what was done previously, with notes, photos, and timestamps? — YES
+Q6.  Can a manager see who is working, where they are, and whether jobs are on track? — YES
+Q7.  Can admin check employee hours quickly and accurately? — YES
+Q8.  Can office run payroll quickly and be confident it is correct? — YES
+Q9.  Can office answer customer questions about last visit, work performed, crew, photos, and timestamps in seconds? — YES
+Q10. Can staff message groups of customers based on route, job status, delay, invoice status, or service type? — NO
+Q11. Can staff see jobs that are missing worksheets, photos, closeout, invoice action, or customer follow-up? — YES
+Q12. Can job reports show estimated vs. actual hours, materials, change orders, issues, and lessons learned? — YES
+Q13. Can customer work requests, Lead Qualifier results, and website inquiries all enter the same sales workflow? — YES
+Q14. Can approved estimates become jobs without retyping important data? — YES
+Q15. Can jobs move through work order, schedule, time, worksheet, closeout, warranty, and reporting cleanly? — YES
+Q16. Can the AI assistant answer questions and perform simple tasks by text/voice while respecting permissions? — YES
+Q17. Are there any duplicate screens, confusing menu items, or old workflows still visible? — NO
+Q18. Are there any places where data is collected but not used later? — YES
+Q19. Are there any places where users need information but the app does not show it at the right time? — YES
+Q20. What are the top 20 workflow issues that will frustrate real users during alpha testing? — See Part D
