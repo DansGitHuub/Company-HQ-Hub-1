@@ -210,46 +210,35 @@ async function checkStorage(): Promise<SubsystemResult> {
     };
   }
 
-  // Cheap liveness: try to list the first configured bucket (no write)
+  // Cheap liveness: list objects under the first configured prefix (object-level
+  // IAM — storage.objects.list).  Never calls buckets.get / bucket.getMetadata.
   try {
-    const { Storage } = await import("@google-cloud/storage");
-    const SIDECAR = "http://127.0.0.1:1106";
-    const storageClient = new Storage({
-      credentials: {
-        audience: "replit",
-        subject_token_type: "access_token",
-        token_url: `${SIDECAR}/token`,
-        type: "external_account",
-        credential_source: {
-          url: `${SIDECAR}/credential`,
-          format: { type: "json", subject_token_field_name: "access_token" },
-        },
-        universe_domain: "googleapis.com",
-      },
-      projectId: "",
-    });
+    const { objectStorageClient } = await import("./replit_integrations/object_storage/objectStorage");
 
-    // Extract bucket name from the first search path (format: /<bucket>/path)
+    // Path format: /<bucket_name>/<prefix>  (comma-separated for PUBLIC_OBJECT_SEARCH_PATHS)
     const firstPath = (searchPaths || privateDir || "").split(",")[0].trim();
     const parts = firstPath.split("/").filter(Boolean);
     const bucketName = parts[0];
+    const objectPrefix = parts.slice(1).join("/");
 
-    if (!bucketName) throw new Error("Could not parse bucket name from path");
+    if (!bucketName) throw new Error("Could not parse bucket name from search path");
 
-    await storageClient.bucket(bucketName).getMetadata();
+    // getFiles with maxResults:1 is a storage.objects.list call — no bucket IAM needed
+    const [files] = await objectStorageClient
+      .bucket(bucketName)
+      .getFiles({ prefix: objectPrefix || "", maxResults: 1 });
 
     return {
       key, label, lastChecked,
       status: "operational",
-      detail: `Bucket reachable (${bucketName})`,
+      detail: `Object storage accessible (bucket: ${bucketName}, prefix: ${objectPrefix || "(root)"}, objects sampled: ${files.length})`,
     };
   } catch (err: any) {
-    // If the sidecar simply isn't available in this environment, report not_configured
     const msg = err?.message ?? "unknown";
     return {
       key, label, lastChecked,
       status: "degraded",
-      detail: `Storage env vars set but bucket unreachable: ${msg}`,
+      detail: `Object-level access failed: ${msg}`,
     };
   }
 }
