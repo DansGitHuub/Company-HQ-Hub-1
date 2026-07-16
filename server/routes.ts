@@ -9580,8 +9580,50 @@ Provide accurate information based on publicly available documentation.`;
 
   app.get("/api/activity-log", requireAuth, async (req, res) => {
     try {
-      const items = await db.select().from(activityLog).orderBy(desc(activityLog.createdAt)).limit(50);
-      res.json(items);
+      const u            = req.user as any;
+      const role: string = u.role ?? "";
+      const userId       = u.id as string;
+      const isMasterAdmin = !!u.isMasterAdmin;
+
+      // Columns aliased to camelCase so the frontend interface stays unchanged
+      const cols = `
+        id,
+        user_id      AS "userId",
+        event_type   AS "eventType",
+        description,
+        link,
+        seen_by      AS "seenBy",
+        created_at   AS "createdAt"
+      `;
+
+      let rows: any[];
+
+      if (isMasterAdmin || role === "Admin" || role === "Manager") {
+        // Full org-wide feed: all event types visible
+        const r = await pool.query(
+          `SELECT ${cols} FROM activity_log ORDER BY created_at DESC LIMIT 50`
+        );
+        rows = r.rows;
+      } else if (role === "Crew") {
+        // Field-scoped feed:
+        //   • events the crew member triggered themselves (user_id = me)
+        //   • field-relevant broadcast events (job pipeline moves, new work, calendar)
+        const r = await pool.query(
+          `SELECT ${cols}
+           FROM activity_log
+           WHERE user_id = $1
+              OR event_type IN ('job_stage_change', 'work_request', 'calendar_event')
+           ORDER BY created_at DESC
+           LIMIT 50`,
+          [userId]
+        );
+        rows = r.rows;
+      } else {
+        // Customer or unrecognised role — no activity feed
+        rows = [];
+      }
+
+      res.json(rows);
     } catch (err) {
       res.status(500).json({ message: "Error fetching activity log" });
     }
@@ -9589,13 +9631,37 @@ Provide accurate information based on publicly available documentation.`;
 
   app.get("/api/activity-log/unseen-count", requireAuth, async (req, res) => {
     try {
-      const userId = req.user!.id;
-      const items = await db.select().from(activityLog).orderBy(desc(activityLog.createdAt)).limit(100);
-      const unseenCount = items.filter((item) => {
-        const seenBy = (item.seenBy as string[]) || [];
-        return !seenBy.includes(userId);
-      }).length;
-      res.json({ count: unseenCount });
+      const u             = req.user as any;
+      const role: string  = u.role ?? "";
+      const userId        = u.id as string;
+      const isMasterAdmin = !!u.isMasterAdmin;
+
+      if (role === "Customer" && !isMasterAdmin) {
+        return res.json({ count: 0 });
+      }
+
+      // Build the same role-scoped WHERE used by the main feed, then count
+      // rows where the current user's id is NOT yet in the seen_by jsonb array.
+      let scopeWhere: string;
+      let params: any[];
+
+      if (isMasterAdmin || role === "Admin" || role === "Manager") {
+        scopeWhere = "TRUE";
+        params     = [userId];
+      } else {
+        // Crew: same scope as the feed query
+        scopeWhere = `(user_id = $1 OR event_type IN ('job_stage_change', 'work_request', 'calendar_event'))`;
+        params     = [userId];
+      }
+
+      const r = await pool.query(
+        `SELECT COUNT(*) AS count
+         FROM activity_log
+         WHERE ${scopeWhere}
+           AND NOT (COALESCE(seen_by, '[]'::jsonb) @> jsonb_build_array($1::text))`,
+        params
+      );
+      res.json({ count: parseInt(r.rows[0].count, 10) });
     } catch (err) {
       res.status(500).json({ message: "Error fetching unseen count" });
     }

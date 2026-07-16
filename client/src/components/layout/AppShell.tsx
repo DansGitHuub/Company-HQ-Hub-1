@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useTranslation } from "react-i18next";
 import type { CompanySettings } from "@shared/schema";
 import AIAssistantPanel from "@/components/AIAssistantPanel";
-import UpdatesPopup from "@/components/UpdatesPopup";
+import { UnifiedNotificationCenter } from "@/components/ui/UnifiedNotificationCenter";
 import GlobalMicButton from "@/components/GlobalMicButton";
 import FeedbackButton from "@/components/FeedbackButton";
 import { useVoice } from "@/hooks/use-voice";
@@ -37,7 +37,6 @@ import {
   CheckSquare,
   HardHat,
   Snowflake,
-  BellRing,
   Brain,
   CalendarCheck,
   X,
@@ -85,7 +84,6 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { NotificationBell } from "@/components/ui/NotificationBell";
 import { Badge } from "@/components/ui/badge";
 import WorksheetWidget from "@/components/WorksheetWidget";
 import AdminLayout from "./AdminLayout";
@@ -103,7 +101,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const contentRef = React.useRef<HTMLDivElement>(null);
   const sidebarNavRef = React.useRef<HTMLDivElement>(null);
   const sidebarScrollPosition = React.useRef<number>(0);
-  const [isUpdatesOpen, setIsUpdatesOpen] = React.useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = React.useState(false);
   const { settings: voiceSettings, isListening, stopListening, setOpenAssistantWithVoice } = useVoice();
@@ -328,25 +325,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     staleTime: 60000,
   });
 
-  const { data: unseenUpdates = [] } = useQuery<{ id: string }[]>({
-    queryKey: ["/api/updates/unseen"],
-    staleTime: 30000,
-    refetchInterval: 60000,
-  });
-
-  const { data: staffNotifCount } = useQuery<{ count: number }>({
-    queryKey: ["/api/staff-notifications/unread-count"],
-    staleTime: 30000,
-    refetchInterval: 30000,
-    enabled: !!user && user.role !== "Customer",
-  });
-
-  const { data: activityUnseenCount } = useQuery<{ count: number }>({
-    queryKey: ["/api/activity-log/unseen-count"],
-    staleTime: 30000,
-    refetchInterval: 30000,
-    enabled: !!user && user.role !== "Customer",
-  });
 
   const { data: publicFeatureFlags } = useQuery<Record<string, boolean>>({
     queryKey: ["/api/feature-flags/public"],
@@ -357,7 +335,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const isAdminUser = effectiveRole === "Admin" || (user as any)?.isMasterAdmin;
   const showLanguageToggle = isAdminUser || !!publicFeatureFlags?.translation_toggle;
 
-  const totalBellCount = (unseenUpdates.length || 0) + (staffNotifCount?.count || 0) + (activityUnseenCount?.count || 0);
 
   const getLogoClasses = () => {
     const shape = companySettings?.logoShape || "square";
@@ -917,29 +894,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             {/* Clock In — first in cluster */}
             <TimeClock />
 
-            {/* Orange updates bell — UNCHANGED, do not move */}
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button 
-                    className="relative h-11 w-11 flex items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-md shadow-orange-500/20 hover:shadow-lg hover:shadow-orange-500/30 hover:scale-105 active:scale-95 transition-all duration-200"
-                    onClick={() => setIsUpdatesOpen(true)}
-                    data-testid="button-updates"
-                  >
-                    <BellRing className="h-[22px] w-[22px] drop-shadow-sm" strokeWidth={2.25} />
-                    {totalBellCount > 0 && (
-                      <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full border-2 border-background px-1 shadow-sm">
-                        {totalBellCount > 9 ? '9+' : totalBellCount}
-                      </span>
-                    )}
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>{t("nav.updates")}</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-
-            {/* Second notification bell — UNCHANGED, do not move */}
-            <NotificationBell />
+            {/* Unified notification center — single bell, three tabs */}
+            <UnifiedNotificationCenter />
 
             {/* More overflow dropdown — low-frequency utilities */}
             <DropdownMenu>
@@ -1045,10 +1001,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </main>
 
         {/* Global Popups */}
-        <UpdatesPopup 
-          isOpen={isUpdatesOpen} 
-          onClose={() => setIsUpdatesOpen(false)} 
-        />
 
         <Sheet open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
           <SheetContent side="right" className="p-0 sm:max-w-[1000px] w-full border-l shadow-2xl">
