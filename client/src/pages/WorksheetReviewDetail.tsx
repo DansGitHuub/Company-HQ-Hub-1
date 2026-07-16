@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ArrowLeft, Loader2, PackageOpen, Receipt, StickyNote, Users,
-  CheckCircle2, PenLine, ThumbsUp, RotateCcw,
+  CheckCircle2, PenLine, ThumbsUp, RotateCcw, ClipboardCheck, AlertTriangle,
+  XCircle,
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -45,6 +46,14 @@ interface Worksheet {
   materials: Material[];
   expenses: Expense[];
   teamMembers: TeamMember[];
+  checklist_work_order_changed: boolean | null;
+  checklist_work_order_note: string | null;
+  checklist_materials_needed: boolean | null;
+  checklist_materials_note: string | null;
+  checklist_change_order_needed: boolean | null;
+  checklist_change_order_note: string | null;
+  checklist_issue_reported: boolean | null;
+  checklist_issue_note: string | null;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -291,6 +300,72 @@ export default function WorksheetReviewDetail() {
         ) : (
           <p className="text-sm text-muted-foreground">No notes added.</p>
         )}
+      </Section>
+
+      {/* Field Checklist */}
+      <Section icon={ClipboardCheck} title="End-of-Day Field Checklist" color="#6366f1">
+        <ul className="space-y-3" data-testid="section-field-checklist">
+          {[
+            {
+              label: "Did anything change from the work order?",
+              answered: ws.checklist_work_order_changed,
+              note: ws.checklist_work_order_note,
+              yesColor: "text-amber-700 bg-amber-50 border-amber-200",
+              testId: "checklist-work-order",
+            },
+            {
+              label: "Are more materials needed?",
+              answered: ws.checklist_materials_needed,
+              note: ws.checklist_materials_note,
+              yesColor: "text-blue-700 bg-blue-50 border-blue-200",
+              testId: "checklist-materials",
+            },
+            {
+              label: "Might a change order be needed?",
+              answered: ws.checklist_change_order_needed,
+              note: ws.checklist_change_order_note,
+              yesColor: "text-purple-700 bg-purple-50 border-purple-200",
+              testId: "checklist-change-order",
+            },
+            {
+              label: "Was there any damage, delay, or customer issue?",
+              answered: ws.checklist_issue_reported,
+              note: ws.checklist_issue_note,
+              yesColor: "text-red-700 bg-red-50 border-red-200",
+              testId: "checklist-issue",
+            },
+          ].map((q) => (
+            <li key={q.testId} data-testid={q.testId} className="flex flex-col gap-1">
+              <div className="flex items-start gap-2">
+                {q.answered ? (
+                  <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                ) : (
+                  <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0 mt-0.5" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-medium text-foreground">{q.label}</span>
+                  <span
+                    className={`ml-2 text-xs font-semibold px-1.5 py-0.5 rounded border ${
+                      q.answered === null || q.answered === undefined
+                        ? "text-muted-foreground bg-muted border-border"
+                        : q.answered
+                        ? q.yesColor
+                        : "text-green-700 bg-green-50 border-green-200"
+                    }`}
+                    data-testid={`${q.testId}-answer`}
+                  >
+                    {q.answered === null || q.answered === undefined ? "—" : q.answered ? "Yes" : "No"}
+                  </span>
+                  {q.answered && q.note && (
+                    <p className="mt-1 text-xs text-muted-foreground italic whitespace-pre-wrap" data-testid={`${q.testId}-note`}>
+                      {q.note}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
       </Section>
 
       {/* Signature */}

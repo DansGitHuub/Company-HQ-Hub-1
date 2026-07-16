@@ -101,7 +101,11 @@ export function registerWorksheetsApiRoutes(app: Express, requireAuth: any) {
            u.username AS employee_username,
            j.client AS job_name,
            COALESCE(mat.total, 0) AS materials_total,
-           COALESCE(exp.total, 0) AS expenses_total
+           COALESCE(exp.total, 0) AS expenses_total,
+           w.checklist_work_order_changed,
+           w.checklist_materials_needed,
+           w.checklist_change_order_needed,
+           w.checklist_issue_reported
          FROM worksheets w
          LEFT JOIN users u ON u.id = w.user_id
          LEFT JOIN jobs  j ON j.id = w.job_id
@@ -466,6 +470,75 @@ export function registerWorksheetsApiRoutes(app: Express, requireAuth: any) {
         } catch (coErr: any) {
           console.error("[worksheets] Q3 draft CO creation:", coErr.message);
         }
+      }
+
+      // ── Q1 notification: work order changed → alert all managers ─────────────
+      if (checklist_work_order_changed) {
+        pool.query(
+          `SELECT id FROM users WHERE (role = ANY($1) OR "is_master_admin" = true)`,
+          [MANAGER_ROLES]
+        ).then(({ rows: managers }) => {
+          const link = ws.job_id ? `/jobs/${ws.job_id}` : "/worksheet-review";
+          return Promise.all(managers.map((mgr: any) =>
+            pool.query(
+              `INSERT INTO staff_notifications (id, user_id, type, title, message, link, metadata)
+               VALUES (gen_random_uuid(), $1, 'field_issue_report', $2, $3, $4, $5)`,
+              [
+                mgr.id,
+                `Field Flag — Work Order Changed`,
+                `${ws.employee_name || "A crew member"} flagged a work order change on their worksheet.`,
+                link,
+                JSON.stringify({ worksheetId: ws.id, jobId: ws.job_id || null, flag: "work_order_changed", note: checklist_work_order_note?.trim() || null }),
+              ]
+            )
+          ));
+        }).catch((e: any) => console.error("[worksheets] Q1 notify:", e.message));
+      }
+
+      // ── Q2 notification: materials needed → alert all managers ────────────────
+      if (checklist_materials_needed) {
+        pool.query(
+          `SELECT id FROM users WHERE (role = ANY($1) OR "is_master_admin" = true)`,
+          [MANAGER_ROLES]
+        ).then(({ rows: managers }) => {
+          const link = ws.job_id ? `/jobs/${ws.job_id}` : "/worksheet-review";
+          return Promise.all(managers.map((mgr: any) =>
+            pool.query(
+              `INSERT INTO staff_notifications (id, user_id, type, title, message, link, metadata)
+               VALUES (gen_random_uuid(), $1, 'field_issue_report', $2, $3, $4, $5)`,
+              [
+                mgr.id,
+                `Field Flag — Materials Needed`,
+                `${ws.employee_name || "A crew member"} flagged that additional materials are needed.`,
+                link,
+                JSON.stringify({ worksheetId: ws.id, jobId: ws.job_id || null, flag: "materials_needed", note: checklist_materials_note?.trim() || null }),
+              ]
+            )
+          ));
+        }).catch((e: any) => console.error("[worksheets] Q2 notify:", e.message));
+      }
+
+      // ── Q3 notification: change order needed → alert all managers ─────────────
+      if (checklist_change_order_needed) {
+        pool.query(
+          `SELECT id FROM users WHERE (role = ANY($1) OR "is_master_admin" = true)`,
+          [MANAGER_ROLES]
+        ).then(({ rows: managers }) => {
+          const link = ws.job_id ? `/jobs/${ws.job_id}` : "/worksheet-review";
+          return Promise.all(managers.map((mgr: any) =>
+            pool.query(
+              `INSERT INTO staff_notifications (id, user_id, type, title, message, link, metadata)
+               VALUES (gen_random_uuid(), $1, 'field_issue_report', $2, $3, $4, $5)`,
+              [
+                mgr.id,
+                `Field Flag — Change Order Needed`,
+                `${ws.employee_name || "A crew member"} flagged a possible change order on their worksheet.`,
+                link,
+                JSON.stringify({ worksheetId: ws.id, jobId: ws.job_id || null, flag: "change_order_needed", note: checklist_change_order_note?.trim() || null }),
+              ]
+            )
+          ));
+        }).catch((e: any) => console.error("[worksheets] Q3 notify:", e.message));
       }
 
       // ── Q4: Issue reported → append to job notes + notify all managers ────────

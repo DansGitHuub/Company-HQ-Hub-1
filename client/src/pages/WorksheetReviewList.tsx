@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Loader2, ClipboardList, Download, MapPin } from "lucide-react";
+import { Loader2, ClipboardList, Download, MapPin, AlertTriangle } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -23,6 +23,10 @@ interface WorksheetSummary {
   job_name: string | null;
   materials_total: string | number;
   expenses_total: string | number;
+  checklist_work_order_changed: boolean;
+  checklist_materials_needed: boolean;
+  checklist_change_order_needed: boolean;
+  checklist_issue_reported: boolean;
 }
 
 interface SkippedStop {
@@ -388,10 +392,19 @@ export default function WorksheetReviewList() {
                   <TableHead className="text-right">Materials $</TableHead>
                   <TableHead className="text-right">Expenses $</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Flags</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sorted.map((w) => (
+                {sorted.map((w) => {
+                  const flags = [
+                    w.checklist_work_order_changed  && { label: "WO Changed",    color: "bg-amber-100 text-amber-800 border-amber-300" },
+                    w.checklist_materials_needed     && { label: "Materials",     color: "bg-blue-100 text-blue-800 border-blue-300"   },
+                    w.checklist_change_order_needed  && { label: "Change Order",  color: "bg-purple-100 text-purple-800 border-purple-300" },
+                    w.checklist_issue_reported       && { label: "Field Issue",   color: "bg-red-100 text-red-800 border-red-300"      },
+                  ].filter(Boolean) as { label: string; color: string }[];
+
+                  return (
                   <TableRow
                     key={w.id}
                     data-testid={`row-worksheet-${w.id}`}
@@ -418,8 +431,26 @@ export default function WorksheetReviewList() {
                         {w.status}
                       </Badge>
                     </TableCell>
+                    <TableCell>
+                      {flags.length === 0 ? (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      ) : (
+                        <div className="flex flex-wrap gap-1" data-testid={`flags-${w.id}`}>
+                          {flags.map((f) => (
+                            <span
+                              key={f.label}
+                              className={`inline-flex items-center gap-0.5 text-[11px] font-medium px-1.5 py-0.5 rounded border ${f.color}`}
+                            >
+                              <AlertTriangle className="w-2.5 h-2.5" />
+                              {f.label}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           )}
