@@ -1,5 +1,23 @@
-const CACHE_NAME = "companyhq-v2";
-const PRECACHE_URLS = ["/", "/index.html", "/my-day", "/time"];
+const CACHE_NAME = "companyhq-v3";
+const FIELD_DATA_CACHE = "companyhq-field-v3";
+
+const PRECACHE_URLS = ["/", "/index.html", "/my-day", "/time", "/route", "/work-orders"];
+
+// Field-critical GET endpoints — network first, cached for offline reads
+function isFieldApiGet(request) {
+  if (request.method !== "GET") return false;
+  const url = new URL(request.url);
+  if (!url.pathname.startsWith("/api/")) return false;
+  const p = url.pathname;
+  return (
+    p === "/api/route/today" ||
+    p.startsWith("/api/route/") ||
+    p.startsWith("/api/my-day/") ||
+    p === "/api/worksheets/today" ||
+    p.startsWith("/api/work-orders") ||
+    /^\/api\/jobs\/[^/]+$/.test(p)
+  );
+}
 
 // ── Install: precache app shell ───────────────────────────────────────────────
 self.addEventListener("install", (event) => {
@@ -10,11 +28,12 @@ self.addEventListener("install", (event) => {
 
 // ── Activate: clear old caches ────────────────────────────────────────────────
 self.addEventListener("activate", (event) => {
+  const KEEP = new Set([CACHE_NAME, FIELD_DATA_CACHE]);
   event.waitUntil(
     caches
       .keys()
       .then((keys) =>
-        Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+        Promise.all(keys.filter((k) => !KEEP.has(k)).map((k) => caches.delete(k)))
       )
       .then(() => self.clients.claim())
   );
@@ -32,66 +51,81 @@ self.addEventListener("fetch", (event) => {
   const isClockEndpoint =
     url.pathname === "/api/time/clock-in" || url.pathname === "/api/time/clock-out";
 
+  // ── Field-critical GETs: network first, cache fallback for offline reads ───
+  if (isApi && isFieldApiGet(request)) {
+    event.respondWith(
+      fetch(request.clone())
+        .then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(FIELD_DATA_CACHE).then((cache) => cache.put(request, clone));
+          }
+          return response;
+        })
+        .catch(async () => {
+          const cached = await caches.match(request, { cacheName: FIELD_DATA_CACHE });
+          if (cached) return cached;
+          return new Response(
+            JSON.stringify({ error: "offline", message: "No network connection" }),
+            { status: 503, headers: { "Content-Type": "application/json" } }
+          );
+        })
+    );
+    return;
+  }
+
+  // ── All other API calls: network first, no cache ──────────────────────────
   if (isApi) {
-    // Network-first for all API calls
     event.respondWith(
       fetch(request.clone()).catch(() => {
-        // Offline fallback for clock endpoints — return queued stub
         if (isClockEndpoint && request.method === "POST") {
           return new Response(JSON.stringify({ status: "queued", offline: true }), {
             status: 200,
             headers: { "Content-Type": "application/json" },
           });
         }
-        // Generic offline API response
-        return new Response(JSON.stringify({ error: "offline", message: "No network connection" }), {
-          status: 503,
-          headers: { "Content-Type": "application/json" },
-        });
+        return new Response(
+          JSON.stringify({ error: "offline", message: "No network connection" }),
+          { status: 503, headers: { "Content-Type": "application/json" } }
+        );
       })
     );
     return;
   }
 
-  // SPA navigation: always serve index.html for page navigations
-  // This handles cases where the CDN returns 404 for client-side routes like /catalog/1
+  // ── SPA navigation: serve index.html, cache for offline ──────────────────
   if (request.mode === "navigate") {
     event.respondWith(
-      fetch(request).then((response) => {
-        // If server returns a non-OK status for a navigation (e.g. CDN 404 for SPA route),
-        // fall back to index.html so the React router can handle the path
-        if (!response.ok) {
-          return caches.match("/index.html").then((cached) => {
-            if (cached) return cached;
-            return fetch("/index.html");
-          });
-        }
-        // Cache the successful response and return it
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-        return response;
-      }).catch(() => {
-        // Offline fallback
-        return caches.match("/index.html");
-      })
+      fetch(request)
+        .then((response) => {
+          if (!response.ok) {
+            return caches.match("/index.html").then((cached) => {
+              if (cached) return cached;
+              return fetch("/index.html");
+            });
+          }
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          return response;
+        })
+        .catch(() => caches.match("/index.html"))
     );
     return;
   }
 
-  // Cache-first for static assets
+  // ── Static assets: cache first ────────────────────────────────────────────
   event.respondWith(
     caches.match(request).then((cached) => {
       if (cached) return cached;
-      return fetch(request).then((response) => {
-        // Cache successful GET responses for static assets
-        if (request.method === "GET" && response.status === 200) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-        }
-        return response;
-      }).catch(() => {
-        return new Response("", { status: 503 });
-      });
+      return fetch(request)
+        .then((response) => {
+          if (request.method === "GET" && response.status === 200) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          }
+          return response;
+        })
+        .catch(() => new Response("", { status: 503 }));
     })
   );
 });

@@ -19,8 +19,10 @@ import {
   Edit2, X, Loader2, FileText, CheckSquare, Boxes, Clock, Image as ImageIcon,
   BookOpen, ChevronDown, ChevronRight, Wrench, HardHat, MapPin, Phone,
   User, Calendar, DollarSign, AlertTriangle, CheckCircle2, Circle,
-  Package, Shield, Leaf, Zap, Snowflake, Settings,
+  Package, Shield, Leaf, Zap, Snowflake, Settings, WifiOff,
 } from "lucide-react";
+import OfflineBanner from "@/components/OfflineBanner";
+import { useIsOnline } from "@/hooks/useIsOnline";
 import { format, parseISO, differenceInMinutes } from "date-fns";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
@@ -263,6 +265,7 @@ export default function WorkOrders() {
   const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
+  const isOnline = useIsOnline();
 
   const isAdmin = user?.role === "Admin" || user?.role === "Manager" || (user as any)?.isMasterAdmin;
 
@@ -308,24 +311,34 @@ export default function WorkOrders() {
 
   if (selectedId !== null) {
     return (
-      <DetailView
-        id={selectedId}
-        detail={detail}
-        isLoading={detailLoading}
-        isAdmin={isAdmin}
-        user={user}
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        onBack={() => { setSelectedId(null); setActiveTab("areas"); }}
-        onStatusChange={(status) => statusMut.mutate({ id: selectedId, status })}
-        onDelete={() => deleteMut.mutate(selectedId)}
-        onRefresh={invalidate}
-      />
+      <>
+        <OfflineBanner />
+        <DetailView
+          id={selectedId}
+          detail={detail}
+          isLoading={detailLoading}
+          isAdmin={isAdmin}
+          user={user}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          onBack={() => { setSelectedId(null); setActiveTab("areas"); }}
+          onStatusChange={(status) => statusMut.mutate({ id: selectedId, status })}
+          onDelete={() => deleteMut.mutate(selectedId)}
+          onRefresh={invalidate}
+        />
+      </>
     );
   }
 
   return (
     <div className="p-4 sm:p-6 max-w-6xl mx-auto">
+      <OfflineBanner />
+      {!isOnline && (
+        <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4" data-testid="banner-cached-wo">
+          <WifiOff className="h-3.5 w-3.5 shrink-0" />
+          Showing saved data (offline)
+        </div>
+      )}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">

@@ -6,9 +6,11 @@ import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { clockIn, clockOut } from "@/lib/timeApi";
+import { useIsOnline } from "@/hooks/useIsOnline";
+import OfflineBanner from "@/components/OfflineBanner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, MapPin, Navigation, Clock, Camera } from "lucide-react";
+import { Loader2, MapPin, Navigation, Clock, Camera, WifiOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import RichTextEditor from "@/components/RichTextEditor";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -1068,6 +1070,7 @@ export default function RoutePage() {
   const qc = useQueryClient();
   const { user } = useAuth();
   const [, navigate] = useLocation();
+  const isOnline = useIsOnline();
 
   const today = todayISODate();
   const storageKey = user?.id ? lsKey(user.id, today) : null;
@@ -1220,6 +1223,13 @@ export default function RoutePage() {
 
   return (
     <div className="max-w-md mx-auto px-4 py-6 min-h-screen">
+      <OfflineBanner />
+      {!isOnline && data && (
+        <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3" data-testid="banner-cached-route">
+          <WifiOff className="h-3.5 w-3.5 shrink-0" />
+          Showing saved data (offline)
+        </div>
+      )}
       {phase === "pre" && (
         <PreView
           data={data}

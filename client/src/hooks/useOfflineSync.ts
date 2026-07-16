@@ -5,18 +5,24 @@ import {
   markEventSynced,
   markEventFailed,
   clearSyncedEvents,
+  getPendingWrites,
+  markWriteSynced,
+  markWriteFailed,
+  clearSyncedWrites,
 } from "@/lib/offlineTimeQueue";
 
 export function useOfflineSync() {
   const [isOnline, setIsOnline] = useState(() => navigator.onLine);
   const [pendingCount, setPendingCount] = useState(0);
+  const [pendingWriteCount, setPendingWriteCount] = useState(0);
   const qc = useQueryClient();
   const flushingRef = useRef(false);
 
   const refreshPendingCount = useCallback(async () => {
     try {
-      const events = await getPendingEvents();
+      const [events, writes] = await Promise.all([getPendingEvents(), getPendingWrites()]);
       setPendingCount(events.length);
+      setPendingWriteCount(writes.length);
     } catch {
       // IndexedDB unavailable (e.g. private browsing in Safari)
     }
@@ -27,11 +33,8 @@ export function useOfflineSync() {
     flushingRef.current = true;
 
     try {
+      // ── Flush clock events (clock-in / clock-out) ───────────────────────────
       const events = await getPendingEvents();
-      if (events.length === 0) {
-        setPendingCount(0);
-        return;
-      }
 
       // Map offline localId string → real server entry id (for resolving clock-out payloads)
       const serverIdMap = new Map<string, number>();
@@ -86,11 +89,60 @@ export function useOfflineSync() {
       }
 
       await clearSyncedEvents();
+
+      // ── Flush write queue (worksheet submits) ───────────────────────────────
+      const writes = await getPendingWrites();
+
+      for (const write of writes) {
+        try {
+          if (write.type === "worksheet-submit") {
+            const { worksheetId, notes, ...checklist } = write.payload;
+
+            // Save notes first (best-effort — the worksheet may already be submitted)
+            try {
+              await fetch(`/api/worksheets/${worksheetId}`, {
+                method: "PATCH",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ notes }),
+              });
+            } catch {
+              // Ignore — notes save is best-effort; submit is what matters
+            }
+
+            const res = await fetch(`/api/worksheets/${worksheetId}/submit`, {
+              method: "POST",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(checklist),
+            });
+
+            if (res.ok) {
+              await markWriteSynced(write.id!);
+            } else {
+              const errData = await res.json().catch(() => ({}));
+              // "already submitted" means our queued action already landed — treat as success
+              const msg: string = errData.message ?? "";
+              if (res.status === 400 && msg.includes("already been submitted")) {
+                await markWriteSynced(write.id!);
+              } else {
+                await markWriteFailed(write.id!, msg || `HTTP ${res.status}`);
+              }
+            }
+          }
+        } catch (err: any) {
+          await markWriteFailed(write.id!, err?.message ?? "Network error");
+        }
+      }
+
+      await clearSyncedWrites();
       await refreshPendingCount();
 
+      // Invalidate field-critical queries so UI reflects synced state
       qc.invalidateQueries({ queryKey: ["/api/time/active"] });
       qc.invalidateQueries({ queryKey: ["/api/time/entries"] });
       qc.invalidateQueries({ queryKey: ["/api/my-day/time-entries"] });
+      qc.invalidateQueries({ queryKey: ["/api/worksheets/today"] });
     } finally {
       flushingRef.current = false;
     }
@@ -125,5 +177,5 @@ export function useOfflineSync() {
     return () => clearInterval(id);
   }, [isOnline, refreshPendingCount]);
 
-  return { isOnline, pendingCount, flushPendingEvents, refreshPendingCount };
+  return { isOnline, pendingCount, pendingWriteCount, flushPendingEvents, refreshPendingCount };
 }

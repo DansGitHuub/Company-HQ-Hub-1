@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { clockIn, clockOut, getActiveSession } from "@/lib/timeApi";
 import OfflineBanner from "@/components/OfflineBanner";
+import { queueWrite, getPendingWrites } from "@/lib/offlineTimeQueue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -730,6 +731,19 @@ export default function DailyWorksheet() {
   // ── Submit worksheet ──────────────────────────────────────────────────────────
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showChecklist, setShowChecklist] = useState(false);
+  const [offlineSubmitPending, setOfflineSubmitPending] = useState(false);
+
+  // On mount (or when worksheet changes), check if there's already a queued offline submit
+  // for this worksheet — restores the "pending" UI state after a page reload while offline
+  useEffect(() => {
+    if (!ws?.id) return;
+    getPendingWrites().then((writes) => {
+      const has = writes.some(
+        (w) => w.type === "worksheet-submit" && w.payload.worksheetId === ws.id
+      );
+      if (has) setOfflineSubmitPending(true);
+    }).catch(() => { /* IndexedDB unavailable in some private-browsing modes */ });
+  }, [ws?.id]);
 
   const emptyChecklist = (): ChecklistState => ({
     q1: null, q1note: "", q2: null, q2note: "",
@@ -747,28 +761,62 @@ export default function DailyWorksheet() {
     if (!ws) return;
     setIsSubmitting(true);
     setShowChecklist(false);
+
+    const checklistPayload = {
+      checklist_work_order_changed:  checklist.q1 === "yes",
+      checklist_work_order_note:     checklist.q1 === "yes" ? checklist.q1note : null,
+      checklist_materials_needed:    checklist.q2 === "yes",
+      checklist_materials_note:      checklist.q2 === "yes" ? checklist.q2note : null,
+      checklist_change_order_needed: checklist.q3 === "yes",
+      checklist_change_order_note:   checklist.q3 === "yes" ? checklist.q3note : null,
+      checklist_issue_reported:      checklist.q4 === "yes",
+      checklist_issue_note:          checklist.q4 === "yes" ? checklist.q4note : null,
+    };
+
+    // ── Offline: queue immediately, don't attempt network ─────────────────────
+    if (!navigator.onLine) {
+      try {
+        await queueWrite("worksheet-submit", { worksheetId: ws.id, notes, ...checklistPayload });
+        setOfflineSubmitPending(true);
+        toast({
+          title: "Saved — will sync when online",
+          description: "Your worksheet will be submitted automatically when you reconnect.",
+        });
+      } catch {
+        toast({ title: "Submit failed", description: "Could not save offline. Please try again.", variant: "destructive" });
+      }
+      setIsSubmitting(false);
+      return;
+    }
+
+    // ── Online: submit normally ───────────────────────────────────────────────
     try {
       await apiRequest("PATCH", `/api/worksheets/${ws.id}`, { notes });
-      await apiRequest("POST", `/api/worksheets/${ws.id}/submit`, {
-        checklist_work_order_changed:  checklist.q1 === "yes",
-        checklist_work_order_note:     checklist.q1 === "yes" ? checklist.q1note : null,
-        checklist_materials_needed:    checklist.q2 === "yes",
-        checklist_materials_note:      checklist.q2 === "yes" ? checklist.q2note : null,
-        checklist_change_order_needed: checklist.q3 === "yes",
-        checklist_change_order_note:   checklist.q3 === "yes" ? checklist.q3note : null,
-        checklist_issue_reported:      checklist.q4 === "yes",
-        checklist_issue_note:          checklist.q4 === "yes" ? checklist.q4note : null,
-      });
+      await apiRequest("POST", `/api/worksheets/${ws.id}/submit`, checklistPayload);
       qc.invalidateQueries({ queryKey: ["/api/worksheets/today"] });
       toast({ title: "Worksheet submitted!", description: "Your worksheet has been submitted." });
     } catch (err: any) {
-      toast({ title: "Submit failed", description: err.message, variant: "destructive" });
+      // Connectivity failure mid-submit → queue it so nothing is lost
+      if (!navigator.onLine || err?.name === "TypeError" || String(err?.message).includes("fetch")) {
+        try {
+          await queueWrite("worksheet-submit", { worksheetId: ws.id, notes, ...checklistPayload });
+          setOfflineSubmitPending(true);
+          toast({
+            title: "Saved — will sync when online",
+            description: "Your worksheet will be submitted automatically when you reconnect.",
+          });
+        } catch {
+          toast({ title: "Submit failed", description: err.message, variant: "destructive" });
+        }
+      } else {
+        toast({ title: "Submit failed", description: err.message, variant: "destructive" });
+      }
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const isSubmitted = ws?.status === "submitted" || ws?.status === "approved";
+  const isSubmitted = ws?.status === "submitted" || ws?.status === "approved" || offlineSubmitPending;
 
   // ── Materials form state ──────────────────────────────────────────────────────
   const [matForm, setMatForm] = useState({ material_name: "", quantity: "", unit: "", unit_cost: "", notes: "" });
