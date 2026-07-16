@@ -41,8 +41,7 @@ import {
   FlagTriangleRight,
   MessageSquareWarning,
   Library,
-  HeartPulse,
-  Brain,
+  HeartPulse, Brain,
 } from "lucide-react";
 
 type AdminNavItem = {
