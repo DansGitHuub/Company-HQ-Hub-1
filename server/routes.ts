@@ -5520,6 +5520,44 @@ Generate detailed information for this landscaping material.`;
         })();
       }
       
+      // Track first customer message timestamp for staleness scheduler
+      if (user.role === "Customer" && initialMessage) {
+        pool.query(
+          `UPDATE messaging_threads SET last_customer_message_at = NOW() WHERE id = $1`,
+          [thread.id]
+        ).catch(() => {});
+      }
+
+      // Fire in-app staff_notification so new thread appears in the unified bell
+      if (initialMessage) {
+        (async () => {
+          try {
+            const notifRecipients: string[] = [];
+            if (thread.assignedEmployeeId) {
+              notifRecipients.push(thread.assignedEmployeeId as string);
+            } else {
+              const allUsers = await storage.getUsers();
+              allUsers
+                .filter((u: any) => (u.role === "Admin" || u.role === "Manager") && u.isActive)
+                .forEach((a: any) => notifRecipients.push(a.id));
+            }
+            const preview = (initialMessage as string).length > 100
+              ? (initialMessage as string).substring(0, 97) + "\u2026"
+              : (initialMessage as string);
+            for (const uid of notifRecipients) {
+              if (uid === user.id) continue;
+              await pool.query(
+                `INSERT INTO staff_notifications (id, user_id, type, title, message, link, metadata)
+                 VALUES (gen_random_uuid(), $1, 'message_needs_reply', $2, $3, '/customer-messages', $4)`,
+                [uid, `New message: "${subject}"`, preview, JSON.stringify({ threadId: thread.id })]
+              );
+            }
+          } catch (e: any) {
+            console.error("[Thread] new-thread staff_notification error:", e.message);
+          }
+        })();
+      }
+
       logActivity("message_sent", `New message from ${user.name}`, "/communications", user.id);
       res.status(201).json(thread);
     } catch (err) {
@@ -5629,6 +5667,50 @@ Generate detailed information for this landscaping material.`;
         await storage.updateMessagingThread(req.params.id, { status: "in_progress" });
       }
 
+      // Track which side last replied (drives staleness scheduler)
+      if (!isInternalNote) {
+        if (user.role === "Customer") {
+          pool.query(
+            `UPDATE messaging_threads
+             SET last_customer_message_at = NOW(), follow_up_notified_at = NULL
+             WHERE id = $1`,
+            [req.params.id]
+          ).catch(() => {});
+
+          // In-app notification to assignee / all admins
+          (async () => {
+            try {
+              const notifRecipients: string[] = [];
+              if (thread.assignedEmployeeId) {
+                notifRecipients.push(thread.assignedEmployeeId as string);
+              } else {
+                const allUsers = await storage.getUsers();
+                allUsers
+                  .filter((u: any) => (u.role === "Admin" || u.role === "Manager") && u.isActive)
+                  .forEach((a: any) => notifRecipients.push(a.id));
+              }
+              const preview = content.length > 100 ? content.substring(0, 97) + "\u2026" : content;
+              for (const uid of notifRecipients) {
+                if (uid === user.id) continue;
+                await pool.query(
+                  `INSERT INTO staff_notifications (id, user_id, type, title, message, link, metadata)
+                   VALUES (gen_random_uuid(), $1, 'message_needs_reply', $2, $3, '/customer-messages', $4)`,
+                  [uid, `Customer reply: "${thread.subject}"`, preview, JSON.stringify({ threadId: req.params.id })]
+                );
+              }
+            } catch (e: any) {
+              console.error("[Thread] customer-reply notification error:", e.message);
+            }
+          })();
+        } else {
+          // Staff replied — reset staleness tracking
+          pool.query(
+            `UPDATE messaging_threads SET last_staff_reply_at = NOW() WHERE id = $1`,
+            [req.params.id]
+          ).catch(() => {});
+        }
+      }
+
       // Send email notification to recipient (non-blocking)
       if (!isInternalNote) {
         (async () => {
@@ -5675,6 +5757,48 @@ Generate detailed information for this landscaping material.`;
   });
   
   // Get unread conversation count for current user
+  // ── PATCH /api/messaging-threads/:id/snooze ─────────────────────────────────
+  // Snooze a thread: set status='snoozed' + snooze_until timestamp.
+  // Pass snooze_until=null to clear the snooze (status reverts to 'open').
+  app.patch("/api/messaging-threads/:id/snooze", requireAuth, async (req, res) => {
+    try {
+      const user = req.user!;
+      if (user.role === "Customer") {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const { snooze_until } = req.body;
+      const snoozeDate = snooze_until ? new Date(snooze_until) : null;
+      const newStatus  = snoozeDate ? "snoozed" : "open";
+
+      await pool.query(
+        `UPDATE messaging_threads SET snooze_until = $1, status = $2 WHERE id = $3`,
+        [snoozeDate, newStatus, req.params.id]
+      );
+      res.json({ success: true, status: newStatus });
+    } catch (err) {
+      res.status(500).json({ message: "Error snoozing thread" });
+    }
+  });
+
+  // ── PATCH /api/messaging-threads/:id/convert-to-task ─────────────────────────
+  // Record which task a thread was converted to, stopping future nudges.
+  app.patch("/api/messaging-threads/:id/convert-to-task", requireAuth, async (req, res) => {
+    try {
+      const user = req.user!;
+      if (user.role === "Customer") {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const { taskId } = req.body;
+      await pool.query(
+        `UPDATE messaging_threads SET converted_to_task_id = $1 WHERE id = $2`,
+        [taskId || null, req.params.id]
+      );
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Error linking task to thread" });
+    }
+  });
+
   app.get("/api/messaging-threads/unread-count", requireAuth, async (req, res) => {
     try {
       const user = req.user!;

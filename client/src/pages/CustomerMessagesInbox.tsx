@@ -22,6 +22,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import {
   MessageSquare,
@@ -213,6 +214,16 @@ export default function CustomerMessagesInbox() {
       toast({ title: "Thread updated" });
     },
     onError: () => toast({ title: "Failed to update thread", variant: "destructive" }),
+  });
+
+  const snoozeMutation = useMutation({
+    mutationFn: (snooze_until: string) =>
+      apiRequest("PATCH", `/api/messaging-threads/${selectedId}/snooze`, { snooze_until }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/messaging-threads"] });
+      toast({ title: "Thread snoozed — follow-up nudges paused" });
+    },
+    onError: () => toast({ title: "Failed to snooze thread", variant: "destructive" }),
   });
 
   const createTaskMutation = useMutation({
@@ -451,10 +462,51 @@ export default function CustomerMessagesInbox() {
                 <SelectContent>
                   <SelectItem value="open">Open</SelectItem>
                   <SelectItem value="in_progress">In Progress</SelectItem>
+                  <SelectItem value="snoozed">Snoozed</SelectItem>
                   <SelectItem value="resolved">Resolved</SelectItem>
                   <SelectItem value="closed">Closed</SelectItem>
                 </SelectContent>
               </Select>
+
+              {/* Snooze — pauses follow-up nudges until the chosen time */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs gap-1.5"
+                    data-testid="button-snooze-thread"
+                    disabled={snoozeMutation.isPending}
+                  >
+                    <Clock className="h-3.5 w-3.5" />
+                    Snooze
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-44 p-1" align="end">
+                  <p className="px-2.5 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Snooze for</p>
+                  <div className="space-y-0.5">
+                    {([
+                      { label: "1 hour",  hours: 1 },
+                      { label: "4 hours", hours: 4 },
+                      { label: "1 day",   hours: 24 },
+                      { label: "3 days",  hours: 72 },
+                    ] as const).map(({ label, hours }) => (
+                      <button
+                        key={hours}
+                        className="w-full text-left px-2.5 py-1.5 text-xs rounded hover:bg-muted transition-colors"
+                        disabled={snoozeMutation.isPending}
+                        onClick={() => {
+                          const until = new Date(Date.now() + hours * 3_600_000).toISOString();
+                          snoozeMutation.mutate(until);
+                        }}
+                        data-testid={`button-snooze-thread-${hours}h`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
 
               {/* Assign */}
               <Select

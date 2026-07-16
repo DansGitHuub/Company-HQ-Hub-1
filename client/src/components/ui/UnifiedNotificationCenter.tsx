@@ -145,12 +145,27 @@ export function UnifiedNotificationCenter() {
 
   // ── Queries ──────────────────────────────────────────────────────────────────
 
-  // Badge: staff_notifications unread count — the ONE thing that drives the badge
+  // Badge: staff_notifications unread count
   const { data: countData } = useQuery<{ count: number }>({
     queryKey: ["/api/staff-notifications/unread-count"],
     refetchInterval: 30_000,
   });
-  const unreadCount = Number(countData?.count ?? 0);
+
+  // Messaging unread counts — included in badge so no message goes unnoticed
+  const { data: threadUnreadData } = useQuery<{ unreadCount: number }>({
+    queryKey: ["/api/messaging-threads/unread-count"],
+    refetchInterval: 60_000,
+    enabled: !!user && user.role !== "Customer",
+  });
+  const { data: dmUnreadData } = useQuery<{ count: number }>({
+    queryKey: ["/api/dm/unread-count"],
+    refetchInterval: 30_000,
+    enabled: !!user && user.role !== "Customer",
+  });
+
+  const threadUnreadCount = Number(threadUnreadData?.unreadCount ?? 0);
+  const dmUnreadCount     = Number(dmUnreadData?.count ?? 0);
+  const unreadCount       = Number(countData?.count ?? 0) + threadUnreadCount + dmUnreadCount;
 
   // For You: full list, only when panel is open
   const { data: notifications = [], isLoading: notifsLoading } =
@@ -623,6 +638,36 @@ export function UnifiedNotificationCenter() {
               </ScrollArea>
             </TabsContent>
           </Tabs>
+
+          {/* Messages shortcut bar — shows when there are unread threads/DMs */}
+          {(threadUnreadCount > 0 || dmUnreadCount > 0) && (
+            <div className="border-t px-4 py-2 bg-muted/20 shrink-0 flex items-center gap-2 text-xs flex-wrap">
+              <MessageSquare className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+              {threadUnreadCount > 0 && (
+                <a
+                  href="/customer-messages"
+                  className="text-primary hover:underline"
+                  onClick={() => setOpen(false)}
+                  data-testid="link-thread-unread"
+                >
+                  {threadUnreadCount} unread customer thread{threadUnreadCount !== 1 ? "s" : ""}
+                </a>
+              )}
+              {threadUnreadCount > 0 && dmUnreadCount > 0 && (
+                <span className="text-muted-foreground">·</span>
+              )}
+              {dmUnreadCount > 0 && (
+                <a
+                  href="/messages"
+                  className="text-primary hover:underline"
+                  onClick={() => setOpen(false)}
+                  data-testid="link-dm-unread"
+                >
+                  {dmUnreadCount} unread DM{dmUnreadCount !== 1 ? "s" : ""}
+                </a>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

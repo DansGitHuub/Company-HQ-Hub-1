@@ -1,5 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import compression from "compression";
+import { pool } from "./db";
 import { registerRoutes } from "./routes";
 import { serveStaticFiles, serveStaticCatchAll } from "./static";
 import { createServer } from "http";
@@ -11,6 +12,7 @@ import { runAssistantMigration } from "./assistantMigration";
 import { runQuizAdaptiveMigration } from "./quizMigration";
 import { runNotificationMigration } from "./notificationMigration";
 import { startTaskScheduler } from "./taskScheduler";
+import { startMessageFollowUpScheduler } from "./messageFollowUpScheduler";
 import { startSopPipelineScheduler } from "./sopPipelineScheduler";
 import { startProcessAuditScheduler } from "./processAuditScheduler";
 import { startNotificationScheduler } from "./notificationScheduler";
@@ -339,6 +341,25 @@ app.use((req, res, next) => {
     await setupVite(httpServer, app);
   }
 
+  // ── Step 5b: Additive migration — message follow-through columns ─────────────
+  try {
+    await pool.query(`
+      ALTER TABLE direct_messages
+        ADD COLUMN IF NOT EXISTS follow_up_state TEXT NOT NULL DEFAULT 'open',
+        ADD COLUMN IF NOT EXISTS snooze_until    TIMESTAMP WITH TIME ZONE
+    `);
+    await pool.query(`
+      ALTER TABLE messaging_threads
+        ADD COLUMN IF NOT EXISTS snooze_until              TIMESTAMP WITH TIME ZONE,
+        ADD COLUMN IF NOT EXISTS last_customer_message_at  TIMESTAMP WITH TIME ZONE,
+        ADD COLUMN IF NOT EXISTS last_staff_reply_at       TIMESTAMP WITH TIME ZONE,
+        ADD COLUMN IF NOT EXISTS converted_to_task_id      VARCHAR(36)
+    `);
+    console.log("[migration] Message follow-through columns ready");
+  } catch (migErr: any) {
+    console.error("[migration] Message follow-through column error:", migErr.message);
+  }
+
   // ── Step 6: Start background schedulers ────────────────────────────────────
   runCustomerDataMigration().catch((err) =>
     console.error("[customer-data] Background seed error:", err.message)
@@ -356,4 +377,5 @@ app.use((req, res, next) => {
   startWorksheetAlertScheduler();
   startAutomationScheduler();
   startMaintenanceVisitScheduler();
+  startMessageFollowUpScheduler();
 })();

@@ -460,7 +460,62 @@ export function registerDirectMessageRoutes(app: Express, requireAuth: any) {
         [recipientId, msg.id]
       );
 
+      // Surface the new message in the recipient's unified bell "For You" tab
+      const senderName = (req.user as any).name || req.user.username;
+      pool.query(
+        `INSERT INTO staff_notifications (id, user_id, type, title, message, link, metadata)
+         VALUES (gen_random_uuid(), $1, 'message_needs_reply', $2, $3, '/messages', $4)`,
+        [
+          recipientId,
+          `New message from ${senderName}`,
+          body.trim().length > 100 ? body.trim().substring(0, 97) + "\u2026" : body.trim(),
+          JSON.stringify({ dmSenderId: me, dmMessageId: msg.id }),
+        ]
+      ).catch((e: any) =>
+        console.error("[DM] staff_notification insert error:", e.message)
+      );
+
       res.status(201).json(msg);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── PATCH /api/dm/conversation/:userId/triage ───────────────────────────────
+  // Set follow_up_state ('open' | 'snoozed' | 'resolved') and/or snooze_until
+  // on every message in the conversation between the current user and :userId.
+  app.patch("/api/dm/conversation/:userId/triage", requireAuth, async (req, res) => {
+    try {
+      const me    = req.user!.id;
+      const other = req.params.userId;
+      const { follow_up_state, snooze_until } = req.body;
+
+      const setClauses: string[] = [];
+      const params: any[]        = [];
+
+      if (follow_up_state) {
+        params.push(follow_up_state);
+        setClauses.push(`follow_up_state = $${params.length}`);
+      }
+      if ("snooze_until" in req.body) {
+        params.push(snooze_until ?? null);
+        setClauses.push(`snooze_until = $${params.length}`);
+      }
+      if (!setClauses.length) {
+        return res.status(400).json({ message: "Nothing to update" });
+      }
+
+      const p1 = params.length + 1;
+      const p2 = params.length + 2;
+      await pool.query(
+        `UPDATE direct_messages
+         SET    ${setClauses.join(", ")}
+         WHERE  (sender_id = $${p1} AND recipient_id = $${p2})
+            OR  (sender_id = $${p2} AND recipient_id = $${p1})`,
+        [...params, me, other]
+      );
+
+      res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

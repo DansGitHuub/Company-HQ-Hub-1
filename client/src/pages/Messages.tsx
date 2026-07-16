@@ -20,7 +20,7 @@ import {
   Star, Archive, MailOpen, Check, CheckCheck, Inbox, Mail, Paperclip, FileText,
   Briefcase, Link2, X as XIcon, ChevronDown,
   FolderPlus, FolderOpen, MoreHorizontal, Plus, Printer, Download,
-  ClipboardList
+  ClipboardList, Clock, CheckCircle2
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -741,6 +741,24 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
     },
   });
 
+  const [snoozeOpen, setSnoozeOpen] = useState(false);
+
+  const triageMutation = useMutation({
+    mutationFn: (payload: { follow_up_state?: string; snooze_until?: string | null }) =>
+      apiRequest("PATCH", `/api/dm/conversation/${userId}/triage`, payload),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["/api/dm/conversations"] });
+      qc.invalidateQueries({ queryKey: ["/api/dm/unread-count"] });
+      setSnoozeOpen(false);
+      toast({
+        title: vars.follow_up_state === "resolved"
+          ? "Conversation resolved"
+          : "Conversation snoozed",
+      });
+    },
+    onError: () => toast({ title: "Failed to update conversation", variant: "destructive" }),
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiRequest("DELETE", `/api/dm/${id}`, {}),
     onSuccess: () => {
@@ -854,6 +872,49 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
               )}
             </PopoverContent>
           </Popover>
+          {/* Snooze conversation */}
+          <Popover open={snoozeOpen} onOpenChange={setSnoozeOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="icon" title="Snooze conversation (pause follow-up nudges)"
+                className="h-8 w-8 text-gray-400 hover:text-indigo-600"
+                data-testid="button-snooze">
+                <Clock className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-44 p-1" align="end">
+              <p className="px-2.5 py-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Snooze for</p>
+              <div className="space-y-0.5">
+                {([
+                  { label: "1 hour",  hours: 1 },
+                  { label: "4 hours", hours: 4 },
+                  { label: "1 day",   hours: 24 },
+                  { label: "3 days",  hours: 72 },
+                ] as const).map(({ label, hours }) => (
+                  <button
+                    key={hours}
+                    className="w-full text-left px-2.5 py-1.5 text-xs rounded hover:bg-gray-100 transition-colors"
+                    disabled={triageMutation.isPending}
+                    onClick={() => {
+                      const until = new Date(Date.now() + hours * 3_600_000).toISOString();
+                      triageMutation.mutate({ follow_up_state: "snoozed", snooze_until: until });
+                    }}
+                    data-testid={`button-snooze-${hours}h`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
+          {/* Resolve conversation (stops future follow-up nudges) */}
+          <Button variant="ghost" size="icon"
+            title="Mark as resolved (stops follow-up nudges)"
+            className="h-8 w-8 text-gray-400 hover:text-green-600"
+            data-testid="button-resolve"
+            disabled={triageMutation.isPending}
+            onClick={() => triageMutation.mutate({ follow_up_state: "resolved", snooze_until: null })}>
+            <CheckCircle2 className="h-4 w-4" />
+          </Button>
           <Button variant="ghost" size="icon"
             title="Print conversation"
             className="h-8 w-8 text-gray-400 hover:text-gray-700"
