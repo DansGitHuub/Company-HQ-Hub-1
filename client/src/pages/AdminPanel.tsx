@@ -718,6 +718,7 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
         { value: "estimate-templates", label: "Estimate Templates", icon: FileText },
         { value: "terms", label: "Terms & Conditions", icon: FileSignature },
         { value: "business-rules", label: "Business Rules", icon: SlidersHorizontal, href: "/admin/business-rules" },
+        { value: "regional-settings", label: "Regional & Seasonal", icon: Globe, href: "/admin/regional-settings" },
         { value: "feedback-reports", label: "Bug Reports & Feedback", icon: MessageSquareWarning, href: "/admin/feedback" },
         { value: "admin-tools", label: "Admin Tools", icon: Wrench, href: "/tools" },
       ],
@@ -1353,6 +1354,7 @@ export default function AdminPanel() {
           if (v === "plant-cards-link") { navigate("/plant-cards"); return; }
           if (v === "admin-tools") { navigate("/tools"); return; }
           if (v === "business-rules") { navigate("/admin/business-rules"); return; }
+          if (v === "regional-settings") { navigate("/admin/regional-settings"); return; }
           if (v === "automation-center") { navigate("/admin/automation-center"); return; }
           if (v === "feature-flags") { navigate("/admin/feature-flags"); return; }
           setActiveTab(v);
@@ -1389,6 +1391,7 @@ export default function AdminPanel() {
               <SelectItem value="catalog-link">Item Catalog</SelectItem>
               <SelectItem value="plant-cards-link">Plant Library</SelectItem>
               <SelectItem value="business-rules">Business Rules</SelectItem>
+              <SelectItem value="regional-settings">Regional &amp; Seasonal</SelectItem>
               <SelectItem value="feedback-reports">Bug Reports & Feedback</SelectItem>
               <SelectItem value="admin-tools">Admin Tools</SelectItem>
             </SelectGroup>

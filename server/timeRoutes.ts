@@ -27,6 +27,11 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
     .then(() => pool.query(`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS clock_out_lng DOUBLE PRECISION`))
     .catch((err) => console.error("[timeRoutes] GPS columns migration:", err.message));
 
+  // ── Migrate: break tracking columns ──────────────────────────────────────────
+  pool.query(`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS break_minutes INTEGER NOT NULL DEFAULT 0`)
+    .then(() => pool.query(`ALTER TABLE time_entries ADD COLUMN IF NOT EXISTS break_source TEXT`))
+    .catch((err) => console.error("[timeRoutes] break columns migration:", err.message));
+
   // ── Clock In ─────────────────────────work-areas───────────────────────────────────────
   app.post("/api/time/clock-in", requireAuth, async (req, res) => {
     const userId = (req.user as any).id;
@@ -143,6 +148,13 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
       return res.status(400).json({ message: "time_entry_id is required" });
     }
 
+    // Read configurable break deduction before opening the transaction (non-blocking)
+    let defaultBreakMin = 0;
+    try {
+      const brRow = await pool.query(`SELECT value FROM app_settings WHERE key = 'default_break_minutes'`);
+      if (brRow.rows[0]?.value) defaultBreakMin = Math.max(0, parseInt(brRow.rows[0].value, 10) || 0);
+    } catch { /* non-fatal */ }
+
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
@@ -164,6 +176,24 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
         return res.status(404).json({ message: "Active time entry not found" });
       }
 
+      // A6: Auto break deduction — applied when configured and session is long enough
+      if (defaultBreakMin > 0) {
+        const rawDur: number | null = result.rows[0].duration_minutes;
+        if (rawDur != null && rawDur > defaultBreakMin + 15) {
+          await client.query(
+            `UPDATE time_entries
+             SET duration_minutes = duration_minutes - $1,
+                 break_minutes = $1,
+                 break_source = 'auto'
+             WHERE id = $2`,
+            [defaultBreakMin, result.rows[0].id]
+          );
+          result.rows[0].duration_minutes = rawDur - defaultBreakMin;
+          result.rows[0].break_minutes = defaultBreakMin;
+          result.rows[0].break_source = "auto";
+        }
+      }
+
       // Update time_card and worksheet_session atomically with the time_entry close
       const tcResult = await client.query(
         `UPDATE time_cards
@@ -183,6 +213,41 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
       await client.query("COMMIT");
 
       const entryRow = result.rows[0];
+
+      // A5: Overtime alert — fire-and-forget after commit, notifies all Admin/Manager users
+      pool.query(`SELECT value FROM app_settings WHERE key = 'overtime_alert_hours'`)
+        .then(async (otRow: any) => {
+          const threshHours = parseFloat(otRow.rows[0]?.value || "0") || 0;
+          if (threshHours <= 0) return;
+          const dailyR = await pool.query(
+            `SELECT COALESCE(SUM(duration_minutes), 0) AS total_min
+             FROM time_entries
+             WHERE user_id = $1 AND clock_in::date = CURRENT_DATE AND clock_out IS NOT NULL`,
+            [userId]
+          );
+          const totalHours = Number(dailyR.rows[0].total_min) / 60;
+          if (totalHours <= threshHours) return;
+          const empR = await pool.query(
+            `SELECT TRIM(first_name || ' ' || COALESCE(last_name, '')) AS full_name
+             FROM employees WHERE user_id = $1 LIMIT 1`,
+            [userId]
+          );
+          const empName = empR.rows[0]?.full_name || `User #${userId}`;
+          const admins = await pool.query(
+            `SELECT id FROM users WHERE role IN ('Admin', 'Manager') AND id != $1`,
+            [userId]
+          );
+          await Promise.all(
+            admins.rows.map((a: any) =>
+              pool.query(
+                `INSERT INTO staff_notifications (user_id, type, title, message, link)
+                 VALUES ($1, 'overtime_alert', 'Overtime Alert', $2, '/admin/time-reports')`,
+                [a.id, `${empName} has logged ${totalHours.toFixed(1)}h today (threshold: ${threshHours}h).`]
+              )
+            )
+          );
+        })
+        .catch((e: any) => console.error("[timeRoutes] overtime check:", e.message));
       const durMin = entryRow.duration_minutes;
       const durDesc = durMin != null ? ` after ${durMin} minutes` : "";
 
@@ -365,6 +430,8 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
           te.clock_in,
           te.clock_out,
           te.duration_minutes,
+          te.break_minutes,
+          te.break_source,
           te.entry_type,
           te.notes,
           te.work_area_name,

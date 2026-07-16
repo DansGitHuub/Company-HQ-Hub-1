@@ -117,15 +117,35 @@ export default function CalculatorRunner({ workAreaId, onInserted, trigger }: Pr
     enabled: open && !!selectedId,
   });
 
+  // A3: Company salt defaults — fetched to pre-fill when Salt Application calculator is opened
+  const { data: saltDefaultsSetting } = useQuery<{ value: string } | null>({
+    queryKey: ["/api/settings/salt_defaults"],
+    enabled: open,
+    retry: false,
+    staleTime: 60_000,
+  });
+
   // Reset form values + clear preview when the selected calculator changes.
   useEffect(() => {
     if (calcDetail) {
-      setValues(buildDefaults(calcDetail.input_schema));
+      let defaults = buildDefaults(calcDetail.input_schema);
+      // Pre-fill company salt defaults if the admin has configured them
+      if (calcDetail.name === "salt_application" && saltDefaultsSetting?.value) {
+        try {
+          const saltDefs = JSON.parse(saltDefaultsSetting.value);
+          for (const key of Object.keys(saltDefs)) {
+            if (key in defaults && saltDefs[key] !== null && saltDefs[key] !== undefined) {
+              defaults[key] = saltDefs[key];
+            }
+          }
+        } catch { /* fall back to schema defaults */ }
+      }
+      setValues(defaults);
     }
     setPreview(null);
     setCalcErr("");
     setInsertErr("");
-  }, [calcDetail]);
+  }, [calcDetail, saltDefaultsSetting]);
 
   // Reset everything when dialog closes.
   function handleOpenChange(v: boolean) {

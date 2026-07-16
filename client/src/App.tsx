@@ -158,6 +158,7 @@ import MessagesPage from "@/pages/Messages";
 import TimeReports from "@/pages/admin/TimeReports";
 import ServiceTypesPage from "@/pages/admin/ServiceTypesPage";
 import BusinessRulesPage from "@/pages/admin/BusinessRulesPage";
+import RegionalSettingsPage from "@/pages/admin/RegionalSettingsPage";
 import AutomationCenterPage from "@/pages/admin/AutomationCenterPage";
 import FeatureFlagsPage from "@/pages/admin/FeatureFlagsPage";
 import FeedbackReportsPage from "@/pages/admin/FeedbackReportsPage";
@@ -346,6 +347,7 @@ function AppRoutes() {
         <ProtectedRoute path="/admin/service-types" component={ServiceTypesPage} allowedRoles={ADMIN_ONLY} />
         <ProtectedRoute path="/admin/business-rules" component={BusinessRulesPage} allowedRoles={ADMIN_ONLY} />
         <ProtectedRoute path="/admin/automation-center" component={AutomationCenterPage} allowedRoles={ADMIN_ONLY} />
+        <ProtectedRoute path="/admin/regional-settings" component={RegionalSettingsPage} allowedRoles={ADMIN_ONLY} />
         <ProtectedRoute path="/admin/feature-flags" component={FeatureFlagsPage} allowedRoles={ADMIN_ONLY} />
         <ProtectedRoute path="/admin/feedback" component={FeedbackReportsPage} allowedRoles={ADMIN_ONLY} />
         <ProtectedRoute path="/admin/companycam-reconciliation" component={CompanyCamReconciliation} allowedRoles={ADMIN_ONLY} />

@@ -31,6 +31,8 @@ interface TimeEntry {
   clock_in: string;
   clock_out: string | null;
   duration_minutes: number | null;
+  break_minutes: number | null;
+  break_source: string | null;
   entry_type: string;
   notes: string | null;
   work_area_name: string | null;
@@ -148,13 +150,14 @@ export default function TimeReports() {
 
   const exportCSV = () => {
     if (!data?.entries.length) return;
-    const headers = ["Employee", "Date", "Clock In", "Clock Out", "Total Hours", "Job", "Customer", "Work Area", "Type"];
+    const headers = ["Employee", "Date", "Clock In", "Clock Out", "Total Hours", "Break Deducted", "Job", "Customer", "Work Area", "Type"];
     const rows = data.entries.map((e) => [
       e.employee_name || e.username,
       formatDate(e.clock_in),
       formatTime(e.clock_in),
       formatTime(e.clock_out),
       formatDuration(e.duration_minutes, e.clock_in, e.clock_out),
+      e.break_minutes ? `${e.break_minutes}m (auto)` : "",
       e.job_type ?? "",
       e.customer ?? "",
       e.work_area_name ?? "",
@@ -372,6 +375,7 @@ export default function TimeReports() {
                     <TableHead>Clock In</TableHead>
                     <TableHead>Clock Out</TableHead>
                     <TableHead>Total Hours</TableHead>
+                    <TableHead>Break</TableHead>
                     <TableHead>Job</TableHead>
                     <TableHead>Customer</TableHead>
                     <TableHead>Work Area</TableHead>
@@ -401,6 +405,15 @@ export default function TimeReports() {
                       </TableCell>
                       <TableCell data-testid={`text-duration-${entry.id}`}>
                         {formatDuration(entry.duration_minutes, entry.clock_in, entry.clock_out)}
+                      </TableCell>
+                      <TableCell data-testid={`text-break-${entry.id}`}>
+                        {entry.break_minutes && entry.break_minutes > 0 ? (
+                          <span className="text-xs text-amber-700 dark:text-amber-400 font-medium">
+                            -{entry.break_minutes}m
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
                       </TableCell>
                       <TableCell data-testid={`text-job-${entry.id}`}>
                         {entry.job_type ?? <span className="text-muted-foreground text-xs">—</span>}

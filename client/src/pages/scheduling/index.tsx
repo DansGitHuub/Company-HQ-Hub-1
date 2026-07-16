@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -68,8 +68,51 @@ interface UnscheduledJob {
   overdue_balance: number;
 }
 interface Employee { id: string; first_name: string; last_name: string; position?: string; }
+interface WeatherDayData { date: string; high: number | null; low: number | null; forecast: string; }
 
 interface PendingDrop { jobId: string; date: string; hour: number; viaClick?: boolean; }
+
+// ── Federal holiday helpers ────────────────────────────────────────────────────
+function nthWeekday(year: number, month: number, weekday: number, n: number): string {
+  const d = new Date(year, month - 1, 1);
+  let count = 0;
+  while (d.getMonth() === month - 1) {
+    if (d.getDay() === weekday) { count++; if (count === n) break; }
+    d.setDate(d.getDate() + 1);
+  }
+  return `${year}-${String(month).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function lastWeekday(year: number, month: number, weekday: number): string {
+  const d = new Date(year, month, 0);
+  while (d.getDay() !== weekday) d.setDate(d.getDate() - 1);
+  return `${year}-${String(month).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function getFederalHolidays(year: number): { key: string; name: string; date: string }[] {
+  return [
+    { key: "new_years",    name: "New Year's Day",  date: `${year}-01-01` },
+    { key: "mlk",          name: "MLK Day",          date: nthWeekday(year, 1, 1, 3) },
+    { key: "presidents",   name: "Presidents' Day",  date: nthWeekday(year, 2, 1, 3) },
+    { key: "memorial",     name: "Memorial Day",     date: lastWeekday(year, 5, 1) },
+    { key: "juneteenth",   name: "Juneteenth",       date: `${year}-06-19` },
+    { key: "independence", name: "Independence Day", date: `${year}-07-04` },
+    { key: "labor",        name: "Labor Day",        date: nthWeekday(year, 9, 1, 1) },
+    { key: "columbus",     name: "Columbus Day",     date: nthWeekday(year, 10, 1, 2) },
+    { key: "veterans",     name: "Veterans Day",     date: `${year}-11-11` },
+    { key: "thanksgiving", name: "Thanksgiving",     date: nthWeekday(year, 11, 4, 4) },
+    { key: "christmas",    name: "Christmas Day",    date: `${year}-12-25` },
+  ];
+}
+function wxEmoji(forecast: string): string {
+  const f = (forecast ?? "").toLowerCase();
+  if (f.includes("thunder") || f.includes("storm")) return "⛈";
+  if (f.includes("snow") || f.includes("blizzard")) return "❄️";
+  if (f.includes("rain") || f.includes("shower") || f.includes("drizzle")) return "🌧";
+  if (f.includes("fog") || f.includes("haze")) return "🌫";
+  if (f.includes("partly") || f.includes("partial")) return "⛅";
+  if (f.includes("cloud") || f.includes("overcast")) return "☁️";
+  if (f.includes("sunny") || f.includes("clear") || f.includes("fair")) return "☀️";
+  return "🌤";
+}
 
 interface UndoPreviousState {
   was_scheduled: boolean;
@@ -191,6 +234,57 @@ export default function SchedulingCalendar() {
       return res.json();
     },
   });
+
+  // ── A1/A2/A4: Regional settings for calendar day-header indicators ─────────
+  const { data: wxForecast } = useQuery<{ days: WeatherDayData[] }>({
+    queryKey: ["/api/weather/forecast"],
+    retry: false,
+    staleTime: 15 * 60 * 1000,
+  });
+  const { data: holidayCfgRaw } = useQuery<{ value: string }>({
+    queryKey: ["/api/settings/holiday_config"],
+    retry: false,
+    staleTime: 60_000,
+  });
+  const { data: blackoutCfgRaw } = useQuery<{ value: string }>({
+    queryKey: ["/api/settings/fertilizer_blackouts"],
+    retry: false,
+    staleTime: 60_000,
+  });
+
+  const weatherMap = useMemo(() => {
+    const map = new Map<string, WeatherDayData>();
+    for (const d of wxForecast?.days ?? []) map.set(d.date, d);
+    return map;
+  }, [wxForecast]);
+
+  const holidayMap = useMemo(() => {
+    const map = new Map<string, string>();
+    const observed: string[] = (() => {
+      if (!holidayCfgRaw?.value) return [];
+      try { return JSON.parse(holidayCfgRaw.value).observed ?? []; } catch { return []; }
+    })();
+    if (observed.length === 0) return map;
+    const years = new Set(weekDays.map(d => d.getFullYear()));
+    for (const y of years) {
+      for (const h of getFederalHolidays(y)) {
+        if (observed.includes(h.key)) map.set(h.date, h.name);
+      }
+    }
+    return map;
+  }, [holidayCfgRaw, weekDays]);
+
+  const blackoutDates = useMemo(() => {
+    const set = new Set<string>();
+    if (!blackoutCfgRaw?.value) return set;
+    let ranges: { name: string; start: string; end: string }[] = [];
+    try { ranges = JSON.parse(blackoutCfgRaw.value); } catch { return set; }
+    for (const d of weekDays) {
+      const ds = format(d, "yyyy-MM-dd");
+      if (ranges.some(r => ds >= r.start && ds <= r.end)) set.add(ds);
+    }
+    return set;
+  }, [blackoutCfgRaw, weekDays]);
 
   // ── Mutations ─────────────────────────────────────────────────────────────
   const scheduleMutation = useMutation({
@@ -708,8 +802,12 @@ export default function SchedulingCalendar() {
           {weekDays.map(day => {
             const todayDay = isToday(day);
             const cnt      = jobCountForDay(day);
+            const dayStr   = format(day, "yyyy-MM-dd");
+            const wd        = weatherMap.get(dayStr);
+            const holiday   = holidayMap.get(dayStr);
+            const inBlackout = blackoutDates.has(dayStr);
             return (
-              <div key={day.toISOString()} className="text-center py-2 border-r last:border-r-0">
+              <div key={day.toISOString()} className={`text-center py-1.5 border-r last:border-r-0 ${holiday ? "bg-amber-50/40 dark:bg-amber-900/10" : ""}`}>
                 <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">
                   {format(day, "EEE")}
                 </div>
@@ -719,6 +817,21 @@ export default function SchedulingCalendar() {
                 <div className="text-[10px] text-muted-foreground mt-0.5">
                   {cnt > 0 ? t("jobCount", { count: cnt }) : ""}
                 </div>
+                {wd && (wd.high !== null || wd.low !== null) && (
+                  <div className="text-[9px] text-blue-500 dark:text-blue-400 leading-tight mt-0.5" title={wd.forecast}>
+                    {wxEmoji(wd.forecast)}&thinsp;{wd.high !== null ? `${wd.high}°` : ""}{wd.high !== null && wd.low !== null ? "/" : ""}{wd.low !== null ? `${wd.low}°` : ""}
+                  </div>
+                )}
+                {holiday && (
+                  <div className="text-[9px] font-medium text-amber-600 dark:text-amber-400 leading-tight truncate px-0.5 mt-0.5" title={holiday}>
+                    🏛 {holiday}
+                  </div>
+                )}
+                {inBlackout && (
+                  <div className="text-[9px] font-medium text-orange-500 dark:text-orange-400 leading-tight mt-0.5">
+                    ⚠ Fert. Blackout
+                  </div>
+                )}
               </div>
             );
           })}
