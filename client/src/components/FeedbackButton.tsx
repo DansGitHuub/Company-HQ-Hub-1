@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -16,14 +16,26 @@ import {
 } from "@/components/ui/select";
 import { MessageSquareWarning, Loader2 } from "lucide-react";
 
-export default function FeedbackButton() {
+interface FeedbackButtonProps {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}
+
+export default function FeedbackButton({ open: controlledOpen, onOpenChange: controlledOnOpenChange }: FeedbackButtonProps = {}) {
+  const isControlled = controlledOpen !== undefined;
   const { user } = useAuth();
   const [location] = useLocation();
   const { toast } = useToast();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
   const [type, setType] = useState<"Bug" | "Feedback">("Bug");
   const [description, setDescription] = useState("");
   const [pageContext, setPageContext] = useState(location);
+
+  const open = isControlled ? controlledOpen! : internalOpen;
+
+  useEffect(() => {
+    if (open) setPageContext(location);
+  }, [open]);
 
   const submitMut = useMutation({
     mutationFn: () => apiRequest("POST", "/api/feedback-reports", {
@@ -35,7 +47,7 @@ export default function FeedbackButton() {
       toast({ title: "Thanks! Your report was submitted." });
       setDescription("");
       setType("Bug");
-      setOpen(false);
+      handleOpenChange(false);
     },
     onError: (e: any) => {
       toast({ title: "Could not submit report", description: e.message, variant: "destructive" });
@@ -46,7 +58,11 @@ export default function FeedbackButton() {
 
   function handleOpenChange(next: boolean) {
     if (next) setPageContext(location);
-    setOpen(next);
+    if (isControlled) {
+      controlledOnOpenChange?.(next);
+    } else {
+      setInternalOpen(next);
+    }
   }
 
   function handleSubmit() {
@@ -59,17 +75,20 @@ export default function FeedbackButton() {
 
   return (
     <>
-      <div className="fixed z-40" style={{ bottom: "1.25rem", left: "1.25rem" }}>
-        <Button
-          size="icon"
-          className="h-11 w-11 rounded-full shadow-lg bg-slate-700 hover:bg-slate-800 text-white"
-          title="Report a Bug / Feedback"
-          onClick={() => handleOpenChange(true)}
-          data-testid="button-open-feedback"
-        >
-          <MessageSquareWarning className="h-5 w-5" />
-        </Button>
-      </div>
+      {/* Floating trigger — only rendered in uncontrolled (legacy) mode */}
+      {!isControlled && (
+        <div className="fixed z-40" style={{ bottom: "1.25rem", left: "1.25rem" }}>
+          <Button
+            size="icon"
+            className="h-11 w-11 rounded-full shadow-lg bg-slate-700 hover:bg-slate-800 text-white"
+            title="Report a Bug / Feedback"
+            onClick={() => handleOpenChange(true)}
+            data-testid="button-open-feedback"
+          >
+            <MessageSquareWarning className="h-5 w-5" />
+          </Button>
+        </div>
+      )}
 
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent data-testid="dialog-feedback">
@@ -119,7 +138,7 @@ export default function FeedbackButton() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)} data-testid="button-cancel-feedback">
+            <Button variant="outline" onClick={() => handleOpenChange(false)} data-testid="button-cancel-feedback">
               Cancel
             </Button>
             <Button onClick={handleSubmit} disabled={submitMut.isPending} data-testid="button-submit-feedback">

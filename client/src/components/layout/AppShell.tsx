@@ -8,6 +8,7 @@ import AIAssistantPanel from "@/components/AIAssistantPanel";
 import UpdatesPopup from "@/components/UpdatesPopup";
 import GlobalMicButton from "@/components/GlobalMicButton";
 import FeedbackButton from "@/components/FeedbackButton";
+import { useVoice } from "@/hooks/use-voice";
 import TimeClock from "@/components/TimeClock";
 import CalendarPage from "@/pages/Calendar";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -56,9 +57,12 @@ import {
   Clock,
   DollarSign,
   MessageSquare,
+  MessageSquareWarning,
   Leaf,
   CalendarDays,
   Route,
+  MoreHorizontal,
+  Mic,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -73,6 +77,9 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -98,6 +105,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const sidebarScrollPosition = React.useRef<number>(0);
   const [isUpdatesOpen, setIsUpdatesOpen] = React.useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = React.useState(false);
+  const { settings: voiceSettings, isListening, stopListening, setOpenAssistantWithVoice } = useVoice();
 
   const menuHelpContent: Record<string, { title: string; description: string; tips: string[] }> = {
     dashboard: {
@@ -905,10 +914,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-1.5 lg:gap-2">
-            <GlobalMicButton />
-            <FeedbackButton />
+            {/* Clock In — first in cluster */}
             <TimeClock />
 
+            {/* Orange updates bell — UNCHANGED, do not move */}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -929,69 +938,99 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               </Tooltip>
             </TooltipProvider>
 
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button 
-                    className="h-11 w-11 flex items-center justify-center rounded-2xl bg-gradient-to-br from-sky-400 to-blue-500 text-white shadow-md shadow-blue-500/20 hover:shadow-lg hover:shadow-blue-500/30 hover:scale-105 active:scale-95 transition-all duration-200"
-                    onClick={() => setIsCalendarOpen(true)}
-                    data-testid="button-calendar"
-                  >
-                    <CalendarCheck className="h-[22px] w-[22px] drop-shadow-sm" strokeWidth={2.25} />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>{t("nav.calendar")}</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-
-            {showLanguageToggle && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    className="h-11 w-11 flex items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 text-white shadow-md shadow-teal-500/20 hover:shadow-lg hover:shadow-teal-500/30 hover:scale-105 active:scale-95 transition-all duration-200"
-                    data-testid="btn-language-toggle"
-                  >
-                    <Languages className="h-[22px] w-[22px] drop-shadow-sm" strokeWidth={2.25} />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-32">
-                  <DropdownMenuLabel>{t("profile.language")}</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem 
-                    className={cn("cursor-pointer justify-between", i18n.language === "en" && "bg-muted font-bold")}
-                    onClick={async () => {
-                      i18n.changeLanguage("en");
-                      try {
-                        await apiRequest("PATCH", "/api/profile", { language: "en" });
-                        queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-                        queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
-                      } catch {
-                        toast({ variant: "destructive", description: "Could not save language preference." });
-                      }
-                    }}
-                  >
-                    English {i18n.language === "en" && <CheckSquare className="h-3 w-3" />}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    className={cn("cursor-pointer justify-between", i18n.language === "es" && "bg-muted font-bold")}
-                    onClick={async () => {
-                      i18n.changeLanguage("es");
-                      try {
-                        await apiRequest("PATCH", "/api/profile", { language: "es" });
-                        queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-                        queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
-                      } catch {
-                        toast({ variant: "destructive", description: "Could not save language preference." });
-                      }
-                    }}
-                  >
-                    Español {i18n.language === "es" && <CheckSquare className="h-3 w-3" />}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
+            {/* Second notification bell — UNCHANGED, do not move */}
             <NotificationBell />
 
+            {/* More overflow dropdown — low-frequency utilities */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="h-9 w-9 flex items-center justify-center rounded-xl hover:bg-muted transition-colors text-muted-foreground hover:text-foreground shrink-0"
+                  data-testid="button-more-menu"
+                  title="More options"
+                >
+                  <MoreHorizontal className="h-5 w-5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuLabel className="text-xs font-semibold text-muted-foreground">More options</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+
+                {/* Feedback */}
+                <DropdownMenuItem
+                  className="cursor-pointer gap-2"
+                  onClick={() => setIsFeedbackOpen(true)}
+                  data-testid="menu-item-feedback"
+                >
+                  <MessageSquareWarning className="h-4 w-4 shrink-0" />
+                  Feedback
+                </DropdownMenuItem>
+
+                {/* Language */}
+                {showLanguageToggle && (
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger className="cursor-pointer gap-2" data-testid="menu-item-language">
+                      <Languages className="h-4 w-4 shrink-0" />
+                      {t("profile.language")}
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent>
+                      <DropdownMenuItem
+                        className={cn("cursor-pointer justify-between", i18n.language === "en" && "bg-muted font-bold")}
+                        onClick={async () => {
+                          i18n.changeLanguage("en");
+                          try {
+                            await apiRequest("PATCH", "/api/profile", { language: "en" });
+                            queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+                            queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
+                          } catch {
+                            toast({ variant: "destructive", description: "Could not save language preference." });
+                          }
+                        }}
+                      >
+                        English {i18n.language === "en" && <CheckSquare className="h-3 w-3" />}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className={cn("cursor-pointer justify-between", i18n.language === "es" && "bg-muted font-bold")}
+                        onClick={async () => {
+                          i18n.changeLanguage("es");
+                          try {
+                            await apiRequest("PATCH", "/api/profile", { language: "es" });
+                            queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+                            queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
+                          } catch {
+                            toast({ variant: "destructive", description: "Could not save language preference." });
+                          }
+                        }}
+                      >
+                        Español {i18n.language === "es" && <CheckSquare className="h-3 w-3" />}
+                      </DropdownMenuItem>
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                )}
+
+                {/* Calendar */}
+                <DropdownMenuItem
+                  className="cursor-pointer gap-2"
+                  onClick={() => setIsCalendarOpen(true)}
+                  data-testid="menu-item-calendar"
+                >
+                  <CalendarCheck className="h-4 w-4 shrink-0" />
+                  {t("nav.calendar")}
+                </DropdownMenuItem>
+
+                {/* Voice — only shown when voice assistant is enabled */}
+                {voiceSettings?.voiceEnabled && (
+                  <DropdownMenuItem
+                    className="cursor-pointer gap-2"
+                    onClick={() => isListening ? stopListening() : setOpenAssistantWithVoice(true)}
+                    data-testid="menu-item-voice"
+                  >
+                    <Mic className={`h-4 w-4 shrink-0 ${isListening ? "text-red-500" : ""}`} />
+                    {isListening ? "Stop Listening" : "Voice"}
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
 
@@ -1027,6 +1066,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </SheetContent>
         </Sheet>
       </div>
+      {/* Feedback dialog — controlled from the More dropdown (no floating bubble) */}
+      <FeedbackButton open={isFeedbackOpen} onOpenChange={setIsFeedbackOpen} />
       <WorksheetWidget />
     </div>
   );
