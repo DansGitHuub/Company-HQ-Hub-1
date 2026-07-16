@@ -374,67 +374,69 @@ export default function JobWorkOrderTab({ jobId, isAdminOrManager }: Props) {
       )}
 
       {/* ── Equipment & Materials ───────────────────────────────────────────── */}
-      {((expectedItems?.equipment?.length ?? 0) > 0 || (expectedItems?.materials?.length ?? 0) > 0) && (
-        <Card data-testid="card-expected-items">
-          <CardHeader className="pb-2 pt-4 px-4">
-            <CardTitle className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Equipment &amp; Materials Needed
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4 space-y-3">
-            {(expectedItems?.equipment?.length ?? 0) > 0 && (
-              <div>
-                <p className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground mb-2">
-                  <Wrench className="h-3 w-3" />Equipment
-                </p>
-                <ul className="space-y-1">
-                  {expectedItems!.equipment.map((item) => (
-                    <li key={item.id} className="flex items-start gap-2 text-sm" data-testid={`equipment-item-${item.id}`}>
-                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 flex-shrink-0 mt-1.5" />
-                      <span>
-                        {item.name}
-                        {(item.quantity || item.unit) && (
-                          <span className="text-muted-foreground ml-1">
-                            — {[item.quantity, item.unit].filter(Boolean).join(" ")}
-                          </span>
-                        )}
-                        {item.work_area_name && (
-                          <span className="text-muted-foreground/70 text-xs ml-1">({item.work_area_name})</span>
-                        )}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+      <Card data-testid="card-expected-items">
+        <CardHeader className="pb-2 pt-4 px-4">
+          <CardTitle className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Equipment &amp; Materials Needed
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-4 pb-4 space-y-3">
+          <div>
+            <p className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground mb-2">
+              <Wrench className="h-3 w-3" />Equipment
+            </p>
+            {(expectedItems?.equipment?.length ?? 0) === 0 ? (
+              <p className="text-sm text-muted-foreground italic" data-testid="equipment-none">None specified</p>
+            ) : (
+              <ul className="space-y-1">
+                {expectedItems!.equipment.map((item) => (
+                  <li key={item.id} className="flex items-start gap-2 text-sm" data-testid={`equipment-item-${item.id}`}>
+                    <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 flex-shrink-0 mt-1.5" />
+                    <span>
+                      {item.name}
+                      {(item.quantity || item.unit) && (
+                        <span className="text-muted-foreground ml-1">
+                          — {[item.quantity, item.unit].filter(Boolean).join(" ")}
+                        </span>
+                      )}
+                      {item.work_area_name && (
+                        <span className="text-muted-foreground/70 text-xs ml-1">({item.work_area_name})</span>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             )}
-            {(expectedItems?.materials?.length ?? 0) > 0 && (
-              <div>
-                <p className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground mb-2">
-                  <Package className="h-3 w-3" />Materials
-                </p>
-                <ul className="space-y-1">
-                  {expectedItems!.materials.map((item) => (
-                    <li key={item.id} className="flex items-start gap-2 text-sm" data-testid={`material-item-${item.id}`}>
-                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 flex-shrink-0 mt-1.5" />
-                      <span>
-                        {item.name}
-                        {(item.quantity || item.unit) && (
-                          <span className="text-muted-foreground ml-1">
-                            — {[item.quantity, item.unit].filter(Boolean).join(" ")}
-                          </span>
-                        )}
-                        {item.work_area_name && (
-                          <span className="text-muted-foreground/70 text-xs ml-1">({item.work_area_name})</span>
-                        )}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+          </div>
+          <div>
+            <p className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground mb-2">
+              <Package className="h-3 w-3" />Materials
+            </p>
+            {(expectedItems?.materials?.length ?? 0) === 0 ? (
+              <p className="text-sm text-muted-foreground italic" data-testid="materials-none">None specified</p>
+            ) : (
+              <ul className="space-y-1">
+                {expectedItems!.materials.map((item) => (
+                  <li key={item.id} className="flex items-start gap-2 text-sm" data-testid={`material-item-${item.id}`}>
+                    <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 flex-shrink-0 mt-1.5" />
+                    <span>
+                      {item.name}
+                      {(item.quantity || item.unit) && (
+                        <span className="text-muted-foreground ml-1">
+                          — {[item.quantity, item.unit].filter(Boolean).join(" ")}
+                        </span>
+                      )}
+                      {item.work_area_name && (
+                        <span className="text-muted-foreground/70 text-xs ml-1">({item.work_area_name})</span>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             )}
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

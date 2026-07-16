@@ -268,6 +268,7 @@ export default function MyDayPage() {
   const { t } = useTranslation("myDay");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
   const [pending, setPending] = useState<PendingClockIn | null>(null);
   const [gpsChecking, setGpsChecking] = useState(false);
   const [pickerJob, setPickerJob] = useState<PickerJob | null>(null);
@@ -335,6 +336,17 @@ export default function MyDayPage() {
     highlightSetRef.current = true;
     setHighlightedJobId(prioritizedJobs[0].id);
   }, [jobsLoading, prioritizedJobs]);
+
+  // ── S1-3: Auto-route to today's single job on first My Day open of the day ─
+  // Uses sessionStorage so back-navigation doesn't immediately bounce crew again.
+  useEffect(() => {
+    if (jobsLoading || jobs.length !== 1) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const flagKey = `myDayAutoNav_${today}_${jobs[0].id}`;
+    if (sessionStorage.getItem(flagKey)) return;
+    sessionStorage.setItem(flagKey, "1");
+    navigate(`/jobs/${jobs[0].id}`);
+  }, [jobsLoading, jobs, navigate]);
 
   // ── Mutations ──────────────────────────────────────────────────────────────
   const clockInMutation = useMutation({
