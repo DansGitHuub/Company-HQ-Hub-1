@@ -98,6 +98,8 @@ import {
   MessageSquareWarning,
   FlaskConical,
   Bell,
+  Rocket,
+  ChevronRight,
 } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import AssistantAgentManager from "@/components/AssistantAgentManager";
@@ -714,6 +716,7 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
     {
       label: "Company Settings",
       items: [
+        { value: "setup-wizard", label: "Setup Wizard", icon: Rocket, href: "/admin/setup-wizard" },
         { value: "company", label: "Company Info & Branding", icon: Building2 },
         { value: "divisions", label: "Division Colors", icon: Layers },
         { value: "estimate-templates", label: "Estimate Templates", icon: FileText },
@@ -1016,6 +1019,25 @@ export default function AdminPanel() {
   const { data: companySettings } = useQuery<CompanySettings>({
     queryKey: ["/api/company-settings"],
     enabled: user?.role === "Admin",
+  });
+
+  const { data: wizardProgress } = useQuery<Record<string, string>>({
+    queryKey: ["/api/setup-wizard/progress"],
+    enabled: user?.role === "Admin" || !!(user as any)?.isMasterAdmin,
+  });
+
+  const wizardStepIds = ["business_info","branding","regional","employees","catalog","integrations","routes","permissions","notifications"];
+  const wizardComplete = wizardProgress
+    ? wizardStepIds.filter((id) => wizardProgress[id] === "complete").length
+    : 0;
+  const wizardPct = Math.round((wizardComplete / wizardStepIds.length) * 100);
+  const wizardAllDone = wizardProgress ? wizardStepIds.every((id) => wizardProgress[id] === "complete" || wizardProgress[id] === "skipped") : false;
+  const wizardDismissed = !!(wizardProgress?.dismissed_at);
+  const showWizardBanner = !!(wizardProgress) && !wizardAllDone && !wizardDismissed;
+
+  const dismissWizardBannerMutation = useMutation({
+    mutationFn: () => apiRequest("PATCH", "/api/setup-wizard/progress", { dismissed_at: new Date().toISOString() }).then((r) => r.json()),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/setup-wizard/progress"] }); },
   });
 
   type DailyPulseSection = { count: number; items: any[] };
@@ -1438,6 +1460,52 @@ export default function AdminPanel() {
         {/* ── Home overview card grid ── */}
         <TabsContent value="home" className="mt-0">
           <div className="space-y-4">
+
+            {/* ── Setup Wizard first-run banner ───────────────────────────── */}
+            {showWizardBanner && (
+              <div className="rounded-xl border border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10 overflow-hidden">
+                <div className="flex items-start gap-3 px-4 py-3">
+                  <div className="rounded-md bg-primary/10 p-2 shrink-0 mt-0.5">
+                    <Rocket className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-semibold text-foreground">Complete your company setup</span>
+                      <span className="text-xs text-muted-foreground">
+                        {wizardComplete} of {wizardStepIds.length} steps done ({wizardPct}%)
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                      Finish setting up Company HQ — add your branding, employees, catalog, and integrations.
+                    </p>
+                    <div className="w-full bg-primary/10 rounded-full h-1.5 mt-2 mb-3">
+                      <div
+                        className="bg-primary rounded-full h-1.5 transition-all"
+                        style={{ width: `${wizardPct}%` }}
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => navigate("/admin/setup-wizard")}
+                        className="text-xs font-medium text-primary hover:underline flex items-center gap-1"
+                        data-testid="setup-wizard-banner-go"
+                      >
+                        Open Setup Wizard
+                        <ChevronRight className="h-3 w-3" />
+                      </button>
+                      <span className="text-muted-foreground/40">·</span>
+                      <button
+                        onClick={() => dismissWizardBannerMutation.mutate()}
+                        className="text-xs text-muted-foreground hover:text-foreground"
+                        data-testid="setup-wizard-banner-dismiss"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Daily Pulse — read-only pane of glass */}
             <div className="rounded-xl border border-red-500/20 bg-card overflow-hidden">

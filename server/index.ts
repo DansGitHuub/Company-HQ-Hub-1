@@ -83,6 +83,7 @@ import { runMessageBlastsMigration, runMessageBlastsConstraintsMigration } from 
 import { runMaintenanceRoutesMigration } from "./migrations/maintenanceRoutes";
 import { runSmsConsentMigration } from "./migrations/smsConsent";
 import { registerMaintenanceRouteRoutes } from "./maintenanceRouteRoutes";
+import { seedSetupWizardProgress, registerSetupWizardRoutes } from "./setupWizardRoutes";
 import { syncCCProjectsFromApi } from "./companyCamRoutes";
 import { registerPublicPages } from "./publicPages";
 import { startLeadAlertScheduler } from "./consultationRoutes";
@@ -225,6 +226,7 @@ app.use((req, res, next) => {
   await runSchedulingMigration();
   await runRouteModeMigration();
   await runAppSettingsMigration();
+  await seedSetupWizardProgress();
   await runMaterialsCatalogColumnsMigration();
   await runCatalogExtendedMigration();
   await runTermsAndConditionsMigration();
@@ -298,6 +300,7 @@ app.use((req, res, next) => {
 
   registerNotificationPreferenceRoutes(app);
   registerMaintenanceRouteRoutes(app);
+  registerSetupWizardRoutes(app);
   await registerRoutes(httpServer, app);
 
   await seedUsers();
