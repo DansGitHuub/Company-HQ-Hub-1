@@ -29,7 +29,12 @@
     <script type="module" src="/src/main.tsx"></script>
     <script>
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js').catch(console.error);
+        // updateViaCache:'none' tells the browser to always fetch sw.js directly
+        // from the network (bypassing its own HTTP cache) so a new deploy is
+        // detected on the very next page load, not after the cache expires.
+        navigator.serviceWorker
+          .register('/sw.js', { updateViaCache: 'none' })
+          .catch(console.error);
       }
     </script>
   </body>
