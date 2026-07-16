@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { fmtDateOnly } from "@/lib/utils";
+import { buildMapUrl, type MapApp } from "@/lib/mapUrl";
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -40,9 +41,10 @@ const DOCUMENT_TYPES = [
   { value: "other", label: "Other" },
 ];
 
-function getGoogleMapsLink(address?: string | null, city?: string | null, state?: string | null, zip?: string | null): string {
+function getGoogleMapsLink(address?: string | null, city?: string | null, state?: string | null, zip?: string | null, mapApp?: string): string {
   const parts = [address, city, state, zip].filter(Boolean).join(", ");
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(parts)}`;
+  if (!parts) return "#";
+  return buildMapUrl(parts, (mapApp ?? "google") as MapApp);
 }
 
 function SoldJobsBoard() {
@@ -561,7 +563,7 @@ function SoldJobsBoard() {
 
               {(editForm.address || editForm.city) && (
                 <a
-                  href={getGoogleMapsLink(editForm.address, editForm.city, editForm.state, editForm.zip)}
+                  href={getGoogleMapsLink(editForm.address, editForm.city, editForm.state, editForm.zip, user?.preferredMapApp)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center text-sm text-primary hover:underline"
@@ -1273,7 +1275,7 @@ function EstimatesBoard() {
 
             {(editForm.propertyAddress || editForm.city) && (
               <a
-                href={getGoogleMapsLink(editForm.propertyAddress, editForm.city, editForm.state, editForm.zip)}
+                href={getGoogleMapsLink(editForm.propertyAddress, editForm.city, editForm.state, editForm.zip, user?.preferredMapApp)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center text-sm text-primary hover:underline"

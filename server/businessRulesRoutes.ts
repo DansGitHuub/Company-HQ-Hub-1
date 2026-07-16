@@ -5,9 +5,9 @@ interface BusinessRuleSeed {
   key: string;
   label: string;
   description: string;
-  category: "Financial" | "Scheduling" | "Workflow";
+  category: "Financial" | "Scheduling" | "Workflow" | "Sales";
   value: string;
-  value_type: "percentage" | "days" | "minutes" | "currency" | "select";
+  value_type: "percentage" | "days" | "minutes" | "currency" | "select" | "number";
   options?: string;
   sort_order: number;
 }
@@ -86,6 +86,15 @@ const BUSINESS_RULE_SEED: BusinessRuleSeed[] = [
     value_type: "select",
     options: "On,Off",
     sort_order: 8,
+  },
+  {
+    key: "lead_followup_days",
+    label: "Lead Follow-up Days",
+    description: "Number of business days (Mon–Fri) after which a new lead requires follow-up contact. Auto-set on every new lead created without an explicit follow-up date.",
+    category: "Sales",
+    value: "2",
+    value_type: "number",
+    sort_order: 9,
   },
 ];
 

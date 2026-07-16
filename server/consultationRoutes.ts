@@ -80,7 +80,70 @@ async function migrateConsultations() {
   await pool.query(`ALTER TABLE consultations ADD CONSTRAINT consultations_assigned_to_employees_fkey FOREIGN KEY (assigned_to) REFERENCES employees(id) ON DELETE SET NULL`);
   console.log("[migration] consultations assigned_to FK fixed -> employees(id)");
 
+  // S10-5/S10-6: lead assignment settings in app_settings
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS preferred_map_app TEXT DEFAULT 'google'`);
+  await pool.query(`INSERT INTO app_settings (key, value) VALUES ('lead_assign_mode', 'none') ON CONFLICT (key) DO NOTHING`);
+  await pool.query(`INSERT INTO app_settings (key, value) VALUES ('lead_default_assignee', '') ON CONFLICT (key) DO NOTHING`);
+  await pool.query(`INSERT INTO app_settings (key, value) VALUES ('lead_assign_last_idx', '0') ON CONFLICT (key) DO NOTHING`);
+
   console.log("[migration] consultations table ready");
+}
+
+// ── Lead auto-assign + follow-up helpers ─────────────────────────────────────
+
+function addBusinessDays(date: Date, days: number): Date {
+  const d = new Date(date);
+  let added = 0;
+  while (added < days) {
+    d.setDate(d.getDate() + 1);
+    const dow = d.getDay();
+    if (dow !== 0 && dow !== 6) added++;
+  }
+  return d;
+}
+
+export async function getAutoFollowUpDate(): Promise<string | null> {
+  try {
+    const r = await pool.query(`SELECT value FROM business_rules WHERE key = 'lead_followup_days'`);
+    const days = Math.max(1, parseInt(r.rows[0]?.value ?? "2", 10));
+    return addBusinessDays(new Date(), days).toISOString().slice(0, 10);
+  } catch {
+    return addBusinessDays(new Date(), 2).toISOString().slice(0, 10);
+  }
+}
+
+export async function getAutoAssignee(explicitAssignee: string | null | undefined): Promise<string | null> {
+  if (explicitAssignee) return explicitAssignee;
+  try {
+    const modeRes = await pool.query(`SELECT value FROM app_settings WHERE key = 'lead_assign_mode'`);
+    const mode = modeRes.rows[0]?.value ?? "none";
+
+    if (mode === "specific") {
+      const idRes = await pool.query(`SELECT value FROM app_settings WHERE key = 'lead_default_assignee'`);
+      const empId = (idRes.rows[0]?.value ?? "").trim();
+      if (!empId) return null;
+      const chk = await pool.query(`SELECT id FROM employees WHERE id = $1`, [empId]);
+      return chk.rows.length ? empId : null;
+    }
+
+    if (mode === "round_robin") {
+      const empsRes = await pool.query(`
+        SELECT e.id FROM employees e
+        JOIN users u ON u.id = e.user_id
+        WHERE u.role IN ('Admin','Manager') AND e.status = 'active'
+        ORDER BY e.id
+      `);
+      if (!empsRes.rows.length) return null;
+      const idxRes = await pool.query(`SELECT value FROM app_settings WHERE key = 'lead_assign_last_idx'`);
+      const lastIdx = parseInt(idxRes.rows[0]?.value ?? "0", 10) || 0;
+      const nextIdx = (lastIdx + 1) % empsRes.rows.length;
+      await pool.query(`UPDATE app_settings SET value = $1 WHERE key = 'lead_assign_last_idx'`, [String(nextIdx)]);
+      return empsRes.rows[nextIdx].id;
+    }
+  } catch (e: any) {
+    console.error("[lead-auto-assign]", e.message);
+  }
+  return null;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -248,7 +311,10 @@ export async function registerConsultationRoutes(app: Express, requireAuth: any)
 
   // ── LIST ──────────────────────────────────────────────────────────────────────
   app.get("/api/consultations", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
-    const { status, date_from, date_to, assigned_to, search, pipeline_stage, customer_id } = req.query as Record<string, string>;
+    const {
+      status, date_from, date_to, assigned_to, search, pipeline_stage, customer_id,
+      unassigned_only, overdue_followup,
+    } = req.query as Record<string, string>;
     try {
       const params: any[] = [];
       const conds: string[] = [];
@@ -259,6 +325,8 @@ export async function registerConsultationRoutes(app: Express, requireAuth: any)
       if (date_from)      { params.push(date_from);      conds.push(`c.scheduled_date >= $${params.length}`); }
       if (date_to)        { params.push(date_to);        conds.push(`c.scheduled_date <= $${params.length}`); }
       if (assigned_to)    { params.push(assigned_to);    conds.push(`c.assigned_to = $${params.length}`); }
+      if (unassigned_only === "true") { conds.push(`c.assigned_to IS NULL`); }
+      if (overdue_followup === "true") { conds.push(`c.next_follow_up_date < CURRENT_DATE`); }
       if (search) {
         params.push(`%${search.toLowerCase()}%`);
         conds.push(`(
@@ -269,6 +337,7 @@ export async function registerConsultationRoutes(app: Express, requireAuth: any)
         )`);
       }
 
+      const today = new Date().toISOString().slice(0, 10);
       const where = conds.length ? "WHERE " + conds.join(" AND ") : "";
       const { rows } = await pool.query(`
         SELECT
@@ -287,6 +356,7 @@ export async function registerConsultationRoutes(app: Express, requireAuth: any)
       res.json(rows.map(r => ({
         ...r,
         customer_name: r.cust_company || `${r.cust_first ?? ""} ${r.cust_last ?? ""}`.trim() || null,
+        is_overdue_followup: !!(r.next_follow_up_date && r.next_follow_up_date.toISOString?.().slice(0,10) < today || (typeof r.next_follow_up_date === "string" && r.next_follow_up_date < today)),
       })));
     } catch (err: any) {
       console.error("[consultations/list]", err.message);
@@ -304,8 +374,20 @@ export async function registerConsultationRoutes(app: Express, requireAuth: any)
       pipeline_stage, budget_range, project_description, best_time_to_reach,
       utilities_marked, permit_required, permit_status, service_type,
       photo_urls, how_heard, project_type, desired_timeline, additional_notes,
+      next_follow_up_date,
     } = req.body;
     try {
+      const effectiveStage = pipeline_stage || "new_lead";
+
+      // S10-5: auto-assign if no explicit assignee provided
+      const effectiveAssignee = await getAutoAssignee(assigned_to || null);
+
+      // S10-6: auto-set follow-up date for new leads without explicit date
+      let effectiveFollowUpDate = next_follow_up_date || null;
+      if (!effectiveFollowUpDate && effectiveStage === "new_lead") {
+        effectiveFollowUpDate = await getAutoFollowUpDate();
+      }
+
       const { rows } = await pool.query(`
         INSERT INTO consultations (
           customer_id, contact_name, contact_phone, contact_email,
@@ -314,17 +396,19 @@ export async function registerConsultationRoutes(app: Express, requireAuth: any)
           assigned_to, estimated_value, lead_source,
           pipeline_stage, budget_range, project_description, best_time_to_reach,
           utilities_marked, permit_required, permit_status, service_type,
-          photo_urls, how_heard, project_type, desired_timeline, additional_notes
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)
+          photo_urls, how_heard, project_type, desired_timeline, additional_notes,
+          next_follow_up_date
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29)
         RETURNING *
       `, [
         customer_id || null, contact_name || null, contact_phone || null, contact_email || null,
         scheduled_date || null, scheduled_time || null, duration_minutes ?? 60, status ?? "scheduled",
         address || null, notes || null, follow_up_required ?? false, follow_up_date || null,
-        assigned_to || null, estimated_value || null, lead_source || null,
-        pipeline_stage || "new_lead", budget_range || null, project_description || null, best_time_to_reach || null,
+        effectiveAssignee, estimated_value || null, lead_source || null,
+        effectiveStage, budget_range || null, project_description || null, best_time_to_reach || null,
         utilities_marked ?? false, permit_required ?? false, permit_status || null, service_type || null,
         JSON.stringify(photo_urls || []), how_heard || null, project_type || null, desired_timeline || null, additional_notes || null,
+        effectiveFollowUpDate,
       ]);
 
       const created = rows[0];
@@ -460,6 +544,64 @@ export async function registerConsultationRoutes(app: Express, requireAuth: any)
       res.status(204).end();
     } catch (err: any) {
       console.error("[consultations/delete]", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── LEAD ASSIGNMENT SETTINGS (Admin only) ────────────────────────────────────
+  app.get("/api/settings/lead-assignment", requireAuth, requireRole("Admin", "Manager"), async (_req, res) => {
+    try {
+      const { rows } = await pool.query(
+        `SELECT key, value FROM app_settings WHERE key IN ('lead_assign_mode','lead_default_assignee','lead_assign_last_idx')`
+      );
+      const map: Record<string, string> = {};
+      rows.forEach(r => { map[r.key] = r.value; });
+
+      let assigneeDetails = null;
+      const empId = (map["lead_default_assignee"] ?? "").trim();
+      if (empId) {
+        const empRes = await pool.query(
+          `SELECT e.id, e.first_name, e.last_name FROM employees e WHERE e.id = $1`,
+          [empId]
+        );
+        if (empRes.rows.length) {
+          assigneeDetails = { id: empRes.rows[0].id, name: `${empRes.rows[0].first_name} ${empRes.rows[0].last_name}` };
+        }
+      }
+
+      res.json({
+        mode: map["lead_assign_mode"] ?? "none",
+        default_assignee: map["lead_default_assignee"] ?? "",
+        assignee_details: assigneeDetails,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.put("/api/settings/lead-assignment", requireAuth, requireRole("Admin"), async (req, res) => {
+    const { mode, default_assignee } = req.body;
+    const validModes = ["none", "specific", "round_robin"];
+    if (mode !== undefined && !validModes.includes(mode)) {
+      return res.status(400).json({ error: "mode must be one of: none, specific, round_robin" });
+    }
+    try {
+      if (mode !== undefined) {
+        await pool.query(
+          `INSERT INTO app_settings (key, value, updated_at) VALUES ('lead_assign_mode', $1, NOW())
+           ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()`,
+          [mode]
+        );
+      }
+      if (default_assignee !== undefined) {
+        await pool.query(
+          `INSERT INTO app_settings (key, value, updated_at) VALUES ('lead_default_assignee', $1, NOW())
+           ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()`,
+          [default_assignee ?? ""]
+        );
+      }
+      res.json({ ok: true });
+    } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });

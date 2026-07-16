@@ -25,6 +25,7 @@ import { format, parseISO, differenceInMinutes } from "date-fns";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
+import { buildMapUrl, type MapApp } from "@/lib/mapUrl";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -854,7 +855,7 @@ function OverviewTab({ detail }: { detail: WorkOrder }) {
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Customer / Site</p>
             {detail.customer_name && <p className="font-semibold">{detail.customer_name}</p>}
             {detail.customer_address && (
-              <a href={`https://maps.google.com/?q=${encodeURIComponent(detail.customer_address)}`} target="_blank" rel="noopener noreferrer"
+              <a href={buildMapUrl(detail.customer_address, (user?.preferredMapApp ?? "google") as MapApp)} target="_blank" rel="noopener noreferrer"
                 className="flex items-center gap-1.5 text-sm text-primary hover:underline">
                 <MapPin className="w-4 h-4 flex-shrink-0" />{detail.customer_address}
               </a>

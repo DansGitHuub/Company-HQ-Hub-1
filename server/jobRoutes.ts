@@ -13,6 +13,45 @@ const NOTIFY_STATUSES: Record<string, string> = {
   cancelled:   "Update on Your Job",
 };
 
+async function sendCustomerJobNotification(jobId: string, newStatus: string): Promise<void> {
+  if (newStatus !== "in_progress" && newStatus !== "completed") return;
+  try {
+    const { rows } = await pool.query(`
+      SELECT j.id, j.title, j.customer_id,
+             c.first_name, c.last_name, c.company_name,
+             ce.email AS customer_email
+      FROM jobs j
+      LEFT JOIN customers c ON c.id = j.customer_id
+      LEFT JOIN customer_emails ce ON ce.customer_id = c.id AND ce.is_primary = true
+      WHERE j.id = $1
+    `, [jobId]);
+    if (!rows.length) return;
+    const job = rows[0];
+    if (!job.customer_id) return;
+
+    const { rows: portalUsers } = await pool.query(`
+      SELECT u.id FROM users u WHERE u.role = 'Customer' AND u.email ILIKE $1 LIMIT 1
+    `, [job.customer_email || ""]);
+    if (!portalUsers.length) return;
+    const customerId = portalUsers[0].id;
+
+    const isStarted = newStatus === "in_progress";
+    const type   = isStarted ? "job_started_customer" : "job_completed_customer";
+    const title  = isStarted ? "Your Job Has Started" : "Your Job Is Complete";
+    const jobTitle = job.title || "Your job";
+    const message = isStarted
+      ? `${jobTitle} is now in progress.`
+      : `${jobTitle} has been completed.`;
+
+    await pool.query(`
+      INSERT INTO customer_notifications (customer_id, type, title, message, link)
+      VALUES ($1, $2, $3, $4, $5)
+    `, [customerId, type, title, message, `/customer/jobs`]);
+  } catch (e: any) {
+    console.error("[customer-job-notification]", e.message);
+  }
+}
+
 function getPortalBaseUrl(): string {
   return process.env.APP_BASE_URL
     ?? (process.env.NODE_ENV === "production"
@@ -552,6 +591,8 @@ export function registerJobRoutes(app: Express, requireAuth: any) {
         });
         // Fire-and-forget customer notification email
         sendJobStatusEmail(req.params.id, status);
+        // S9-7 / S9-8: write in-app customer_notifications entry
+        sendCustomerJobNotification(req.params.id, status).catch(() => {});
 
         if (status.toLowerCase() === "completed") {
           import("./automationEngine").then(({ onJobCompleted }) => {

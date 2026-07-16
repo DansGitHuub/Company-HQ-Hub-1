@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, Dispatch, SetStateAction } from "react";
+import { buildNavUrl, type MapApp } from "@/lib/mapUrl";
 import { useLocation } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMutation } from "@tanstack/react-query";
@@ -170,9 +171,9 @@ function formatDate(d: Date): string {
   });
 }
 
-function mapsHref(address: string | null | undefined): string {
+function mapsHref(address: string | null | undefined, mapApp?: string): string {
   if (!address) return "#";
-  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
+  return buildNavUrl(address, (mapApp ?? "google") as MapApp);
 }
 
 function uniqueCustomers(stops: Stop[]): number {
@@ -353,6 +354,7 @@ function StopView({
 }) {
   const { toast } = useToast();
   const qc = useQueryClient();
+  const { user } = useAuth();
 
   const stop = stops[index];
   const total = stops.length;
@@ -638,7 +640,7 @@ function StopView({
               {address && (
                 <a
                   data-testid="link-navigate-stop"
-                  href={mapsHref(address)}
+                  href={mapsHref(address, user?.preferredMapApp)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 mt-2 text-sm font-medium text-primary hover:underline"

@@ -31,3 +31,4 @@
 - [Drizzle timestamp coercion](drizzle-timestamp-coercion.md) — Drizzle .set() silently rejects string values for timestamp() columns; must convert to new Date() in storage layer before calling .set().
 - [Test-account cleanup fires on restart](test-account-cleanup-on-restart.md) — a mid-session workflow restart re-runs seed.ts's cleanup sweep, silently deleting @example.com test users and cascading their data, mimicking a feature bug.
 - [WO→job auto-complete pattern](wo-job-auto-complete.md) — wo_auto_completed_at column on jobs guards reversible WO task rollup; only reverts if that column IS NOT NULL (i.e. WO triggered the completion, not a manual admin action).
+- [Lead auto-assign + map app pattern](lead-autoassign-map-app.md) — lead helpers exported from consultationRoutes.ts; map URLs centralized in client/src/lib/mapUrl.ts; preferred_map_app migrated via raw SQL in consultationRoutes.ts migration block.

@@ -6906,7 +6906,7 @@ SECTION GENERATION RULES:
 
   app.patch("/api/profile", requireAuth, async (req, res) => {
     try {
-      const { name, email, bio, phone, profilePicture, theme, emailNotifications, language, largerText, highContrast, currentPassword, newPassword } = req.body;
+      const { name, email, bio, phone, profilePicture, theme, emailNotifications, language, largerText, highContrast, preferred_map_app, currentPassword, newPassword } = req.body;
       const updates: any = { updatedAt: new Date() };
       if (name !== undefined) updates.name = name;
       if (email !== undefined) updates.email = email;
@@ -6918,6 +6918,7 @@ SECTION GENERATION RULES:
       if (language !== undefined) updates.language = language;
       if (largerText !== undefined) updates.largerText = largerText;
       if (highContrast !== undefined) updates.highContrast = highContrast;
+      if (preferred_map_app !== undefined) updates.preferredMapApp = preferred_map_app;
       
       // Self-service password change
       if (newPassword) {

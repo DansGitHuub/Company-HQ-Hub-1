@@ -1,5 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -653,6 +654,102 @@ function ConsultationModal({
 }
 
 // ─── Lead Source Stats Bar ────────────────────────────────────────────────────
+// ─── Lead Settings Modal ────────────────────────────────────────────────────
+function LeadSettingsModal({
+  open, onClose, employees,
+}: {
+  open: boolean;
+  onClose: () => void;
+  employees: Employee[];
+}) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [mode, setMode] = useState<"none" | "specific" | "round_robin">("none");
+  const [defaultAssignee, setDefaultAssignee] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const { data: settings, isLoading } = useQuery<{ mode: string; default_assignee: string }>({
+    queryKey: ["/api/settings/lead-assignment"],
+    queryFn: () => fetch("/api/settings/lead-assignment", { credentials: "include" }).then(r => r.json()),
+    enabled: open,
+  });
+
+  useEffect(() => {
+    if (settings) {
+      setMode((settings.mode as "none" | "specific" | "round_robin") || "none");
+      setDefaultAssignee(settings.default_assignee || "");
+    }
+  }, [settings]);
+
+  async function save() {
+    setSaving(true);
+    try {
+      await apiRequest("PUT", "/api/settings/lead-assignment", {
+        mode,
+        default_assignee: defaultAssignee || "",
+      });
+      toast({ title: "Lead assignment settings saved" });
+      qc.invalidateQueries({ queryKey: ["/api/settings/lead-assignment"] });
+      onClose();
+    } catch {
+      toast({ title: "Failed to save settings", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={o => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-md" data-testid="lead-settings-modal">
+        <DialogHeader>
+          <DialogTitle>Lead Auto-Assignment Settings</DialogTitle>
+        </DialogHeader>
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground py-4 text-center">Loading…</p>
+        ) : (
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Assignment Mode</Label>
+              <Select value={mode} onValueChange={v => setMode(v as "none" | "specific" | "round_robin")}>
+                <SelectTrigger data-testid="select-assign-mode">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Off — assign manually</SelectItem>
+                  <SelectItem value="specific">Specific person — always assign the same person</SelectItem>
+                  <SelectItem value="round_robin">Round robin — rotate among all active managers</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {mode === "specific" && (
+              <div className="space-y-1.5">
+                <Label>Default Assignee</Label>
+                <Select value={defaultAssignee || "_none"} onValueChange={v => setDefaultAssignee(v === "_none" ? "" : v)}>
+                  <SelectTrigger data-testid="select-default-assignee">
+                    <SelectValue placeholder="Select a person…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_none">— None —</SelectItem>
+                    {employees.map(e => (
+                      <SelectItem key={e.id} value={e.id}>{e.first_name} {e.last_name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={save} disabled={saving} data-testid="btn-save-lead-settings">
+            {saving ? "Saving…" : "Save"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function SourceStatsBar() {
   const { data } = useQuery<{ source: string; count: number }[]>({
     queryKey: ["/api/consultations/source-stats"],
@@ -790,6 +887,7 @@ function KanbanView({
 export default function Consultations() {
   const { toast } = useToast();
   const qc = useQueryClient();
+  const { user } = useAuth();
 
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
   const [statusFilter,    setStatusFilter]    = useState("");
@@ -797,12 +895,15 @@ export default function Consultations() {
   const [dateTo,          setDateTo]          = useState("");
   const [assignedFilter,  setAssignedFilter]  = useState("");
   const [searchText,      setSearchText]      = useState("");
+  const [unassignedOnly,  setUnassignedOnly]  = useState(false);
+  const [overdueFollowup, setOverdueFollowup] = useState(false);
 
   const [modalOpen,         setModalOpen]         = useState(false);
   const [editing,           setEditing]           = useState<Consultation | null>(null);
   const [deleteTarget,      setDeleteTarget]       = useState<Consultation | null>(null);
   const [lostReasonTarget,  setLostReasonTarget]  = useState<{ id: string; stage: string } | null>(null);
   const [lostReasonInput,   setLostReasonInput]   = useState("");
+  const [showLeadSettings,  setShowLeadSettings]  = useState(false);
 
   const listParams = new URLSearchParams();
   if (statusFilter)   listParams.set("status",      statusFilter);
@@ -810,9 +911,11 @@ export default function Consultations() {
   if (dateTo)         listParams.set("date_to",     dateTo);
   if (assignedFilter) listParams.set("assigned_to", assignedFilter);
   if (searchText)     listParams.set("search",      searchText);
+  if (unassignedOnly)  listParams.set("unassigned_only", "true");
+  if (overdueFollowup) listParams.set("overdue_followup", "true");
 
   const { data: consultations = [], isLoading } = useQuery<Consultation[]>({
-    queryKey: ["/api/consultations", statusFilter, dateFrom, dateTo, assignedFilter, searchText],
+    queryKey: ["/api/consultations", statusFilter, dateFrom, dateTo, assignedFilter, searchText, unassignedOnly, overdueFollowup],
     queryFn: () => fetch(`/api/consultations?${listParams}`, { credentials: "include" }).then(r => r.json()),
   });
 
@@ -875,8 +978,9 @@ export default function Consultations() {
   const clearFilters = () => {
     setStatusFilter(""); setDateFrom(""); setDateTo("");
     setAssignedFilter(""); setSearchText("");
+    setUnassignedOnly(false); setOverdueFollowup(false);
   };
-  const hasFilters = statusFilter || dateFrom || dateTo || assignedFilter || searchText;
+  const hasFilters = !!(statusFilter || dateFrom || dateTo || assignedFilter || searchText || unassignedOnly || overdueFollowup);
 
   return (
     <div className="flex flex-col h-full" data-testid="consultations-page">
@@ -907,6 +1011,11 @@ export default function Consultations() {
               <LayoutGrid className="h-3.5 w-3.5" /> Pipeline
             </button>
           </div>
+          {user?.role === "Admin" && (
+            <Button variant="outline" size="sm" onClick={() => setShowLeadSettings(true)} data-testid="btn-lead-settings">
+              ⚙ Lead Settings
+            </Button>
+          )}
           <Button onClick={openNew} data-testid="btn-new-consultation">
             <Plus className="h-4 w-4 mr-2" /> New Consultation
           </Button>
@@ -1017,6 +1126,24 @@ export default function Consultations() {
                 ))}
               </SelectContent>
             </Select>
+            <Button
+              variant={unassignedOnly ? "default" : "outline"}
+              size="sm"
+              className="h-8 text-xs"
+              onClick={() => setUnassignedOnly(v => !v)}
+              data-testid="btn-filter-unassigned"
+            >
+              ⚠ Unassigned
+            </Button>
+            <Button
+              variant={overdueFollowup ? "default" : "outline"}
+              size="sm"
+              className="h-8 text-xs"
+              onClick={() => setOverdueFollowup(v => !v)}
+              data-testid="btn-filter-overdue"
+            >
+              🔴 Overdue Follow-up
+            </Button>
             {hasFilters && (
               <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={clearFilters}
                 data-testid="btn-clear-filters">Clear</Button>
@@ -1147,6 +1274,13 @@ export default function Consultations() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ── Lead Settings Modal */}
+      <LeadSettingsModal
+        open={showLeadSettings}
+        onClose={() => setShowLeadSettings(false)}
+        employees={employees}
+      />
 
       {/* ── Lost Reason Dialog */}
       <AlertDialog open={!!lostReasonTarget} onOpenChange={o => { if (!o) setLostReasonTarget(null); }}>

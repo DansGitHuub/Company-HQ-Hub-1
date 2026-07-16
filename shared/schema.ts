@@ -35,6 +35,7 @@ export const users = pgTable("users", {
   dashboardWidgets: jsonb("dashboard_widgets"),
   largerText: boolean("larger_text").notNull().default(false),
   highContrast: boolean("high_contrast").notNull().default(false),
+  preferredMapApp: text("preferred_map_app").default("google"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

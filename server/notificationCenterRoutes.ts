@@ -28,7 +28,9 @@ const NOTIFICATION_TYPE_SEEDS = [
   { type: "application_followup", label: "Application Follow-up",        description: "A job application has been waiting without action for 3+ days",              category: "Hiring",     cadence: "daily_digest", sort_order: 170 },
   // Customer & Sales
   { type: "new_inquiry",          label: "New Lead / Inquiry",           description: "A new contact form or inquiry has been submitted from the public site",       category: "Customer",   cadence: "immediate",    sort_order: 180 },
+  { type: "job_started_customer", label: "Job Started (Customer)",       description: "Sent to a customer portal account when their job transitions to In Progress", category: "Customer",   cadence: "immediate",    sort_order: 185 },
   { type: "new_booking",          label: "New Service Booking",          description: "A new service booking has been confirmed via the booking page",               category: "Customer",   cadence: "immediate",    sort_order: 190 },
+  { type: "job_completed_customer",label:"Job Completed (Customer)",     description: "Sent to a customer portal account when their job is marked Completed",       category: "Customer",   cadence: "immediate",    sort_order: 195 },
   { type: "customer_satisfaction",label: "Customer Satisfaction Rating", description: "A customer has submitted a post-job satisfaction rating",                    category: "Customer",   cadence: "immediate",    sort_order: 200 },
   // System
   { type: "note_reminder",        label: "Note Reminder",                description: "A flagged note has a scheduled reminder due",                                 category: "System",     cadence: "immediate",    sort_order: 210 },

@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { pool } from "./db";
 import { sendEmail, escapeHtml, getAppUrl } from "./emailService";
+import { getAutoAssignee, getAutoFollowUpDate } from "./consultationRoutes";
 
 async function sendStaffNotificationDb(userId: string, type: string, title: string, message: string, link: string) {
   try {
@@ -64,6 +65,26 @@ export async function registerPublicInquiryRoutes(app: Express) {
       ]);
 
       const created = rows[0];
+
+      // S10-5: auto-assign if no explicit assignee set
+      // S10-6: auto-set next_follow_up_date
+      try {
+        const autoAssignee = await getAutoAssignee(null);
+        const autoFollowUp = await getAutoFollowUpDate();
+        if (autoAssignee || autoFollowUp) {
+          const setClauses: string[] = [];
+          const vals: any[] = [];
+          if (autoAssignee) { vals.push(autoAssignee); setClauses.push(`assigned_to = $${vals.length}`); }
+          if (autoFollowUp) { vals.push(autoFollowUp); setClauses.push(`next_follow_up_date = $${vals.length}`); }
+          vals.push(created.id);
+          await pool.query(
+            `UPDATE consultations SET ${setClauses.join(", ")} WHERE id = $${vals.length}`,
+            vals
+          );
+        }
+      } catch (e: any) {
+        console.error("[inquiry-auto-assign]", e.message);
+      }
 
       // Send customer confirmation email
       await sendEmail(email, "We received your inquiry — Chapin Landscapes", `

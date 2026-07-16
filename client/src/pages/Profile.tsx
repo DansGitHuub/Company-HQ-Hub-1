@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Camera, Save, User, Mail, Phone, FileText, Palette, Check, Lock, Eye, EyeOff, Bell, BellOff, Volume2, VolumeX, Mic, Play, Globe, Accessibility } from "lucide-react";
+import { Loader2, Camera, Save, User, Mail, Phone, FileText, Palette, Check, Lock, Eye, EyeOff, Bell, BellOff, Volume2, VolumeX, Mic, Play, Globe, Accessibility, MapPin } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
@@ -572,6 +572,39 @@ export default function Profile() {
                   <SelectContent>
                     <SelectItem value="en" data-testid="option-language-en">{t("language.english")}</SelectItem>
                     <SelectItem value="es" data-testid="option-language-es">{t("language.spanish")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="border rounded-lg p-4 space-y-2 bg-muted/30">
+              <Label className="flex items-center gap-2">
+                <MapPin className="h-4 w-4" /> Preferred Map App
+              </Label>
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">
+                  Map links and navigation buttons will open in your chosen app.
+                </p>
+                <Select
+                  value={(displayProfile as any)?.preferred_map_app ?? "google"}
+                  onValueChange={async (value) => {
+                    try {
+                      await apiRequest("PATCH", "/api/profile", { preferred_map_app: value });
+                      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+                      queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
+                      toast({ title: "Map preference saved" });
+                    } catch {
+                      toast({ title: "Failed to save map preference", variant: "destructive" });
+                    }
+                  }}
+                >
+                  <SelectTrigger className="w-40" data-testid="select-map-app">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="google" data-testid="option-map-google">Google Maps</SelectItem>
+                    <SelectItem value="apple" data-testid="option-map-apple">Apple Maps</SelectItem>
+                    <SelectItem value="waze" data-testid="option-map-waze">Waze</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
