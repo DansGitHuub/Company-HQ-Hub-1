@@ -1,6 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import OpenAI from "openai";
 import { requireAdmin } from "./auth";
+import { buildCompanyPolicyContext } from "./companyPoliciesContext";
 
 type AuthRequest = Request & { user?: any };
 import { pool } from "./db";
@@ -130,7 +131,7 @@ async function getAgentContext(userRole: string) {
 
 const CUSTOMER_TOOLS = ["navigateTo", "searchGlobal", "submitRepairRequest"];
 
-function buildSystemPrompt(user: any, appContext: any, currentModule: string, agentAddition?: string) {
+function buildSystemPrompt(user: any, appContext: any, currentModule: string, agentAddition?: string, policyContext?: string) {
   const now = new Date().toLocaleString("en-US", { timeZone: "America/New_York" });
 
   const layer1 = `You are the CompanyHQ AI Assistant for a landscape business management platform.
@@ -240,6 +241,7 @@ General Rules:
 
   let prompt = `${layer1}\n\n${layer2}\n\n${layer3}`;
   if (agentAddition) prompt += `\n\nAdditional instructions:\n${agentAddition}`;
+  if (policyContext) prompt += `\n\n${policyContext}`;
   return prompt;
 }
 
@@ -354,9 +356,12 @@ export function registerAssistantRoutes(app: Express) {
         return res.json({ response: "No problem, I've cancelled that action.", type: "text" });
       }
 
-      const appContext = await getAppContext(user.id, user.role);
-      const agentContext = await getAgentContext(user.role);
-      const systemPrompt = buildSystemPrompt(user, appContext, currentModule || "", agentContext.promptAdditions);
+      const [appContext, agentContext, policyContext] = await Promise.all([
+        getAppContext(user.id, user.role),
+        getAgentContext(user.role),
+        buildCompanyPolicyContext(),
+      ]);
+      const systemPrompt = buildSystemPrompt(user, appContext, currentModule || "", agentContext.promptAdditions, policyContext);
 
       await logConversation(user.id, sid, "user", message);
 

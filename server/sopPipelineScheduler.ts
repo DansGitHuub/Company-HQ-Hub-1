@@ -32,13 +32,16 @@ async function generateSopFromPipelineItem(itemId: string): Promise<boolean> {
     const existingSops = await storage.getSops();
     const sampleTitles = existingSops.slice(0, 5).map(s => s.title).join(", ");
 
+    const { buildCompanyPolicyContext } = await import("./companyPoliciesContext");
+    const policyContext = await buildCompanyPolicyContext();
+
     const contentCompletion = await openai.chat.completions.create({
       model: "gpt-4o",
       temperature: 0.7,
       messages: [
         {
           role: "system",
-          content: `You are an expert technical writer specializing in landscape installation and maintenance SOPs for "Chapin Landscapes". Write comprehensive, practical SOPs that field crews can actually follow.
+          content: (policyContext ? `${policyContext}\n\n` : "") + `You are an expert technical writer specializing in landscape installation and maintenance SOPs for "Chapin Landscapes". Write comprehensive, practical SOPs that field crews can actually follow.
 
 Your SOPs must include:
 - A clear desired outcome

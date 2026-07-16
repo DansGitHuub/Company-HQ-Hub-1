@@ -13,6 +13,7 @@ import { registerEstimateTranscriptRoutes } from "./estimateTranscriptRoutes";
 import { registerEstimateAiDraftRoutes } from "./estimateAiDraftRoutes";
 import { registerHiringRoutes } from "./hiringRoutes";
 import { registerTranslateRoutes } from "./translateRoutes";
+import { registerCompanyPoliciesRoutes } from "./companyPoliciesRoutes";
 import { registerEmployeeFormsRoutes } from "./employeeFormsRoutes";
 import { registerNotesRoutes, migrateNotesTable, runNoteReminderScheduler } from "./notesRoutes";
 import { registerDailyWorksheetRoutes } from "./dailyWorksheetRoutes";
@@ -131,6 +132,7 @@ export async function registerRoutes(
   registerFollowUpRoutes(app, requireAuth);
   await registerServiceTypesRoutes(app, requireAuth, requireAdmin);
   await registerBusinessRulesRoutes(app, requireAuth, requireAdmin);
+  await registerCompanyPoliciesRoutes(app, requireAuth, requireAdmin);
   await registerAutomationRoutes(app, requireAuth, requireAdmin);
   await registerFeatureFlagsRoutes(app, requireAuth, requireAdmin);
   await registerFeedbackReportsRoutes(app, requireAuth, requireAdmin);

@@ -2,6 +2,7 @@ import { Express } from "express";
 import { pool } from "./db";
 import { requireAuth } from "./auth";
 import OpenAI from "openai";
+import { buildCompanyPolicyContext } from "./companyPoliciesContext";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -73,7 +74,8 @@ export function registerEstimateAiDraftRoutes(app: Express) {
         }
 
         // 4. Build the prompt
-        const systemPrompt = `You are an expert landscape estimator for Chapin Landscapes, an Ohio landscaping company.
+        const policyContext = await buildCompanyPolicyContext();
+        const systemPrompt = (policyContext ? `${policyContext}\n\n` : "") + `You are an expert landscape estimator for Chapin Landscapes, an Ohio landscaping company.
 Analyze the site visit photos and/or voice transcript provided, then generate realistic estimate line items.
 
 For every line item output these fields:

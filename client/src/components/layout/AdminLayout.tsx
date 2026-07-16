@@ -42,6 +42,7 @@ import {
   MessageSquareWarning,
   Library,
   HeartPulse,
+  Brain,
 } from "lucide-react";
 
 type AdminNavItem = {
@@ -138,6 +139,7 @@ const ADMIN_GROUPS: AdminNavGroup[] = [
     label: "AI & Automation Tools",
     labelColor: "text-fuchsia-600 dark:text-fuchsia-400",
     items: [
+      { value: "ai-knowledge", label: "AI Knowledge Base", icon: Brain, href: "/admin/ai-knowledge" },
       { value: "assistant-agents", label: "Assistant Agents", icon: Sparkles, tab: "assistant-agents" },
       { value: "ai-logs", label: "Usage Summary", icon: Bot, tab: "ai-logs" },
       { value: "ai-agents", label: "AI Agents", icon: Bot, tab: "ai-agents" },

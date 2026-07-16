@@ -2414,5 +2414,24 @@
     "saveNotes": "Guardar Notas",
     "saveDraft": "Guardar Borrador",
     "submitWorksheet": "Enviar Hoja de Trabajo"
+  },
+  "aiKnowledge": {
+    "pageTitle": "Base de Conocimiento de IA",
+    "pageSubtitle": "Responde preguntas clave para que la IA refleje cómo manejas tu negocio.",
+    "answered": "respondidas",
+    "unanswered": "Sin respuesta",
+    "currentAnswer": "Respuesta actual",
+    "lastUpdated": "Última actualización",
+    "by": "por",
+    "answerButton": "Responder",
+    "editAnswer": "Editar Respuesta",
+    "modalTitle": "Responder Pregunta de Política",
+    "yes": "Sí",
+    "no": "No",
+    "shortTextPlaceholder": "Escribe tu respuesta aquí...",
+    "saveAnswer": "Guardar Respuesta",
+    "cancel": "Cancelar",
+    "saved": "Respuesta guardada",
+    "saveFailed": "No se pudo guardar"
   }
 }

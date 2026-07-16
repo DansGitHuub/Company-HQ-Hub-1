@@ -2414,5 +2414,24 @@
     "saveNotes": "Save Notes",
     "saveDraft": "Save Draft",
     "submitWorksheet": "Submit Worksheet"
+  },
+  "aiKnowledge": {
+    "pageTitle": "AI Knowledge Base",
+    "pageSubtitle": "Answer key questions to help the AI respond consistently with how you run your business.",
+    "answered": "answered",
+    "unanswered": "Unanswered",
+    "currentAnswer": "Current answer",
+    "lastUpdated": "Last updated",
+    "by": "by",
+    "answerButton": "Answer",
+    "editAnswer": "Edit Answer",
+    "modalTitle": "Answer Policy Question",
+    "yes": "Yes",
+    "no": "No",
+    "shortTextPlaceholder": "Type your answer here...",
+    "saveAnswer": "Save Answer",
+    "cancel": "Cancel",
+    "saved": "Answer saved",
+    "saveFailed": "Could not save"
   }
 }

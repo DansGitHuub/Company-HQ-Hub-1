@@ -181,6 +181,7 @@ import DailyPlanPage from "@/pages/DailyPlan";
 import AdminInbox from "@/pages/AdminInbox";
 import DocumentLibraryPage from "@/pages/admin/DocumentLibraryPage";
 import SetupWizardPage from "@/pages/admin/SetupWizardPage";
+import AIKnowledgePage from "@/pages/admin/AIKnowledgePage";
 
 const ADMIN_ONLY = ["Admin"];
 const ADMIN_OR_MANAGER = ["Admin", "Manager"];
@@ -349,6 +350,7 @@ function AppRoutes() {
         <ProtectedRoute path="/admin/service-types" component={ServiceTypesPage} allowedRoles={ADMIN_ONLY} />
         <ProtectedRoute path="/admin/setup-wizard" component={SetupWizardPage} allowedRoles={ADMIN_ONLY} />
         <ProtectedRoute path="/admin/business-rules" component={BusinessRulesPage} allowedRoles={ADMIN_ONLY} />
+        <ProtectedRoute path="/admin/ai-knowledge" component={AIKnowledgePage} allowedRoles={ADMIN_ONLY} />
         <ProtectedRoute path="/admin/automation-center" component={AutomationCenterPage} allowedRoles={ADMIN_ONLY} />
         <ProtectedRoute path="/admin/regional-settings" component={RegionalSettingsPage} allowedRoles={ADMIN_ONLY} />
         <ProtectedRoute path="/admin/notification-center" component={NotificationCenterPage} allowedRoles={ADMIN_OR_MANAGER} />
