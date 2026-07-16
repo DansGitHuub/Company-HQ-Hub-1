@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
 import { useTranslation } from "react-i18next";
+import { TranslateButton, TranslateDraftButton } from "@/components/TranslateButton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -1685,29 +1686,33 @@ function ThreadDetail({ threadId, onBack }: { threadId: string; onBack: () => vo
               <span className="text-xs text-gray-400">{msg.createdAt ? new Date(msg.createdAt).toLocaleString() : ""}</span>
             </div>
             <p className="text-sm text-gray-700 whitespace-pre-wrap">{msg.content}</p>
+            <TranslateButton text={msg.content} messageId={msg.id} />
           </div>
         ))}
       </div>
 
       {thread?.status !== "closed" && (
-        <div className="flex gap-2">
-          <Textarea
-            value={reply}
-            onChange={e => setReply(e.target.value)}
-            placeholder="Type your reply..."
-            rows={2}
-            className="flex-1"
-            data-testid="input-reply"
-          />
-          <Button
-            onClick={() => reply.trim() && replyMutation.mutate(reply.trim())}
-            disabled={!reply.trim() || replyMutation.isPending}
-            style={{ backgroundColor: brandColors.darkGreen }}
-            className="self-end"
-            data-testid="button-send-reply"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
+        <div className="flex flex-col gap-1">
+          <div className="flex gap-2">
+            <Textarea
+              value={reply}
+              onChange={e => setReply(e.target.value)}
+              placeholder="Type your reply..."
+              rows={2}
+              className="flex-1"
+              data-testid="input-reply"
+            />
+            <Button
+              onClick={() => reply.trim() && replyMutation.mutate(reply.trim())}
+              disabled={!reply.trim() || replyMutation.isPending}
+              style={{ backgroundColor: brandColors.darkGreen }}
+              className="self-end"
+              data-testid="button-send-reply"
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </div>
+          <TranslateDraftButton text={reply} onTranslated={(t) => setReply(t)} />
         </div>
       )}
     </div>

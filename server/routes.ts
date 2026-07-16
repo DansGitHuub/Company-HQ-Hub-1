@@ -12,6 +12,7 @@ import { registerSystemHealthRoutes } from "./systemHealthRoutes";
 import { registerEstimateTranscriptRoutes } from "./estimateTranscriptRoutes";
 import { registerEstimateAiDraftRoutes } from "./estimateAiDraftRoutes";
 import { registerHiringRoutes } from "./hiringRoutes";
+import { registerTranslateRoutes } from "./translateRoutes";
 import { registerEmployeeFormsRoutes } from "./employeeFormsRoutes";
 import { registerNotesRoutes, migrateNotesTable, runNoteReminderScheduler } from "./notesRoutes";
 import { registerDailyWorksheetRoutes } from "./dailyWorksheetRoutes";
@@ -142,6 +143,7 @@ export async function registerRoutes(
   registerMessagesRoutes(app, requireAuth);
   registerDirectMessageRoutes(app, requireAuth);
   registerCustomerMessagingRoutes(app, requireAuth);
+  registerTranslateRoutes(app);
   registerPlantCardRoutes(app, requireAuth, requireAdmin);
   registerWorkOrderRoutes(app, requireAuth);
 

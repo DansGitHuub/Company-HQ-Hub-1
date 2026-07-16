@@ -1183,7 +1183,13 @@
     "failedToCreate": "Error al crear conversación",
     "assignedEmployee": "Empleado Asignado",
     "noConversations": "Sin conversaciones",
-    "startConversation": "Iniciar una conversación"
+    "startConversation": "Iniciar una conversación",
+    "translate": "Traducir",
+    "translating": "Traduciendo...",
+    "showOriginal": "Mostrar original",
+    "translatedFrom": "Traducido del {{language}}",
+    "translateError": "Error al traducir",
+    "translateDraft": "Traducir borrador"
   },
   "forms": {
     "title": "Formularios",

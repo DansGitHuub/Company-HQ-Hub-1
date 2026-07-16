@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
+import { TranslateButton } from "@/components/TranslateButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -1063,6 +1064,10 @@ function ConversationThread({ userId, myId, folder, onBack, onClose }: {
                           </div>
                         )}
                       </div>
+                      <TranslateButton
+                        text={msg.body.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()}
+                        messageId={msg.id}
+                      />
                       <div className={cn("flex items-center gap-1 px-1 mt-0.5",
                         isMine ? "flex-row-reverse" : "flex-row")}>
                         <span className="text-[10px] text-gray-400">

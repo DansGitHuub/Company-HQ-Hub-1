@@ -1183,7 +1183,13 @@
     "failedToCreate": "Failed to create conversation",
     "assignedEmployee": "Assigned Employee",
     "noConversations": "No conversations",
-    "startConversation": "Start a conversation"
+    "startConversation": "Start a conversation",
+    "translate": "Translate",
+    "translating": "Translating...",
+    "showOriginal": "Show original",
+    "translatedFrom": "Translated from {{language}}",
+    "translateError": "Translation failed",
+    "translateDraft": "Translate draft"
   },
   "forms": {
     "title": "Forms",

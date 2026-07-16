@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { TranslateButton, TranslateDraftButton } from "@/components/TranslateButton";
 import { useAuth } from "@/hooks/use-auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -602,6 +603,9 @@ export default function CustomerMessagesInbox() {
                       )}>
                         {msg.content}
                       </div>
+                      {!isInternal && (
+                        <TranslateButton text={msg.content} messageId={msg.id} />
+                      )}
                     </div>
                   </div>
                 );
@@ -659,9 +663,14 @@ export default function CustomerMessagesInbox() {
                 <span className="ml-1.5">{asInternal ? "Add Note" : "Reply"}</span>
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground mt-1.5">
-              Ctrl+Enter to send · Changes to status/priority/assignment save immediately
-            </p>
+            <div className="flex items-center justify-between mt-1.5">
+              {!asInternal && (
+                <TranslateDraftButton text={replyText} onTranslated={(t) => setReplyText(t)} />
+              )}
+              <p className="text-xs text-muted-foreground">
+                Ctrl+Enter to send · Changes to status/priority/assignment save immediately
+              </p>
+            </div>
           </div>
         </div>
       ) : (
