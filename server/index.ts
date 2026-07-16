@@ -79,7 +79,7 @@ import { runWorkOrderProgressMigration } from "./migrations/workOrderProgress";
 import { runSkippedWorkNotesMigration } from "./migrations/skippedWorkNotes";
 import { runCrewNotesCustomerVisibleMigration } from "./migrations/crewNotesCustomerVisible";
 import { runCustomerSatisfactionMigration } from "./migrations/customerSatisfaction";
-import { runMessageBlastsMigration, runMessageBlastsConstraintsMigration } from "./migrations/messageBlasts";
+import { runMessageBlastsMigration, runMessageBlastsConstraintsMigration, runMessageBlastsChannelsMigration } from "./migrations/messageBlasts";
 import { runMaintenanceRoutesMigration } from "./migrations/maintenanceRoutes";
 import { runSmsConsentMigration } from "./migrations/smsConsent";
 import { registerMaintenanceRouteRoutes } from "./maintenanceRouteRoutes";
@@ -272,6 +272,7 @@ app.use((req, res, next) => {
   await runCustomerSatisfactionMigration();
   await runMessageBlastsMigration();
   await runMessageBlastsConstraintsMigration();
+  await runMessageBlastsChannelsMigration();
   await runMaintenanceRoutesMigration();
   await runSmsConsentMigration();
 

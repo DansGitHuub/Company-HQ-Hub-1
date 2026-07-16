@@ -70,3 +70,11 @@ export async function runMessageBlastsConstraintsMigration() {
 
   console.log("[migration] Message blasts constraints ready (customer FK, channel check)");
 }
+
+export async function runMessageBlastsChannelsMigration() {
+  await pool.query(`
+    ALTER TABLE message_blasts
+    ADD COLUMN IF NOT EXISTS channels TEXT[]
+  `);
+  console.log("[migration] message_blasts.channels column ready");
+}

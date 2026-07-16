@@ -2,9 +2,12 @@ import { Express } from "express";
 import { pool } from "./db";
 import { requireRole } from "./auth";
 import {
-  segmentCustomers, sendToCustomer, renderTemplate, buildTemplateVars, SegmentFilters,
+  segmentCustomers, sendToCustomer, sendToCustomerOnChannels,
+  renderTemplate, buildTemplateVars, SegmentFilters,
   sendContextualMessage, ContextualMessageType,
 } from "./customerMessagingService";
+import { sendEmail } from "./emailService";
+import { sendSms } from "./smsService";
 
 const JOB_NOTIFY_TYPES: ContextualMessageType[] = ["start_reminder", "weather_delay", "completion"];
 
@@ -24,10 +27,14 @@ export function registerCustomerMessagingRoutes(app: Express, requireAuth: any) 
         overdueInvoice: body.overdueInvoice === true,
       };
       const results = await segmentCustomers(filters);
+      const smsConsentCount = results.filter(r => r.hasSmsConsent).length;
+      const smsPhoneCount = results.filter(r => !!r.phone).length;
       res.json({
         count: results.length,
         reachable: results.filter(r => r.channel !== "none").length,
         unreachable: results.filter(r => r.channel === "none").length,
+        smsConsentCount,
+        smsPhoneCount,
         customers: results,
       });
     } catch (err: any) {
@@ -36,54 +43,127 @@ export function registerCustomerMessagingRoutes(app: Express, requireAuth: any) 
     }
   });
 
-  // ── BLAST: create + send a message blast to a segment (or explicit customer id list) ──
-  app.post("/api/message-blasts", requireAuth, requireStaff, async (req: any, res) => {
+  // ── BLAST TEST: send the composed message to the requesting admin only ────
+  // No real blast record is created — this is a preflight check for the admin.
+  // SMS respects SMS_SENDING_LIVE gate; email is sent to the admin's own login email.
+  app.post("/api/message-blasts/test", requireAuth, requireStaff, async (req: any, res) => {
     try {
-      const { subject, body, templateKey, filters, customerIds } = req.body ?? {};
+      const { subject, body, channels } = req.body ?? {};
       if (!body || typeof body !== "string") {
         return res.status(400).json({ message: "Message body is required" });
       }
+      const selectedChannels: string[] = Array.isArray(channels) && channels.length
+        ? channels
+        : ["portal", "email"];
+
+      const adminEmail: string | null = req.user?.email ?? null;
+
+      // Look up the admin's employee phone (personal_phone or work_phone)
+      let adminPhone: string | null = null;
+      if (adminEmail) {
+        const { rows: empRows } = await pool.query(
+          `SELECT personal_phone FROM employees WHERE personal_email = $1 OR work_email = $1 LIMIT 1`,
+          [adminEmail]
+        );
+        if (empRows.length && empRows[0].personal_phone) {
+          adminPhone = empRows[0].personal_phone;
+        }
+      }
+
+      const results: { channel: string; success: boolean; note?: string }[] = [];
+      const previewBody = body.replace(/\{\{\s*customer_name\s*\}\}/g, req.user?.name ?? "Admin");
+      const previewSubject = subject || "Message from Chapin Landscapes";
+
+      // Email test — send to the admin's own login email
+      if (selectedChannels.includes("email")) {
+        if (adminEmail) {
+          try {
+            const ok = await sendEmail(adminEmail, `[TEST] ${previewSubject}`, previewBody.replace(/\n/g, "<br>"));
+            results.push({ channel: "email", success: ok, note: ok ? `Sent to ${adminEmail}` : "Email send failed" });
+          } catch (err: any) {
+            results.push({ channel: "email", success: false, note: err.message });
+          }
+        } else {
+          results.push({ channel: "email", success: false, note: "No email on your account" });
+        }
+      }
+
+      // SMS test — send to admin phone (smsService handles live/redirect gate)
+      if (selectedChannels.includes("sms")) {
+        if (adminPhone) {
+          try {
+            const ok = await sendSms(adminPhone, `[TEST] ${previewBody}`, "customer");
+            results.push({ channel: "sms", success: ok, note: ok ? "SMS sent (respects test gate)" : "SMS send failed" });
+          } catch (err: any) {
+            results.push({ channel: "sms", success: false, note: err.message });
+          }
+        } else {
+          results.push({ channel: "sms", success: false, note: "No phone linked to your staff profile. Add one in your employee record to test SMS." });
+        }
+      }
+
+      // Portal test — not applicable for staff accounts
+      if (selectedChannels.includes("portal")) {
+        results.push({ channel: "portal", success: false, note: "Portal preview only — staff accounts are not customer portal users." });
+      }
+
+      res.json({
+        results,
+        channels: results.filter(r => r.success).map(r => r.channel),
+      });
+    } catch (err: any) {
+      console.error("[customerMessaging] blast test error:", err.message);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // ── BLAST: create + send a message blast to a segment (or explicit customer id list) ──
+  app.post("/api/message-blasts", requireAuth, requireStaff, async (req: any, res) => {
+    try {
+      const { subject, body, templateKey, filters, customerIds, channels } = req.body ?? {};
+      if (!body || typeof body !== "string") {
+        return res.status(400).json({ message: "Message body is required" });
+      }
+
+      // Default channels for backward compat (legacy sends used auto-detect = all)
+      const selectedChannels: string[] = Array.isArray(channels) && channels.length
+        ? channels
+        : ["portal", "email", "sms"];
 
       let targets = Array.isArray(customerIds) && customerIds.length
         ? await segmentCustomers({}).then(all => all.filter(c => customerIds.includes(c.customerId)))
         : await segmentCustomers(filters ?? {});
 
       const { rows: blastRows } = await pool.query(
-        `INSERT INTO message_blasts (subject, template_key, body, filters, created_by)
-         VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-        [subject ?? null, templateKey ?? null, body, filters ? JSON.stringify(filters) : null, req.user.id]
+        `INSERT INTO message_blasts (subject, template_key, body, filters, channels, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+        [subject ?? null, templateKey ?? null, body, filters ? JSON.stringify(filters) : null, selectedChannels, req.user.id]
       );
       const blastId = blastRows[0].id;
 
       let sentCount = 0;
       let skippedCount = 0;
-      for (const target of targets) {
-        if (target.channel === "none") {
-          skippedCount++;
-          await pool.query(
-            `INSERT INTO message_blast_recipients (blast_id, customer_id, channel, status, error)
-             VALUES ($1, $2, 'none', 'skipped', 'No reachable channel')`,
-            [blastId, target.customerId]
-          );
-          continue;
-        }
 
+      for (const target of targets) {
         const vars = buildTemplateVars({
           customerName: `${target.firstName} ${target.lastName}`.trim(),
         });
         const renderedBody = renderTemplate(body, vars);
         const renderedSubject = subject ? renderTemplate(subject, vars) : "Message from Chapin Landscapes";
 
-        const result = await sendToCustomer(target.customerId, renderedSubject, renderedBody, req.user.id);
-
-        await pool.query(
-          `INSERT INTO message_blast_recipients (blast_id, customer_id, channel, status, error, sent_at)
-           VALUES ($1, $2, $3, $4, $5, ${result.success ? "NOW()" : "NULL"})`,
-          [blastId, target.customerId, result.channel, result.success ? "sent" : "failed", result.error ?? null]
+        const channelResults = await sendToCustomerOnChannels(
+          target, selectedChannels, renderedSubject, renderedBody, req.user.id
         );
 
-        if (result.success) sentCount++;
-        else skippedCount++;
+        for (const result of channelResults) {
+          await pool.query(
+            `INSERT INTO message_blast_recipients (blast_id, customer_id, channel, status, error, sent_at)
+             VALUES ($1, $2, $3, $4, $5, ${result.success ? "NOW()" : "NULL"})`,
+            [blastId, target.customerId, result.channel, result.success ? "sent" : (result.channel === "none" ? "skipped" : "failed"), result.error ?? null]
+          );
+          if (result.success) sentCount++;
+          else skippedCount++;
+        }
       }
 
       await pool.query(`UPDATE message_blasts SET sent_at = NOW() WHERE id = $1`, [blastId]);
@@ -100,7 +180,7 @@ export function registerCustomerMessagingRoutes(app: Express, requireAuth: any) 
     try {
       const { rows } = await pool.query(`
         SELECT
-          mb.id, mb.subject, mb.template_key, mb.body, mb.filters, mb.created_at, mb.sent_at,
+          mb.id, mb.subject, mb.template_key, mb.body, mb.filters, mb.channels, mb.created_at, mb.sent_at,
           u.name AS created_by_name,
           COUNT(mbr.id) AS recipient_count,
           COUNT(mbr.id) FILTER (WHERE mbr.status = 'sent') AS sent_count,

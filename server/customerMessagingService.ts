@@ -14,6 +14,7 @@ export interface ReachableCustomer {
   portalUserId: string | null;
   email: string | null;
   phone: string | null;
+  hasSmsConsent: boolean;
 }
 
 /**
@@ -30,7 +31,12 @@ export async function resolveCustomerChannel(customerId: string): Promise<Reacha
       c.id, c.first_name, c.last_name, c.company_name,
       ce.email AS primary_email,
       cp.phone AS primary_phone,
-      pu.id AS portal_user_id
+      pu.id AS portal_user_id,
+      CASE WHEN EXISTS (
+        SELECT 1 FROM sms_opt_ins so
+        WHERE REGEXP_REPLACE(so.phone, '[^0-9]', '', 'g') = REGEXP_REPLACE(cp.phone, '[^0-9]', '', 'g')
+          AND so.promotional_consent = true
+      ) THEN true ELSE false END AS has_sms_consent
     FROM customers c
     LEFT JOIN customer_emails ce ON ce.customer_id = c.id AND ce.is_primary = true
     LEFT JOIN customer_phones cp ON cp.customer_id = c.id AND cp.is_primary = true
@@ -58,6 +64,7 @@ export async function resolveCustomerChannel(customerId: string): Promise<Reacha
     portalUserId: row.portal_user_id ?? null,
     email: row.primary_email ?? null,
     phone: row.primary_phone ?? null,
+    hasSmsConsent: !!row.has_sms_consent,
   };
 }
 
@@ -95,7 +102,7 @@ export interface SendResult {
 }
 
 /**
- * Send a message to a single CRM customer via the best available channel.
+ * Send a message to a single CRM customer via the best available channel (legacy single-channel send).
  * senderId is the staff user id (used as thread sender for portal messages).
  */
 export async function sendToCustomer(
@@ -143,6 +150,72 @@ export async function sendToCustomer(
   } catch (err: any) {
     return { channel: target.channel, success: false, error: err.message };
   }
+}
+
+/**
+ * Send a message to a customer via ALL selected channels they support.
+ * Returns one result per channel attempted (may be multiple per customer).
+ * SMS is only attempted if hasSmsConsent is true.
+ */
+export async function sendToCustomerOnChannels(
+  customer: ReachableCustomer,
+  selectedChannels: string[],
+  subject: string,
+  body: string,
+  senderId: string
+): Promise<{ channel: MessageChannel; success: boolean; error?: string }[]> {
+  const results: { channel: MessageChannel; success: boolean; error?: string }[] = [];
+
+  // Portal message (customer must have a portal login)
+  if (selectedChannels.includes("portal") && customer.portalUserId) {
+    try {
+      const threads = await storage.getMessagingThreads({ customerId: customer.portalUserId });
+      let thread = threads.find((t: any) => t.status !== "closed");
+      if (!thread) {
+        thread = await storage.createMessagingThread({
+          customerId: customer.portalUserId,
+          subject,
+          priority: "normal",
+        } as any);
+      }
+      await storage.createThreadMessage({
+        threadId: thread.id,
+        senderId,
+        senderRole: "employee",
+        content: body,
+      } as any);
+      results.push({ channel: "portal", success: true });
+    } catch (err: any) {
+      results.push({ channel: "portal", success: false, error: err.message });
+    }
+  }
+
+  // Email
+  if (selectedChannels.includes("email") && customer.email) {
+    try {
+      const ok = await sendEmail(customer.email, subject, body.replace(/\n/g, "<br>"));
+      results.push({ channel: "email", success: ok, error: ok ? undefined : "Email send failed" });
+    } catch (err: any) {
+      results.push({ channel: "email", success: false, error: err.message });
+    }
+  }
+
+  // SMS — only if customer has opted in
+  if (selectedChannels.includes("sms") && customer.phone && customer.hasSmsConsent) {
+    try {
+      const ok = await sendSms(customer.phone, body, "customer");
+      results.push({ channel: "sms", success: ok, error: ok ? undefined : "SMS send failed" });
+    } catch (err: any) {
+      results.push({ channel: "sms", success: false, error: err.message });
+    }
+  }
+
+  // Nothing sent — flag as skipped
+  if (results.length === 0) {
+    results.push({ channel: "none", success: false, error: "No matching channel available for selected channels" });
+  }
+
+  return results;
 }
 
 export type ContextualMessageType =
@@ -245,9 +318,9 @@ export interface SegmentFilters {
 }
 
 /**
- * Return CRM customers matching the given filters, along with their reachable channel.
- * Filters are applied via EXISTS against jobs / invoices so a customer with multiple
- * matching jobs/invoices is only returned once.
+ * Return CRM customers matching the given filters, along with their reachable channel
+ * and SMS consent status. Filters are applied via EXISTS against jobs / invoices so a
+ * customer with multiple matching jobs/invoices is only returned once.
  */
 export async function segmentCustomers(filters: SegmentFilters): Promise<ReachableCustomer[]> {
   const conditions: string[] = ["c.is_active = true"];
@@ -297,7 +370,12 @@ export async function segmentCustomers(filters: SegmentFilters): Promise<Reachab
       c.id, c.first_name, c.last_name, c.company_name,
       ce.email AS primary_email,
       cp.phone AS primary_phone,
-      pu.id AS portal_user_id
+      pu.id AS portal_user_id,
+      CASE WHEN cp.phone IS NOT NULL AND EXISTS (
+        SELECT 1 FROM sms_opt_ins so
+        WHERE REGEXP_REPLACE(so.phone, '[^0-9]', '', 'g') = REGEXP_REPLACE(cp.phone, '[^0-9]', '', 'g')
+          AND so.promotional_consent = true
+      ) THEN true ELSE false END AS has_sms_consent
     FROM customers c
     LEFT JOIN customer_emails ce ON ce.customer_id = c.id AND ce.is_primary = true
     LEFT JOIN customer_phones cp ON cp.customer_id = c.id AND cp.is_primary = true
@@ -322,6 +400,7 @@ export async function segmentCustomers(filters: SegmentFilters): Promise<Reachab
       portalUserId: row.portal_user_id ?? null,
       email: row.primary_email ?? null,
       phone: row.primary_phone ?? null,
+      hasSmsConsent: !!row.has_sms_consent,
     };
   });
 }
