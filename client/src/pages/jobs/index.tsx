@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/table";
 import {
   Plus, Search, Briefcase, ChevronRight, Calendar,
-  Mail, MessageSquare, Send, Loader2, AlertCircle, CheckCircle2, Download, Pin,
+  Mail, MessageSquare, Send, Loader2, AlertCircle, AlertTriangle, CheckCircle2, Download, Pin,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { JobFormModal, EMPTY_JOB } from "./JobFormModal";
@@ -34,6 +34,7 @@ interface JobRow {
   scheduled_end_time: string | null;
   progress: number | null;
   is_behind_schedule: boolean;
+  has_work_order: boolean;
   price: string | null; value: number | null;
   customer_id: string | null;
   cust_first: string | null; cust_last: string | null; cust_company: string | null;
@@ -66,6 +67,15 @@ function BehindScheduleBadge() {
     <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 ml-1">
       <AlertCircle className="w-3 h-3" />
       Behind Schedule
+    </span>
+  );
+}
+
+function NoWorkOrderBadge() {
+  return (
+    <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 ml-1" data-testid="badge-no-work-order">
+      <AlertTriangle className="w-3 h-3" />
+      No Work Order
     </span>
   );
 }
@@ -484,6 +494,7 @@ export default function JobsPage() {
                       <div className="flex items-center flex-wrap gap-y-1">
                         <StatusBadge status={job.status || "lead"} />
                         {job.is_behind_schedule && <BehindScheduleBadge />}
+                        {!job.has_work_order && ["scheduled", "in_progress"].includes(job.status) && <NoWorkOrderBadge />}
                       </div>
                     </TableCell>
                     {isAdminOrManager && (

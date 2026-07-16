@@ -13,14 +13,14 @@ import {
 import {
   DollarSign, Briefcase, TrendingUp, TrendingDown, Clock, Users,
   AlertCircle, AlertTriangle, BarChart2, Layers, FileText, Timer, PieChart, ChevronDown, ChevronUp,
-  Download, Wrench, CheckCircle,
+  Download, Wrench, CheckCircle, ArrowLeftRight,
 } from "lucide-react";
 import { Loader2, Star } from "lucide-react";
 import { downloadCsv } from "@/lib/csv-export";
 import { useFavorites } from "@/hooks/use-favorites";
 import { cn } from "@/lib/utils";
 
-type Tab = "revenue" | "invoice-aging" | "crew-hours" | "profitability" | "time-by-division" | "materials-spend" | "equipment-repair" | "material-shortages";
+type Tab = "revenue" | "invoice-aging" | "crew-hours" | "profitability" | "time-by-division" | "materials-spend" | "equipment-repair" | "material-shortages" | "work-area-budget" | "compare-jobs";
 
 const DIVISIONS = ["Maintenance", "Install", "Snow", "General"];
 
@@ -544,7 +544,7 @@ function CrewHours() {
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Profitability Report
 // ═══════════════════════════════════════════════════════════════════════════════
-type SortKey = "sold_value" | "gross_profit" | "margin_pct" | "labor_cost" | "material_cost" | "actual_hours";
+type SortKey = "sold_value" | "gross_profit" | "margin_pct" | "labor_cost" | "material_cost" | "actual_hours" | "equipment_cost";
 
 function marginColor(pct: number) {
   if (pct >= 40) return "text-green-600 dark:text-green-400";
@@ -586,8 +586,10 @@ function ProfitabilityReport() {
     profit: acc.profit + Number(r.gross_profit ?? 0),
     labor: acc.labor + Number(r.labor_cost ?? 0),
     materials: acc.materials + Number(r.material_cost ?? 0),
+    equipment: acc.equipment + Number(r.equipment_cost ?? 0),
     hours: acc.hours + Number(r.actual_hours ?? 0),
-  }), { sold: 0, profit: 0, labor: 0, materials: 0, hours: 0 });
+    eqHours: acc.eqHours + Number(r.equipment_hours ?? 0),
+  }), { sold: 0, profit: 0, labor: 0, materials: 0, equipment: 0, hours: 0, eqHours: 0 });
 
   const avgMargin = totals.sold > 0 ? (totals.profit / totals.sold) * 100 : 0;
 
@@ -629,10 +631,11 @@ function ProfitabilityReport() {
             <Button size="sm" variant="outline" disabled={!sorted.length}
               onClick={() => downloadCsv(
                 `job-profitability-${new Date().toISOString().split("T")[0]}.csv`,
-                ["Job", "Client", "Division", "Sold Value", "Actual Hours", "Labor Cost", "Material Cost", "Gross Profit", "Margin %"],
+                ["Job", "Client", "Division", "Sold Value", "Actual Hours", "Labor Cost", "Material Cost", "Equipment Cost", "Equipment Hours", "Gross Profit", "Margin %"],
                 sorted.map((r: any) => [
                   r.title, r.client, r.division ?? "", r.sold_value, Number(r.actual_hours).toFixed(2),
-                  r.labor_cost, r.material_cost, r.gross_profit, Number(r.margin_pct).toFixed(1),
+                  r.labor_cost, r.material_cost, Number(r.equipment_cost ?? 0).toFixed(2), Number(r.equipment_hours ?? 0).toFixed(2),
+                  r.gross_profit, Number(r.margin_pct).toFixed(1),
                 ]),
               )}
               data-testid="btn-export-profitability">
@@ -644,7 +647,7 @@ function ProfitabilityReport() {
 
       {/* Summary cards */}
       {!isLoading && sorted.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           <Card>
             <CardContent className="pt-4 pb-3">
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Revenue</p>
@@ -673,6 +676,13 @@ function ProfitabilityReport() {
               <p className="text-xs text-muted-foreground">
                 {totals.sold > 0 ? fmtPct((totals.materials / totals.sold) * 100) : "0%"} of revenue
               </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4 pb-3">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Equipment Cost</p>
+              <p className="text-xl font-bold mt-0.5">{fmt$(totals.equipment)}</p>
+              <p className="text-xs text-muted-foreground">{fmtHrs(totals.eqHours)} tracked</p>
             </CardContent>
           </Card>
         </div>
@@ -704,6 +714,9 @@ function ProfitabilityReport() {
                     </TableHead>
                     <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("material_cost")}>
                       Materials <SortIcon k="material_cost" />
+                    </TableHead>
+                    <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("equipment_cost")}>
+                      Equipment <SortIcon k="equipment_cost" />
                     </TableHead>
                     <TableHead className="text-right cursor-pointer select-none" onClick={() => toggleSort("gross_profit")}>
                       Gross Profit <SortIcon k="gross_profit" />
@@ -742,6 +755,11 @@ function ProfitabilityReport() {
                       <TableCell className="text-right text-muted-foreground">{fmtHrs(Number(r.actual_hours))}</TableCell>
                       <TableCell className="text-right text-muted-foreground">{fmt$(r.labor_cost)}</TableCell>
                       <TableCell className="text-right text-muted-foreground">{fmt$(r.material_cost)}</TableCell>
+                      <TableCell className="text-right text-muted-foreground" data-testid={`cell-eq-cost-${r.id}`}>
+                        {Number(r.equipment_hours ?? 0) > 0
+                          ? fmt$(Number(r.equipment_cost ?? 0))
+                          : <span className="text-muted-foreground/50 text-xs">—</span>}
+                      </TableCell>
                       <TableCell className={`text-right font-semibold ${r.gross_profit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600"}`}>
                         {fmt$(r.gross_profit)}
                       </TableCell>
@@ -1499,6 +1517,302 @@ function MaterialShortagesReport() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+//  Work Area Budget Report (S16-9)
+// ═══════════════════════════════════════════════════════════════════════════════
+function WorkAreaBudgetReport() {
+  const thisYear = new Date().getFullYear();
+  const [year, setYear] = useState(String(thisYear));
+  const [division, setDivision] = useState("");
+  const [onlyOver, setOnlyOver] = useState(false);
+  const [applied, setApplied] = useState({ year: String(thisYear), division: "", onlyOver: false });
+
+  const params = new URLSearchParams();
+  if (applied.year) params.set("year", applied.year);
+  if (applied.division) params.set("division", applied.division);
+  if (applied.onlyOver) params.set("only_over_budget", "true");
+
+  const { data, isLoading, error } = useQuery<any[]>({
+    queryKey: ["/api/reports/work-area-budget", applied],
+    queryFn: () => fetch(`/api/reports/work-area-budget?${params}`).then(r => r.json()),
+  });
+
+  const rows = data ?? [];
+  const overCount = rows.filter((r: any) => r.is_over_budget).length;
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between flex-wrap gap-2">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingDown className="h-5 w-5" /> Work Area Budget
+              </CardTitle>
+              <CardDescription>Estimated vs actual hours per work area — spot where jobs ran long</CardDescription>
+            </div>
+            <Button size="sm" variant="outline" disabled={!rows.length}
+              onClick={() => downloadCsv(
+                `work-area-budget-${new Date().toISOString().split("T")[0]}.csv`,
+                ["Job", "Client", "Division", "Work Area", "Est. Hours", "Act. Hours", "Variance", "% Over", "Over Budget"],
+                rows.map((r: any) => [r.job_title, r.client, r.division ?? "", r.work_area_name,
+                  r.estimated_hours.toFixed(1), r.actual_hours.toFixed(1), r.variance.toFixed(1),
+                  r.pct_over.toFixed(1), r.is_over_budget ? "Yes" : "No"]),
+              )}
+              data-testid="btn-export-work-area-budget">
+              <Download className="h-3.5 w-3.5 mr-1.5" /> Export CSV
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap gap-3 items-end">
+            <div className="space-y-1">
+              <Label className="text-xs">Year</Label>
+              <Select value={year} onValueChange={setYear}>
+                <SelectTrigger className="w-28 h-8 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {[thisYear, thisYear - 1, thisYear - 2].map(y => (
+                    <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Division</Label>
+              <Select value={division || "__all__"} onValueChange={v => setDivision(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="w-36 h-8 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">All Divisions</SelectItem>
+                  {DIVISIONS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2 pb-0.5">
+              <input type="checkbox" id="only-over" checked={onlyOver}
+                onChange={e => setOnlyOver(e.target.checked)}
+                className="h-4 w-4 rounded border-input"
+                data-testid="check-only-over-budget" />
+              <Label htmlFor="only-over" className="text-sm cursor-pointer">Over budget only</Label>
+            </div>
+            <Button size="sm" onClick={() => setApplied({ year, division, onlyOver })}
+              data-testid="btn-apply-work-area-budget">Apply</Button>
+          </div>
+
+          {isLoading ? (
+            <div className="py-12 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+          ) : error ? (
+            <p className="text-sm text-destructive py-8 text-center">Failed to load data</p>
+          ) : rows.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-8 text-center">No work areas found for the selected filters.</p>
+          ) : (
+            <>
+              {overCount > 0 && (
+                <div className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  {overCount} work area{overCount !== 1 ? "s" : ""} over budget
+                </div>
+              )}
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Job</TableHead>
+                      <TableHead>Work Area</TableHead>
+                      <TableHead className="hidden sm:table-cell">Division</TableHead>
+                      <TableHead className="text-right">Est. Hrs</TableHead>
+                      <TableHead className="text-right">Act. Hrs</TableHead>
+                      <TableHead className="text-right">Variance</TableHead>
+                      <TableHead className="text-center">Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {rows.map((r: any, i: number) => (
+                      <TableRow key={`${r.job_id}-${r.work_area_id}-${i}`}
+                        className={r.is_over_budget ? "bg-red-50/50 dark:bg-red-950/10" : ""}>
+                        <TableCell className="text-sm font-medium">{r.job_title}</TableCell>
+                        <TableCell className="text-sm">{r.work_area_name}</TableCell>
+                        <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">{r.division ?? "—"}</TableCell>
+                        <TableCell className="text-right text-sm">{r.estimated_hours.toFixed(1)}</TableCell>
+                        <TableCell className="text-right text-sm font-medium">{r.actual_hours.toFixed(1)}</TableCell>
+                        <TableCell className={`text-right text-sm font-semibold ${r.variance > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>
+                          {r.variance > 0 ? "+" : ""}{r.variance.toFixed(1)} hrs
+                          {r.pct_over !== 0 && r.estimated_hours > 0 && (
+                            <span className="text-xs font-normal ml-1">
+                              ({r.pct_over > 0 ? "+" : ""}{r.pct_over.toFixed(0)}%)
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {r.estimated_hours === 0 ? (
+                            <Badge variant="outline" className="text-xs">No estimate</Badge>
+                          ) : r.is_over_budget ? (
+                            <Badge className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-0 text-xs">Over budget</Badge>
+                          ) : (
+                            <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-0 text-xs">On track</Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Compare Jobs Report (S16-11)
+// ═══════════════════════════════════════════════════════════════════════════════
+function CompareJobsReport() {
+  const [search, setSearch] = useState("");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  const { data: searchResults } = useQuery<any[]>({
+    queryKey: ["/api/jobs", { search }],
+    queryFn: () => fetch(`/api/jobs?search=${encodeURIComponent(search)}&status=all`).then(r => r.json()),
+    enabled: search.length >= 2,
+  });
+
+  const { data: compData, isLoading, error } = useQuery<any[]>({
+    queryKey: ["/api/reports/job-comparison", selectedIds.join(",")],
+    queryFn: () => fetch(`/api/reports/job-comparison?ids=${selectedIds.join(",")}`).then(r => r.json()),
+    enabled: selectedIds.length >= 2,
+  });
+
+  const jobs = searchResults ?? [];
+  const compRows = compData ?? [];
+
+  function toggleJob(id: string) {
+    setSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : prev.length < 6 ? [...prev, id] : prev
+    );
+  }
+  function removeJob(id: string) { setSelectedIds(prev => prev.filter(i => i !== id)); }
+
+  const METRICS = [
+    { key: "sold_value",   label: "Sold Value",    fmt: (v: any) => fmt$(Number(v)),  higherIsBetter: true },
+    { key: "actual_hours", label: "Actual Hours",  fmt: (v: any) => fmtHrs(Number(v)), higherIsBetter: false },
+    { key: "labor_cost",   label: "Labor Cost",    fmt: (v: any) => fmt$(Number(v)),  higherIsBetter: false },
+    { key: "material_cost",label: "Material Cost", fmt: (v: any) => fmt$(Number(v)),  higherIsBetter: false },
+    { key: "equipment_cost",label: "Equipment Cost",fmt: (v: any) => fmt$(Number(v)), higherIsBetter: false },
+    { key: "gross_profit", label: "Gross Profit",  fmt: (v: any) => fmt$(Number(v)),  higherIsBetter: true },
+    { key: "margin_pct",   label: "Margin %",      fmt: (v: any) => fmtPct(Number(v)),higherIsBetter: true },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2">
+            <ArrowLeftRight className="h-5 w-5" /> Compare Jobs
+          </CardTitle>
+          <CardDescription>Select 2–6 jobs to compare profitability side by side</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label className="text-xs">Search & select jobs</Label>
+            <Input
+              placeholder="Type job title or client name…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="max-w-md"
+              data-testid="input-compare-job-search"
+            />
+            {jobs.length > 0 && search.length >= 2 && (
+              <div className="border rounded-lg divide-y max-h-48 overflow-y-auto max-w-md">
+                {jobs.slice(0, 20).map((j: any) => (
+                  <button
+                    key={j.id}
+                    onClick={() => toggleJob(j.id)}
+                    className={cn(
+                      "w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors flex items-center justify-between gap-2",
+                      selectedIds.includes(j.id) && "bg-primary/10 text-primary font-medium"
+                    )}
+                    data-testid={`btn-select-job-${j.id}`}
+                  >
+                    <span>{j.title || j.client || "Untitled"}</span>
+                    {selectedIds.includes(j.id) && <CheckCircle className="h-3.5 w-3.5 shrink-0" />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {selectedIds.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {selectedIds.map(id => {
+                const job = jobs.find((j: any) => j.id === id) ?? compRows.find((r: any) => r.id === id);
+                return (
+                  <span key={id} className="inline-flex items-center gap-1 px-2 py-1 bg-primary/10 text-primary rounded-full text-xs font-medium">
+                    {(job as any)?.title ?? id}
+                    <button onClick={() => removeJob(id)} className="hover:text-destructive ml-1" data-testid={`btn-remove-job-${id}`}>×</button>
+                  </span>
+                );
+              })}
+            </div>
+          )}
+
+          {selectedIds.length < 2 ? (
+            <p className="text-sm text-muted-foreground py-6 text-center">
+              {selectedIds.length === 0
+                ? "Search and select at least 2 jobs to compare."
+                : "Select one more job to begin comparison."}
+            </p>
+          ) : isLoading ? (
+            <div className="py-10 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+          ) : error ? (
+            <p className="text-sm text-destructive py-6 text-center">Failed to load comparison data</p>
+          ) : compRows.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-6 text-center">No data found for selected jobs.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[140px]">Metric</TableHead>
+                    {compRows.map((r: any) => (
+                      <TableHead key={r.id} className="text-right min-w-[130px]">
+                        <div className="font-semibold text-foreground truncate max-w-[160px]">{r.title ?? r.client ?? "Untitled"}</div>
+                        <div className="text-xs font-normal text-muted-foreground">{r.status}</div>
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {METRICS.map(m => {
+                    const vals = compRows.map((r: any) => Number(r[m.key] ?? 0));
+                    const bestVal = m.higherIsBetter ? Math.max(...vals) : Math.min(...vals.filter(v => v > 0));
+                    return (
+                      <TableRow key={m.key}>
+                        <TableCell className="text-xs font-medium text-muted-foreground">{m.label}</TableCell>
+                        {compRows.map((r: any) => {
+                          const v = Number(r[m.key] ?? 0);
+                          const isBest = compRows.length > 1 && v === bestVal && v > 0;
+                          return (
+                            <TableCell key={r.id}
+                              className={`text-right text-sm ${isBest ? "font-bold text-green-600 dark:text-green-400" : ""}`}
+                              data-testid={`cell-compare-${m.key}-${r.id}`}>
+                              {m.fmt(r[m.key])}
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 //  Main Reports Page
 // ═══════════════════════════════════════════════════════════════════════════════
 const TABS: { id: Tab; label: string; icon: React.ElementType; desc: string }[] = [
@@ -1510,13 +1824,15 @@ const TABS: { id: Tab; label: string; icon: React.ElementType; desc: string }[] 
   { id: "materials-spend",     label: "Materials Spend",     icon: Layers,     desc: "Materials cost from job records by item, division, and month" },
   { id: "equipment-repair",    label: "Equipment Repair",    icon: Wrench,     desc: "Maintenance and repair costs per asset and by month" },
   { id: "material-shortages",  label: "Material Shortages",  icon: AlertTriangle, desc: "Worksheets where crew flagged missing materials on-site" },
+  { id: "work-area-budget",    label: "Work Area Budget",    icon: TrendingDown,  desc: "Work areas over estimated hours — see where jobs ran long" },
+  { id: "compare-jobs",        label: "Compare Jobs",        icon: ArrowLeftRight, desc: "Side-by-side profitability comparison for selected jobs" },
 ];
 
 export default function Reports() {
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     const sp = new URLSearchParams(window.location.search);
     const t = sp.get("tab") as Tab | null;
-    if (t && ["revenue","invoice-aging","crew-hours","profitability","time-by-division","materials-spend","equipment-repair","material-shortages"].includes(t)) return t;
+    if (t && ["revenue","invoice-aging","crew-hours","profitability","time-by-division","materials-spend","equipment-repair","material-shortages","work-area-budget","compare-jobs"].includes(t)) return t;
     return "revenue";
   });
   const { isFavorited, toggleFavorite } = useFavorites("report");
@@ -1576,6 +1892,8 @@ export default function Reports() {
           {activeTab === "materials-spend"    && <MaterialsSpend />}
           {activeTab === "equipment-repair"   && <EquipmentRepairReport />}
           {activeTab === "material-shortages" && <MaterialShortagesReport />}
+          {activeTab === "work-area-budget"   && <WorkAreaBudgetReport />}
+          {activeTab === "compare-jobs"       && <CompareJobsReport />}
         </div>
       </div>
     </div>

@@ -46,4 +46,11 @@ export async function runPhase4Migration() {
   `);
 
   console.log("[migration] record_history + job_equipment_assignments tables ready");
+
+  // ── Additive: equipment hourly rate for cost tracking (S16-4) ────────────
+  await pool.query(`
+    ALTER TABLE job_equipment_assignments
+    ADD COLUMN IF NOT EXISTS hourly_rate NUMERIC(8,2) DEFAULT 0
+  `);
+  console.log("[migration] job_equipment_assignments.hourly_rate column ready");
 }

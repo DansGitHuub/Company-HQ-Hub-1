@@ -111,7 +111,7 @@ export function registerJobRoutes(app: Express, requireAuth: any) {
 
   // ── LIST ──────────────────────────────────────────────────────────────────────
   app.get("/api/jobs", requireAuth, async (req, res) => {
-    const { status, customer_id, date_from, date_to, search, behind_schedule } = req.query as Record<string, string>;
+    const { status, customer_id, date_from, date_to, search, behind_schedule, missing_work_order } = req.query as Record<string, string>;
 
     try {
       let q = `
@@ -140,7 +140,8 @@ export function registerJobRoutes(app: Express, requireAuth: any) {
              AND (CASE WHEN j.scheduled_start_time IS NOT NULL
                        THEN (j.scheduled_date::date::text || ' ' || j.scheduled_start_time)::timestamp < NOW()
                        ELSE j.scheduled_date::date < CURRENT_DATE END))
-          ) THEN true ELSE false END AS is_behind_schedule
+          ) THEN true ELSE false END AS is_behind_schedule,
+          EXISTS(SELECT 1 FROM work_orders wo WHERE wo.job_id = j.id::text) AS has_work_order
         FROM jobs j
         LEFT JOIN customers c ON c.id = j.customer_id
         LEFT JOIN properties p ON p.id = j.property_id
@@ -183,6 +184,11 @@ export function registerJobRoutes(app: Express, requireAuth: any) {
                AND (CASE WHEN j.scheduled_start_time IS NOT NULL
                          THEN (j.scheduled_date::date::text || ' ' || j.scheduled_start_time)::timestamp < NOW()
                          ELSE j.scheduled_date::date < CURRENT_DATE END)))`;
+      }
+
+      if (missing_work_order === "true") {
+        q += ` AND NOT EXISTS(SELECT 1 FROM work_orders wo WHERE wo.job_id = j.id::text)
+               AND j.status IN ('lead','scheduled','in_progress')`;
       }
 
       q += ` ORDER BY j.created_at DESC`;

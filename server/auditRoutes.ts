@@ -129,7 +129,19 @@ export function registerAuditRoutes(app: Express, requireAuth: any) {
              FROM job_materials jm
              WHERE jm.job_id = j.id::text
                AND jm.quantity IS NOT NULL AND jm.unit_cost IS NOT NULL
-           ), 0) AS material_cost
+           ), 0) AS material_cost,
+           -- Equipment cost: hours_used × hourly_rate per assignment (S16-4)
+           COALESCE((
+             SELECT SUM(jea.hours_used * COALESCE(jea.hourly_rate, 0))
+             FROM job_equipment_assignments jea
+             WHERE jea.job_id = j.id::text
+           ), 0) AS equipment_cost,
+           -- Equipment hours tracked on this job (shown even if rate not set)
+           COALESCE((
+             SELECT SUM(jea.hours_used)
+             FROM job_equipment_assignments jea
+             WHERE jea.job_id = j.id::text
+           ), 0) AS equipment_hours
          FROM jobs j
          LEFT JOIN sales_estimates se ON se.id::text = j.source_estimate_id
          WHERE ${where}
@@ -141,17 +153,137 @@ export function registerAuditRoutes(app: Express, requireAuth: any) {
       // Add computed fields
       const enriched = rows.map(r => {
         const sold = Number(r.sold_value);
-        const cogs = Number(r.labor_cost) + Number(r.material_cost);
+        const equipment_cost = Number(r.equipment_cost || 0);
+        const equipment_hours = Number(r.equipment_hours || 0);
+        const cogs = Number(r.labor_cost) + Number(r.material_cost) + equipment_cost;
         const gross_profit = sold - cogs;
         const margin_pct = sold > 0 ? (gross_profit / sold) * 100 : 0;
         const variance_from_estimate = sold - Number(r.estimate_value);
         const missing_rate_count = Number(r.missing_rate_count || 0);
-        return { ...r, cogs, gross_profit, margin_pct, variance_from_estimate, missing_rate_count };
+        return { ...r, equipment_cost, equipment_hours, cogs, gross_profit, margin_pct, variance_from_estimate, missing_rate_count };
       });
 
       return res.json(enriched);
     } catch (err: any) {
       console.error("[profitability] query error:", err.message);
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── Work Area Budget — per-work-area estimated vs actual hours (S16-9) ──────
+  app.get("/api/reports/work-area-budget", requireAuth, async (req: any, res) => {
+    if (!["Admin", "Manager", "Master Admin"].includes(req.user?.role)) {
+      return res.status(403).json({ message: "Admin only" });
+    }
+    const { division, year, only_over_budget } = req.query as Record<string, string>;
+    const conditions: string[] = ["jwa.is_active = true"];
+    const params: any[] = [];
+    if (division) { params.push(division); conditions.push(`j.division = $${params.length}`); }
+    if (year) {
+      params.push(`${year}-01-01`, `${year}-12-31`);
+      conditions.push(`j.created_at BETWEEN $${params.length - 1} AND $${params.length}::date + interval '1 day'`);
+    }
+    const where = conditions.join(" AND ");
+    try {
+      const { rows } = await pool.query(
+        `SELECT
+           j.id AS job_id, j.title AS job_title, j.client, j.division, j.status,
+           jwa.id AS work_area_id, jwa.name AS work_area_name,
+           COALESCE(jwa.estimated_hours::numeric, 0) AS estimated_hours,
+           COALESCE((
+             SELECT SUM(EXTRACT(EPOCH FROM (te.clock_out - te.clock_in)) / 3600)
+             FROM time_entries te
+             WHERE te.job_work_area_id = jwa.id AND te.clock_out IS NOT NULL
+               AND te.entry_type NOT IN ('break','shop_time','shop')
+           ), 0) AS actual_hours
+         FROM job_work_areas jwa
+         JOIN jobs j ON j.id = jwa.job_id
+         WHERE ${where}
+         ORDER BY j.title, jwa.name
+         LIMIT 1000`,
+        params
+      );
+      const enriched = rows.map(r => {
+        const est = Number(r.estimated_hours);
+        const act = Number(r.actual_hours);
+        const variance = act - est;
+        const pct_over = est > 0 ? (variance / est) * 100 : 0;
+        const is_over_budget = est > 0 && act > est;
+        return { ...r, estimated_hours: est, actual_hours: act, variance, pct_over, is_over_budget };
+      });
+      const result = only_over_budget === "true" ? enriched.filter(r => r.is_over_budget) : enriched;
+      return res.json(result);
+    } catch (err: any) {
+      console.error("[work-area-budget] query error:", err.message);
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── Job Comparison — side-by-side profitability for selected jobs (S16-11) ──
+  app.get("/api/reports/job-comparison", requireAuth, async (req: any, res) => {
+    if (!["Admin", "Manager", "Master Admin"].includes(req.user?.role)) {
+      return res.status(403).json({ message: "Admin only" });
+    }
+    const { ids } = req.query as Record<string, string>;
+    if (!ids) return res.json([]);
+    const idList = ids.split(",").map((s: string) => s.trim()).filter(Boolean).slice(0, 10);
+    if (!idList.length) return res.json([]);
+    try {
+      const { rows } = await pool.query(
+        `SELECT
+           j.id, j.title, j.client, j.status, j.division,
+           j.created_at, j.completion_date,
+           COALESCE(j.estimated_hours, 0) AS estimated_hours,
+           COALESCE(j.price::numeric, 0) AS sold_value,
+           COALESCE(se.total::numeric, 0) AS estimate_value,
+           COALESCE((
+             SELECT SUM(co.total) FROM job_change_orders co
+             WHERE co.job_id = j.id AND co.status = 'approved'
+           ), 0) AS approved_co_total,
+           COALESCE((
+             SELECT SUM(EXTRACT(EPOCH FROM (COALESCE(te.clock_out, NOW()) - te.clock_in)) / 3600)
+             FROM time_entries te
+             WHERE te.job_id = j.id AND te.clock_out IS NOT NULL
+               AND te.entry_type NOT IN ('break','shop_time','shop')
+           ), 0) AS actual_hours,
+           COALESCE((
+             SELECT SUM(EXTRACT(EPOCH FROM (te.clock_out - te.clock_in)) / 3600
+               * COALESCE(NULLIF(emp.pay_rate,'')::numeric, 0))
+             FROM time_entries te
+             LEFT JOIN employees emp ON emp.user_id = te.user_id
+             WHERE te.job_id = j.id AND te.clock_out IS NOT NULL
+               AND te.entry_type NOT IN ('break','shop_time','shop')
+           ), 0) AS labor_cost,
+           COALESCE((
+             SELECT SUM(jm.quantity * jm.unit_cost) FROM job_materials jm
+             WHERE jm.job_id = j.id::text
+               AND jm.quantity IS NOT NULL AND jm.unit_cost IS NOT NULL
+           ), 0) AS material_cost,
+           COALESCE((
+             SELECT SUM(jea.hours_used * COALESCE(jea.hourly_rate, 0))
+             FROM job_equipment_assignments jea WHERE jea.job_id = j.id::text
+           ), 0) AS equipment_cost,
+           COALESCE((
+             SELECT SUM(jea.hours_used) FROM job_equipment_assignments jea
+             WHERE jea.job_id = j.id::text
+           ), 0) AS equipment_hours
+         FROM jobs j
+         LEFT JOIN sales_estimates se ON se.id::text = j.source_estimate_id
+         WHERE j.id = ANY($1::text[])
+         ORDER BY j.created_at DESC`,
+        [idList]
+      );
+      const enriched = rows.map(r => {
+        const sold = Number(r.sold_value);
+        const equipment_cost = Number(r.equipment_cost || 0);
+        const cogs = Number(r.labor_cost) + Number(r.material_cost) + equipment_cost;
+        const gross_profit = sold - cogs;
+        const margin_pct = sold > 0 ? (gross_profit / sold) * 100 : 0;
+        return { ...r, equipment_cost, cogs, gross_profit, margin_pct };
+      });
+      return res.json(enriched);
+    } catch (err: any) {
+      console.error("[job-comparison] query error:", err.message);
       return res.status(500).json({ message: err.message });
     }
   });
