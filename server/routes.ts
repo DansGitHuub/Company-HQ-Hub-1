@@ -49,6 +49,8 @@ import { registerFeedbackReportsRoutes } from "./feedbackReportsRoutes";
 import { registerFavoritesRoutes } from "./favoritesRoutes";
 import { registerPricingRoutes } from "./pricingRoutes";
 import { registerCalculatorRoutes } from "./calculatorRoutes";
+import { registerNotificationCenterRoutes } from "./notificationCenterRoutes";
+import { startNotificationDigestScheduler } from "./notificationDigestScheduler";
 import { registerUserAvailabilityRoutes } from "./userAvailabilityRoutes";
 import { registerPublicInquiryRoutes } from "./publicInquiryRoutes";
 import { registerPublicBookingRoutes } from "./publicBookingRoutes";
@@ -10174,6 +10176,8 @@ Provide accurate information based on publicly available documentation.`;
   await registerFavoritesRoutes(app, requireAuth);
   registerPricingRoutes(app, requireAuth);
   registerCalculatorRoutes(app, requireAuth);
+  await registerNotificationCenterRoutes(app, requireAuth);
+  startNotificationDigestScheduler();
   setInterval(runNoteReminderScheduler, 60 * 1000);
   console.log("[notes-scheduler] Note reminder scheduler started (checking every minute)");
 
