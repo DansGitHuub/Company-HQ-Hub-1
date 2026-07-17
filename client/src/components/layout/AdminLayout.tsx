@@ -41,12 +41,13 @@ import {
   FlagTriangleRight,
   MessageSquareWarning,
   Library,
-  HeartPulse, Brain,
+  HeartPulse, Brain, UserCheck,
 } from "lucide-react";
 
 type AdminNavItem = {
   value: string;
   label: string;
+  subtitle?: string;
   icon: React.ComponentType<{ className?: string }>;
   href?: string;
   tab?: string;
@@ -79,7 +80,9 @@ const ADMIN_GROUPS: AdminNavGroup[] = [
     label: "People",
     labelColor: "text-blue-600 dark:text-blue-400",
     items: [
-      { value: "users", label: "User Management", icon: Users, tab: "users" },
+      { value: "users", label: "Users & Roles", subtitle: "Login accounts & roles", icon: Users, tab: "users" },
+      { value: "employees", label: "Employees", subtitle: "Staff records & HR", icon: UserCheck, href: "/employees" },
+      { value: "vendors", label: "Vendors", subtitle: "Suppliers & contacts", icon: Building2, href: "/vendors" },
       { value: "requests", label: "Access Requests", icon: Megaphone, tab: "requests" },
       { value: "agreements", label: "Agreement Templates", icon: FileSignature, tab: "agreements" },
       { value: "suggestions", label: "Customer Suggestions", icon: Lightbulb, tab: "suggestions" },
@@ -291,8 +294,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                           : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
                       )}
                     >
-                      <Icon className="h-3.5 w-3.5 shrink-0 opacity-80" />
-                      <span className="truncate">{item.label}</span>
+                      <Icon className={cn("h-3.5 w-3.5 shrink-0 opacity-80", item.subtitle && "mt-0.5")} />
+                      <span className="min-w-0 flex-1">
+                        <span className="truncate block">{item.label}</span>
+                        {item.subtitle && (
+                          <span className="text-[10px] font-normal opacity-50 leading-tight block truncate">{item.subtitle}</span>
+                        )}
+                      </span>
                     </button>
                   );
                 })}
