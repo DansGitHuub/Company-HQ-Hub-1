@@ -1241,7 +1241,9 @@
     "loginToSetupMaster": "Debe estar conectado para configurar el administrador maestro.",
     "enterSetupCode": "Ingrese el código de configuración",
     "settingUp": "Configurando...",
-    "activateMasterAdmin": "Activar Administrador Maestro"
+    "activateMasterAdmin": "Activar Administrador Maestro",
+    "previewBanner": "Vista previa como {{role}}",
+    "exitTestView": "Salir de la vista de prueba"
   },
   "tools": {
     "title": "Herramientas",

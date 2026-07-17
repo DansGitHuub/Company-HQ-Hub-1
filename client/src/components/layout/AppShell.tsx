@@ -56,7 +56,7 @@ import {
   Clock,
   DollarSign,
   MessageSquare,
-  MessageSquareWarning,
+  MessageSquareWarning, Eye, EyeOff,
   Leaf,
   CalendarDays,
   Route,
@@ -89,7 +89,7 @@ import WorksheetWidget from "@/components/WorksheetWidget";
 import AdminLayout from "./AdminLayout";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  const { user, logoutMutation, effectiveRole, previewRole } = useAuth();
+  const { user, logoutMutation, effectiveRole, previewRole, setPreviewRole } = useAuth();
   const { t, i18n } = useTranslation();
   const { toast } = useToast();
   const [location] = useLocation();
@@ -813,17 +813,42 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     location === "/plant-cards" ||
     location.startsWith("/mors-budget");
 
+  const PreviewBanner = previewRole ? (
+    <div
+      className="fixed top-0 left-0 right-0 z-[9999] h-9 flex items-center justify-between px-4 bg-amber-500 text-white text-sm font-semibold shadow-lg"
+      data-testid="preview-role-banner"
+    >
+      <div className="flex items-center gap-2">
+        <Eye className="h-4 w-4 shrink-0" />
+        <span>{t("admin.previewBanner", { role: previewRole })}</span>
+      </div>
+      <button
+        onClick={() => setPreviewRole(null)}
+        data-testid="button-exit-preview-banner"
+        className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 hover:bg-white/30 active:bg-white/40 transition-colors text-xs font-bold whitespace-nowrap"
+      >
+        <EyeOff className="h-3.5 w-3.5" />
+        {t("admin.exitTestView")}
+      </button>
+    </div>
+  ) : null;
+
   if (isAdminArea) {
     return (
-      <div className="h-screen overflow-hidden bg-background">
-        <AdminLayout>{children}</AdminLayout>
-        <WorksheetWidget />
-      </div>
+      <>
+        {PreviewBanner}
+        <div className={cn("h-screen overflow-hidden bg-background", previewRole && "pt-9")}>
+          <AdminLayout>{children}</AdminLayout>
+          <WorksheetWidget />
+        </div>
+      </>
     );
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <>
+      {PreviewBanner}
+    <div className={cn("flex h-screen overflow-hidden bg-background", previewRole && "pt-9")}>
       {/* Sidebar - Desktop */}
       <aside className="hidden lg:flex flex-col w-[260px] border-r border-sidebar-border bg-sidebar overflow-hidden">
         <NavContent key={i18n.language} />
@@ -1022,5 +1047,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <FeedbackButton open={isFeedbackOpen} onOpenChange={setIsFeedbackOpen} />
       <WorksheetWidget />
     </div>
+    </>
   );
 }

@@ -1241,7 +1241,9 @@
     "loginToSetupMaster": "You need to be logged in to set up master admin.",
     "enterSetupCode": "Enter setup code",
     "settingUp": "Setting up...",
-    "activateMasterAdmin": "Activate Master Admin"
+    "activateMasterAdmin": "Activate Master Admin",
+    "previewBanner": "Previewing as {{role}}",
+    "exitTestView": "Exit test view"
   },
   "tools": {
     "title": "Tools",
