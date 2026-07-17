@@ -364,6 +364,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   ];
 
   const internalNavItems: Record<string, { icon: any; label: string; href: string }> = {
+    home: { icon: LayoutDashboard, label: t("nav.home"), href: "/" },
     dashboard: { icon: LayoutDashboard, label: t("nav.myWorkspace"), href: "/" },
     applicant_portal: { icon: ClipboardCheck, label: t("nav.myApplication"), href: "/applicant" },
     sops: { icon: BookOpen, label: t("nav.sopLibrary"), href: "/sops" },
@@ -424,7 +425,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   const sidebarSections: NavSection[] = [
-    { label: "MY SPACE", items: ["hq", "dashboard", "my_hours", "my_day", "messages"] },
+    { label: "MY SPACE", items: ["home", "my_hours", "my_day", "messages"] },
     { label: "SALES", items: ["customers", "consultations", "estimates", "jobs"] },
     { label: "OPERATIONS", items: ["manager_dashboard", "todos", "work_orders", "daily_plan", "scheduling", "maintenance_routes", "time_tracking", "equipment"] },
     { label: "RESOURCES", items: ["sops", "education", "testing", "tools"] },
@@ -482,6 +483,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     const currentLang = i18nNav.language;
 
     const navLabels: Record<string, string> = React.useMemo(() => ({
+      home: tNav("nav.home"),
       dashboard: tNav("nav.myWorkspace"),
       applicant_portal: tNav("nav.myApplication"),
       sops: tNav("nav.sopLibrary"),
@@ -724,12 +726,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 {previewRole || effectiveRole || user?.role}
               </p>
             </div>
-            <Link href="/hq" className="shrink-0">
+            <Link href="/?tab=company-hq" className="shrink-0">
               <button
                 className="p-1 rounded-lg hover:bg-white/10 text-sidebar-foreground transition-colors"
                 onClick={() => setIsMobileOpen(false)}
-                title="HQ Overview"
-                data-testid="link-hq-mobile"
+                title={t("nav.home")}
+                data-testid="link-company-hq-mobile"
               >
                 <Building2 className="h-5 w-5 opacity-70" />
               </button>
@@ -775,11 +777,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 </div>
               </div>
             </Link>
-            <Link href="/hq">
+            <Link href="/?tab=company-hq">
               <button
                 className="p-1 rounded-lg hover:bg-white/10 text-sidebar-foreground transition-colors shrink-0"
-                title="HQ Overview"
-                data-testid="link-hq"
+                title={t("nav.home")}
+                data-testid="link-company-hq"
               >
                 <Building2 className="h-5 w-5 opacity-40 shrink-0" />
               </button>

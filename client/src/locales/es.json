@@ -15,6 +15,7 @@
     "help": "Ayuda",
     "companyHQ": "CompanyHQ",
     "hqOverview": "Resumen de HQ",
+    "home": "Inicio",
     "marketing": "Marketing",
     "forms": "Formularios",
     "messages": "Mensajes",
@@ -1614,6 +1615,10 @@
     "research": "Investigar",
     "aiResearching": "La IA está investigando {{name}}...",
     "discoveringCapabilities": "Descubriendo capacidades de API y requisitos de configuración"
+  },
+  "home": {
+    "tabMyWorkspace": "Mi espacio de trabajo",
+    "tabCompanyHQ": "HQ de la empresa"
   },
   "hq": {
     "subtitle": "Un equipo, una visión. Construyendo la empresa de paisajismo más respetada de la región.",

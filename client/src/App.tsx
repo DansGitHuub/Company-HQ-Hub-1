@@ -92,7 +92,6 @@ import EmployeesImport from "@/pages/EmployeesImport";
 import Vendors from "@/pages/Vendors";
 import VendorsImport from "@/pages/VendorsImport";
 import FormHub from "@/pages/FormHub";
-import HQOverview from "@/pages/HQOverview";
 import JobList from "@/pages/jobs/index";
 import JobDetail from "@/pages/jobs/show";
 import InvoiceList from "@/pages/invoices/index";
@@ -316,7 +315,7 @@ function AppRoutes() {
         <Route path="/onboarding-forms/:formType?/:submissionId?" component={FormHub} />
         <Route path="/employee" component={EmployeePortal} />
         <Route path="/employee-portal" component={EmployeePortal} />
-        <Route path="/hq" component={HQOverview} />
+        <Route path="/hq"><Redirect to="/?tab=company-hq" /></Route>
         <ProtectedRoute path="/jobs" component={JobList} allowedRoles={STAFF_ROLES} />
         <ProtectedRoute path="/jobs/:id" component={JobDetail} allowedRoles={STAFF_ROLES} />
         <ProtectedRoute path="/invoices" component={InvoiceList} allowedRoles={ADMIN_OR_MANAGER} />

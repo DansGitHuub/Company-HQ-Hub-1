@@ -15,6 +15,7 @@
     "help": "Help",
     "companyHQ": "CompanyHQ",
     "hqOverview": "HQ Overview",
+    "home": "Home",
     "marketing": "Marketing",
     "forms": "Forms",
     "messages": "Messages",
@@ -1614,6 +1615,10 @@
     "research": "Research",
     "aiResearching": "AI is researching {{name}}...",
     "discoveringCapabilities": "Discovering API capabilities and setup requirements"
+  },
+  "home": {
+    "tabMyWorkspace": "My Workspace",
+    "tabCompanyHQ": "Company HQ"
   },
   "hq": {
     "subtitle": "One team, one vision. Building the most respected landscape company in the region.",
