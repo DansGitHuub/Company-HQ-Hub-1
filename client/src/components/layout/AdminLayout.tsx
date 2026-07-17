@@ -180,6 +180,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return () => window.removeEventListener("admin-set-tab", handler);
   }, []);
 
+  const goToOverview = () => {
+    navigate("/admin");
+    setActiveTab("");
+    window.dispatchEvent(new CustomEvent("admin-set-tab", { detail: { tab: "" } }));
+  };
+
   const handleItemClick = (item: AdminNavItem) => {
     if (item.href) {
       navigate(item.href);
@@ -252,7 +258,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         <div className="px-3 pt-2">
           <button
-            onClick={() => { navigate("/admin"); setActiveTab(""); }}
+            onClick={goToOverview}
             data-testid="admin-nav-overview"
             className={cn(
               "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left mb-1",
@@ -310,7 +316,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           data-testid="admin-breadcrumb"
         >
           <button
-            onClick={() => { navigate("/admin"); setActiveTab(""); }}
+            onClick={goToOverview}
             className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
             data-testid="admin-breadcrumb-home"
           >
@@ -319,7 +325,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           {breadcrumbGroup && (
             <>
               <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
-              <span className="text-sm text-muted-foreground/70">{breadcrumbGroup.label}</span>
+              <button
+                onClick={goToOverview}
+                className="text-sm text-muted-foreground/70 hover:text-foreground transition-colors"
+                data-testid="admin-breadcrumb-group"
+              >
+                {breadcrumbGroup.label}
+              </button>
             </>
           )}
           {breadcrumbItem && (
