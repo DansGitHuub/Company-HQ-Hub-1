@@ -41,7 +41,7 @@ import {
   FlagTriangleRight,
   MessageSquareWarning,
   Library,
-  HeartPulse, Brain, UserCheck,
+  HeartPulse, Brain,
 } from "lucide-react";
 
 type AdminNavItem = {
@@ -67,9 +67,7 @@ const ADMIN_GROUPS: AdminNavGroup[] = [
     labelColor: "text-green-600 dark:text-green-400",
     items: [
       { value: "overdue", label: "Overdue Items", icon: AlertTriangle, href: "/overdue" },
-      { value: "time-reports", label: "Time Reports", icon: ClipboardList, href: "/admin/time-reports" },
       { value: "time-admin", label: "Time Admin", icon: Clock, href: "/admin/time" },
-      { value: "worksheet-review", label: "Worksheet Review", icon: ClipboardCheck, href: "/admin/time?tab=worksheet" },
       { value: "qbo-export", label: "QuickBooks Export", icon: Upload, href: "/admin/qbo-export" },
       { value: "archive", label: "Time Archive", icon: Archive, href: "/admin/archive" },
       { value: "maintenance-reports", label: "Maintenance Reports", icon: BarChart2, href: "/admin/maintenance-reports" },
@@ -80,9 +78,7 @@ const ADMIN_GROUPS: AdminNavGroup[] = [
     label: "People",
     labelColor: "text-blue-600 dark:text-blue-400",
     items: [
-      { value: "users", label: "Users & Roles", subtitle: "Login accounts & roles", icon: Users, tab: "users" },
-      { value: "employees", label: "Employees", subtitle: "Staff records & HR", icon: UserCheck, href: "/employees" },
-      { value: "vendors", label: "Vendors", subtitle: "Suppliers & contacts", icon: Building2, href: "/vendors" },
+      { value: "users", label: "User Management", icon: Users, tab: "users" },
       { value: "requests", label: "Access Requests", icon: Megaphone, tab: "requests" },
       { value: "agreements", label: "Agreement Templates", icon: FileSignature, tab: "agreements" },
       { value: "suggestions", label: "Customer Suggestions", icon: Lightbulb, tab: "suggestions" },
@@ -99,7 +95,6 @@ const ADMIN_GROUPS: AdminNavGroup[] = [
       { value: "terms", label: "Terms & Conditions", icon: FileSignature, tab: "terms" },
       { value: "business-rules", label: "Business Rules", icon: SlidersHorizontal, href: "/admin/business-rules" },
       { value: "feedback-reports", label: "Bug Reports & Feedback", icon: MessageSquareWarning, href: "/admin/feedback" },
-      { value: "admin-tools", label: "Admin Tools", icon: Wrench, href: "/tools" },
     ],
   },
   {
@@ -132,7 +127,6 @@ const ADMIN_GROUPS: AdminNavGroup[] = [
     labelColor: "text-amber-600 dark:text-amber-400",
     items: [
       { value: "sop-pipeline", label: "SOP Pipeline", icon: Zap, tab: "sop-pipeline" },
-      { value: "documents", label: "Document Library", icon: FileText, tab: "documents" },
       { value: "shared-links", label: "External Share Links", icon: ExternalLink, tab: "shared-links" },
     ],
   },
