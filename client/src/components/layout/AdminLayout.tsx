@@ -15,7 +15,6 @@ import {
   Users,
   Megaphone,
   FileSignature,
-  Lightbulb,
   Building2,
   Layers,
   Tag,
@@ -81,7 +80,6 @@ const ADMIN_GROUPS: AdminNavGroup[] = [
       { value: "users", label: "User Management", icon: Users, tab: "users" },
       { value: "requests", label: "Access Requests", icon: Megaphone, tab: "requests" },
       { value: "agreements", label: "Agreement Templates", icon: FileSignature, tab: "agreements" },
-      { value: "suggestions", label: "Customer Suggestions", icon: Lightbulb, tab: "suggestions" },
     ],
   },
   {
