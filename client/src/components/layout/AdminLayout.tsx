@@ -183,7 +183,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const goToOverview = () => {
     navigate("/admin");
     setActiveTab("");
-    window.dispatchEvent(new CustomEvent("admin-set-tab", { detail: { tab: "" } }));
+    window.dispatchEvent(new CustomEvent("admin-set-tab", { detail: { tab: "home" } }));
   };
 
   const handleItemClick = (item: AdminNavItem) => {
