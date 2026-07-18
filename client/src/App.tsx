@@ -378,7 +378,7 @@ function AppRoutes() {
         <Route path="/tools/integration-wizard" component={IntegrationWizard} />
         <ProtectedRoute path="/tools/calculator" component={() => <CalculatorPage />} allowedRoles={TOOL_CALCULATOR_ROLES} />
         <ProtectedRoute path="/tools/lead-qualifier" component={() => <LeadQualifier />} allowedRoles={TOOL_LEAD_QUALIFIER_ROLES} />
-        <Route path="/care-guides" component={CareGuideManager} />
+        <ProtectedRoute path="/care-guides" component={CareGuideManager} allowedRoles={ADMIN_OR_MANAGER} />
         <ProtectedRoute path="/tools" component={Tools} allowedRoles={STAFF_ROLES} />
         <Route path="/calendar" component={CalendarPage} />
         <Route path="/training" component={TestingKnowledge} />

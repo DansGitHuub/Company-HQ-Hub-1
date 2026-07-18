@@ -186,7 +186,10 @@ app.use((req, res, next) => {
   // (before API routes exist); it is deferred to Step 5, after all API routes
   // are registered, matching the ordering guarantee already used for
   // serveStaticCatchAll() in production. See server/vite.ts for details.
-  if (process.env.NODE_ENV === "production") {
+  //
+  // Note: the deployed container does not always set NODE_ENV, so we treat any
+  // value other than "development" as production (i.e., serve built assets).
+  if (process.env.NODE_ENV !== "development") {
     serveStaticFiles(app);
   }
 
@@ -330,15 +333,18 @@ app.use((req, res, next) => {
   // ── Step 5: React catch-all (MUST be after all API routes) ─────────────────
   // Serves index.html for any path that didn't match an API route, enabling
   // client-side React routing (/reports, /jobs, etc.).
-  if (process.env.NODE_ENV === "production") {
-    serveStaticCatchAll(app);
-  } else {
+  //
+  // Note: the deployed container does not always set NODE_ENV, so we treat any
+  // value other than "development" as production (i.e., register the catch-all).
+  if (process.env.NODE_ENV === "development") {
     // Dev: Vite's dev-server middleware + SPA catch-all. Deliberately deferred
     // to here (rather than Step 1) so its wildcard fallback is registered
     // AFTER registerRoutes()'s /api/* handlers — otherwise every API request
     // would be intercepted and served the frontend HTML instead of JSON.
     const { setupVite } = await import("./vite");
     await setupVite(httpServer, app);
+  } else {
+    serveStaticCatchAll(app);
   }
 
   // ── Step 5b: Additive migration — message follow-through columns ─────────────

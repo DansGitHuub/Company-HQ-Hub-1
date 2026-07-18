@@ -40,9 +40,11 @@ export function serveStaticFiles(app: Express) {
 
 // React client-side routing catch-all.
 // MUST be registered AFTER all API routes so /api/* is not intercepted.
+// Uses a path-less app.use() so it matches every method and path that
+// reaches it, regardless of Express version wildcard syntax differences.
 export function serveStaticCatchAll(app: Express) {
   const distPath = getDistPath();
-  app.use("/{*path}", (_req, res) => {
+  app.use((_req, res) => {
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }
