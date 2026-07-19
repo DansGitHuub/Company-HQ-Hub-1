@@ -344,7 +344,9 @@ app.use((req, res, next) => {
     const { setupVite } = await import("./vite");
     await setupVite(httpServer, app);
   } else {
+    log(`[spa] registering SPA catch-all (NODE_ENV=${process.env.NODE_ENV ?? "unset"})`);
     serveStaticCatchAll(app);
+    log("[spa] SPA catch-all registered — hard-refresh on any client route will serve index.html");
   }
 
   // ── Step 5b: Additive migration — message follow-through columns ─────────────

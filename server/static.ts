@@ -44,8 +44,11 @@ export function serveStaticFiles(app: Express) {
 // reaches it, regardless of Express version wildcard syntax differences.
 export function serveStaticCatchAll(app: Express) {
   const distPath = getDistPath();
-  app.use((_req, res) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
+  const indexPath = path.resolve(distPath, "index.html");
+  console.log(`[spa] catch-all will serve: ${indexPath} (exists: ${fs.existsSync(indexPath)})`);
+  app.use((req, res) => {
+    console.log(`[spa] catch-all hit: ${req.method} ${req.path} → serving index.html`);
+    res.sendFile(indexPath);
   });
 }
 
