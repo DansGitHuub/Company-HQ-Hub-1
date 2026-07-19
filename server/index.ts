@@ -167,30 +167,26 @@ app.use((req, res, next) => {
 (async () => {
   const port = parseInt(process.env.PORT || "5000", 10);
 
-  // ── Step 1: Serve static files and bind port BEFORE migrations ─────────────
+  // ── Step 1: Serve static files + SPA catch-all, then bind port ────────────
   // The autoscale startup probe (GET /) fires within seconds of container start.
-  // Previously, listen() was called AFTER all 60+ migrations, meaning the probe
-  // saw 500 errors for ~2+ minutes and the deployment was marked failed even
-  // though the app eventually became healthy.
+  // Previously, listen() was called AFTER all 60+ migrations (~35 s), meaning
+  // the probe saw errors and the deployment was marked failed.
   //
-  // Fix: register express.static (serves dist/public/index.html → 200 for GET /)
-  // and call listen() immediately. express.static() only intercepts requests for
-  // files that actually exist on disk; /api/* and any unknown path fall through
-  // via next() and reach the API routes registered further below.
-  // The React catch-all (which must come after API routes) is added in Step 5.
+  // Both serveStaticFiles and serveStaticCatchAll are registered HERE, before
+  // listen(), so they are active from the very first request — including the
+  // entire ~35-second migration window.  The catch-all has an internal bypass
+  // guard for /api, /auth, /objects, and server-rendered public pages so those
+  // paths fall through to the handlers registered later in the stack.
   //
-  // In development, setupVite() registers a wildcard catch-all (matches every
-  // path, including /api/*) as part of its Vite dev-server integration. Unlike
-  // express.static() above, it does NOT fall through for unmatched files — it
-  // unconditionally serves the SPA HTML. So it must NOT be called here in Step 1
-  // (before API routes exist); it is deferred to Step 5, after all API routes
-  // are registered, matching the ordering guarantee already used for
-  // serveStaticCatchAll() in production. See server/vite.ts for details.
-  //
-  // Note: the deployed container does not always set NODE_ENV, so we treat any
-  // value other than "development" as production (i.e., serve built assets).
+  // In development, setupVite() registers its own wildcard catch-all.  It is
+  // intentionally deferred to Step 5 (after all API routes) because it does NOT
+  // call next() for unmatched paths — every path returns SPA HTML — so it must
+  // never sit in front of the API route registration.
   if (process.env.NODE_ENV !== "development") {
     serveStaticFiles(app);
+    log(`[spa] registering SPA catch-all (NODE_ENV=${process.env.NODE_ENV ?? "unset"})`);
+    serveStaticCatchAll(app);
+    log("[spa] SPA catch-all registered — active before listen(), bypass guard protects /api /auth /objects and server-rendered pages");
   }
 
   // ── Auth routes registered BEFORE migrations and before listen() ────────────
@@ -330,23 +326,15 @@ app.use((req, res, next) => {
     return res.status(status).json({ message });
   });
 
-  // ── Step 5: React catch-all (MUST be after all API routes) ─────────────────
-  // Serves index.html for any path that didn't match an API route, enabling
-  // client-side React routing (/reports, /jobs, etc.).
-  //
-  // Note: the deployed container does not always set NODE_ENV, so we treat any
-  // value other than "development" as production (i.e., register the catch-all).
+  // ── Step 5: Vite dev-server middleware (development only) ──────────────────
+  // In production, the SPA catch-all is registered in Step 1 (before listen())
+  // so that it is active during the entire ~35-second migration boot window.
+  // In development, Vite's wildcard catch-all must be deferred to here so it
+  // sits AFTER the /api/* handlers — Vite does NOT call next() for unmatched
+  // paths, so registering it first would swallow every API request.
   if (process.env.NODE_ENV === "development") {
-    // Dev: Vite's dev-server middleware + SPA catch-all. Deliberately deferred
-    // to here (rather than Step 1) so its wildcard fallback is registered
-    // AFTER registerRoutes()'s /api/* handlers — otherwise every API request
-    // would be intercepted and served the frontend HTML instead of JSON.
     const { setupVite } = await import("./vite");
     await setupVite(httpServer, app);
-  } else {
-    log(`[spa] registering SPA catch-all (NODE_ENV=${process.env.NODE_ENV ?? "unset"})`);
-    serveStaticCatchAll(app);
-    log("[spa] SPA catch-all registered — hard-refresh on any client route will serve index.html");
   }
 
   // ── Step 5b: Additive migration — message follow-through columns ─────────────
