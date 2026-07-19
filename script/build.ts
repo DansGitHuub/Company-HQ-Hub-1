@@ -1,6 +1,6 @@
 import { build as esbuild } from "esbuild";
 import { build as viteBuild } from "vite";
-import { rm, readFile } from "fs/promises";
+import { rm, readFile, copyFile } from "fs/promises";
 
 // server deps to bundle to reduce openat(2) syscalls
 // which helps cold start times
@@ -61,6 +61,12 @@ async function buildAll() {
     external: externals,
     logLevel: "info",
   });
+
+  // Copy index.html → 404.html so CDN-layer hosts (GitHub Pages, Replit
+  // static serving, etc.) that serve a custom 404 page will still load the
+  // React SPA and let React Router handle the path client-side.
+  console.log("copying dist/public/index.html → dist/public/404.html for SPA fallback...");
+  await copyFile("dist/public/index.html", "dist/public/404.html");
 }
 
 buildAll().catch((err) => {
