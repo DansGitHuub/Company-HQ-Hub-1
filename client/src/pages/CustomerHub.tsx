@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Home, Briefcase, FileText, BookOpen, MessageSquare, Bell,
-  ChevronRight, Download, Bookmark, BookmarkCheck, Search,
+  ChevronRight, Download, Search,
   Send, Clock, MapPin, Calendar, CheckCircle2, AlertCircle,
   Leaf, Sun, Snowflake, CloudRain, ArrowLeft, Eye, Star,
   Receipt, AlertTriangle, Camera, X as XIcon, Loader2
@@ -22,11 +22,6 @@ import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 
-const CARE_CATEGORIES = [
-  "Hardscape & Patios", "Plants & Landscape Beds", "Lawn Care",
-  "Irrigation Systems", "Outdoor Living Features", "Seasonal Guides",
-  "Troubleshooting", "Snow & Winter"
-];
 
 const MESSAGE_TOPICS = [
   "Question about my job", "Document request", "Scheduling",
@@ -1111,16 +1106,17 @@ function PlantCardDetail_Hub({ card, onBack }: { card: any; onBack: () => void }
 }
 
 function CareLibrarySection({ onSelectGuide }: { onSelectGuide: (id: string) => void }) {
-  const { t } = useTranslation();
   const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("all");
-  const [tab, setTab] = useState<"all" | "saved" | "plants">("all");
+  const [tab, setTab] = useState<"guides" | "plants">("guides");
   const [plantTypeFilter, setPlantTypeFilter] = useState("all");
   const [selectedPlant, setSelectedPlant] = useState<any | null>(null);
 
-  const { data: guides = [], isLoading } = useQuery({
-    queryKey: ["/api/customer-hub/care-guides"],
-    queryFn: async () => (await apiRequest("GET", "/api/customer-hub/care-guides")).json(),
+  const { data: resources = [], isLoading } = useQuery({
+    queryKey: ["/api/resources", "Care Guides"],
+    queryFn: async () => {
+      const all = await (await apiRequest("GET", "/api/resources")).json();
+      return (all as any[]).filter((r: any) => r.category === "Care Guides");
+    },
   });
 
   const { data: plantCards = [], isLoading: plantsLoading } = useQuery({
@@ -1130,11 +1126,9 @@ function CareLibrarySection({ onSelectGuide }: { onSelectGuide: (id: string) => 
 
   const PLANT_TYPES_HUB = ["Tree", "Shrub", "Perennial", "Annual", "Groundcover", "Vine", "Grass", "Other"];
 
-  const filtered = guides.filter((g: any) => {
-    if (tab === "saved" && !g.isSaved) return false;
-    if (category !== "all" && g.category !== category) return false;
-    if (search && !g.title.toLowerCase().includes(search.toLowerCase()) && !g.category.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
+  const filtered = resources.filter((r: any) => {
+    if (!search) return true;
+    return r.title.toLowerCase().includes(search.toLowerCase()) || (r.description ?? "").toLowerCase().includes(search.toLowerCase());
   });
 
   const filteredPlants = (plantCards as any[]).filter((c: any) => {
@@ -1143,7 +1137,6 @@ function CareLibrarySection({ onSelectGuide }: { onSelectGuide: (id: string) => 
     return true;
   });
 
-  // Plant detail view
   if (selectedPlant) {
     return <PlantCardDetail_Hub card={selectedPlant} onBack={() => setSelectedPlant(null)} />;
   }
@@ -1154,8 +1147,7 @@ function CareLibrarySection({ onSelectGuide }: { onSelectGuide: (id: string) => 
 
       <Tabs value={tab} onValueChange={v => { setTab(v as any); setSearch(""); }}>
         <TabsList>
-          <TabsTrigger value="all" data-testid="tab-all-guides">All Guides</TabsTrigger>
-          <TabsTrigger value="saved" data-testid="tab-saved-guides">My Guides</TabsTrigger>
+          <TabsTrigger value="guides" data-testid="tab-all-guides">All Guides</TabsTrigger>
           <TabsTrigger value="plants" data-testid="tab-plant-cards">
             <Leaf className="w-3.5 h-3.5 mr-1" />
             Plant Library
@@ -1168,7 +1160,6 @@ function CareLibrarySection({ onSelectGuide }: { onSelectGuide: (id: string) => 
         </TabsList>
       </Tabs>
 
-      {/* Search + filter row */}
       <div className="flex gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -1180,15 +1171,7 @@ function CareLibrarySection({ onSelectGuide }: { onSelectGuide: (id: string) => 
             data-testid="input-search-guides"
           />
         </div>
-        {tab !== "plants" ? (
-          <Select value={category} onValueChange={setCategory}>
-            <SelectTrigger className="w-48" data-testid="select-guide-category"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              {CARE_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        ) : (
+        {tab === "plants" && (
           <Select value={plantTypeFilter} onValueChange={setPlantTypeFilter}>
             <SelectTrigger className="w-44" data-testid="select-plant-type-hub"><SelectValue placeholder="All Types" /></SelectTrigger>
             <SelectContent>
@@ -1199,26 +1182,24 @@ function CareLibrarySection({ onSelectGuide }: { onSelectGuide: (id: string) => 
         )}
       </div>
 
-      {/* Guides tab */}
-      {tab !== "plants" && (
+      {tab === "guides" && (
         isLoading ? (
           <div className="grid md:grid-cols-2 gap-3">{[1, 2, 3, 4].map(i => <div key={i} className="h-32 bg-gray-200 rounded animate-pulse" />)}</div>
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={BookOpen}
-            title={tab === "saved" ? "No saved guides" : "No guides found"}
-            description={tab === "saved" ? "Bookmark guides to save them here for quick access." : "Try adjusting your search or category filter."}
+            title="No guides found"
+            description="Care guides will appear here once they're published."
           />
         ) : (
           <div className="grid md:grid-cols-2 gap-3">
-            {filtered.map((guide: any) => (
-              <GuideCard key={guide.id} guide={guide} onClick={() => onSelectGuide(guide.id)} />
+            {filtered.map((resource: any) => (
+              <GuideCard key={resource.id} guide={resource} onClick={() => onSelectGuide(resource.id)} />
             ))}
           </div>
         )
       )}
 
-      {/* Plant Cards tab */}
       {tab === "plants" && (
         plantsLoading ? (
           <div className="grid sm:grid-cols-2 gap-3">{[1, 2, 3, 4].map(i => <div key={i} className="h-40 bg-gray-200 rounded-lg animate-pulse" />)}</div>
@@ -1241,53 +1222,27 @@ function CareLibrarySection({ onSelectGuide }: { onSelectGuide: (id: string) => 
 }
 
 function GuideCard({ guide, onClick }: { guide: any; onClick: () => void }) {
-  const queryClient = useQueryClient();
-
-  const toggleSave = useMutation({
-    mutationFn: async () => {
-      if (guide.isSaved) {
-        await apiRequest("DELETE", `/api/customer-hub/care-guides/${guide.id}/save`);
-      } else {
-        await apiRequest("POST", `/api/customer-hub/care-guides/${guide.id}/save`);
-      }
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/customer-hub/care-guides"] }),
-  });
-
-  const categoryColors: Record<string, string> = {
-    "Hardscape & Patios": "bg-orange-100 text-orange-700",
-    "Plants & Landscape Beds": "bg-green-100 text-green-700",
-    "Lawn Care": "bg-emerald-100 text-emerald-700",
-    "Irrigation Systems": "bg-blue-100 text-blue-700",
-    "Outdoor Living Features": "bg-purple-100 text-purple-700",
-    "Seasonal Guides": "bg-amber-100 text-amber-700",
-    "Troubleshooting": "bg-red-100 text-red-700",
-    "Snow & Winter": "bg-cyan-100 text-cyan-700",
+  const seasonColors: Record<string, string> = {
+    Spring: "bg-green-100 text-green-700",
+    Summer: "bg-yellow-100 text-yellow-700",
+    Fall: "bg-orange-100 text-orange-700",
+    "Year-Round": "bg-blue-100 text-blue-700",
   };
 
   return (
-    <Card className="cursor-pointer hover:shadow-md transition-shadow" data-testid={`card-guide-${guide.id}`}>
+    <Card
+      className="cursor-pointer hover:shadow-md transition-shadow"
+      onClick={onClick}
+      data-testid={`card-guide-${guide.id}`}
+    >
       <CardContent className="p-4">
-        <div className="flex justify-between items-start">
-          <div className="flex-1" onClick={onClick}>
-            <Badge className={`text-xs ${categoryColors[guide.category] || "bg-gray-100 text-gray-700"}`}>
-              {guide.category}
-            </Badge>
-            <h3 className="font-semibold mt-2 text-sm" style={{ color: brandColors.darkGreen }}>{guide.title}</h3>
-            {guide.summary && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{guide.summary}</p>}
-          </div>
-          <button
-            onClick={e => { e.stopPropagation(); toggleSave.mutate(); }}
-            className="p-1 hover:bg-gray-100 rounded"
-            data-testid={`button-save-guide-${guide.id}`}
-          >
-            {guide.isSaved ? (
-              <BookmarkCheck className="h-5 w-5" style={{ color: brandColors.gold }} />
-            ) : (
-              <Bookmark className="h-5 w-5 text-gray-300" />
-            )}
-          </button>
-        </div>
+        {guide.season && guide.season !== "N/A" && (
+          <Badge className={`text-xs ${seasonColors[guide.season] || "bg-gray-100 text-gray-700"}`}>
+            {guide.season}
+          </Badge>
+        )}
+        <h3 className="font-semibold mt-2 text-sm" style={{ color: brandColors.darkGreen }}>{guide.title}</h3>
+        {guide.description && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{guide.description}</p>}
       </CardContent>
     </Card>
   );
@@ -1295,8 +1250,8 @@ function GuideCard({ guide, onClick }: { guide: any; onClick: () => void }) {
 
 function GuideDetail({ guideId, onBack }: { guideId: string; onBack: () => void }) {
   const { data: guide, isLoading } = useQuery({
-    queryKey: [`/api/customer-hub/care-guides/${guideId}`],
-    queryFn: async () => (await apiRequest("GET", `/api/customer-hub/care-guides/${guideId}`)).json(),
+    queryKey: [`/api/resources/${guideId}`],
+    queryFn: async () => (await apiRequest("GET", `/api/resources/${guideId}`)).json(),
   });
 
   if (isLoading) return <div className="animate-pulse"><div className="h-8 bg-gray-200 rounded w-64 mb-4" /><div className="h-96 bg-gray-200 rounded" /></div>;
@@ -1307,16 +1262,20 @@ function GuideDetail({ guideId, onBack }: { guideId: string; onBack: () => void 
       <button onClick={onBack} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
         <ArrowLeft className="h-4 w-4" /> Back to Care Library
       </button>
-      <Badge variant="outline">{guide.category}</Badge>
       <h2 className="text-xl font-bold" style={{ color: brandColors.darkGreen }}>{guide.title}</h2>
-      {guide.pdfUrl && (
-        <Button variant="outline" size="sm" onClick={() => window.open(guide.pdfUrl, "_blank")}>
-          <Download className="h-4 w-4 mr-1" /> Download PDF
+      {guide.fileUrl && (
+        <Button variant="outline" size="sm" onClick={() => window.open(guide.fileUrl, "_blank")}>
+          <Download className="h-4 w-4 mr-1" /> Download File
         </Button>
       )}
-      <div className="prose prose-sm max-w-none text-gray-700 whitespace-pre-wrap leading-relaxed">
-        {guide.content}
-      </div>
+      {guide.description && (
+        <p className="text-sm text-gray-500 italic">{guide.description}</p>
+      )}
+      {guide.content && (
+        <div className="prose prose-sm max-w-none text-gray-700 whitespace-pre-wrap leading-relaxed">
+          {guide.content}
+        </div>
+      )}
     </div>
   );
 }
