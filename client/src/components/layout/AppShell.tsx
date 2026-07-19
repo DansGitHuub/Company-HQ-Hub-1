@@ -373,10 +373,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     todos: { icon: CheckSquare, label: t("nav.tasks"), href: "/todos" },
     hiring: { icon: Users, label: t("nav.hiring"), href: "/hiring" },
     employees: { icon: User, label: t("nav.employees"), href: "/employees" },
-    vendors: { icon: Building2, label: "Vendors", href: "/vendors" },
+    vendors: { icon: Building2, label: t("nav.vendors"), href: "/vendors" },
     my_profile: { icon: User, label: t("nav.myProfile"), href: "/employees/me" },
     jobs: { icon: Briefcase, label: t("nav.jobs"), href: "/jobs" },
-    scheduling: { icon: CalendarCheck, label: t("nav.scheduling"), href: "/scheduling" },
+    scheduling: { icon: CalendarCheck, label: t("nav.dispatchBoard"), href: "/scheduling" },
     my_day: { icon: Sun, label: t("nav.myDay"), href: "/my-day" },
     my_hours: { icon: Clock, label: t("nav.myHours"), href: "/my-hours" },
     estimates: { icon: Calculator, label: t("nav.estimates"), href: "/estimates" },
@@ -394,24 +394,22 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     marketing: { icon: Megaphone, label: t("nav.marketing"), href: "/marketing" },
     forms: { icon: FileText, label: t("nav.forms"), href: "/forms" },
     inbox: { icon: Mail, label: "Customer Inbox", href: "/inbox" },
-    messages: { icon: MessageSquare, label: "Messages", href: "/messages" },
-    customer_messages: { icon: MessageSquare, label: "Customer Messages", href: "/customer-messages" },
-    customer_blasts: { icon: Megaphone, label: "Customer Blasts", href: "/customer-blasts" },
+    messages: { icon: MessageSquare, label: t("nav.messages"), href: "/messages" },
+    customer_messages: { icon: MessageSquare, label: t("nav.customerMessages"), href: "/customer-messages" },
+    customer_blasts: { icon: Megaphone, label: t("nav.customerBlasts"), href: "/customer-blasts" },
     admin: { icon: Shield, label: t("nav.adminPanel"), href: "/admin" },
-  time_reports: { icon: ClipboardList, label: t("nav.timeReports"), href: "/admin/time-reports" },
-  worksheet_review: { icon: ClipboardList, label: t("nav.worksheetReview"), href: "/admin/worksheet-review" },
-  time_card_approval: { icon: CheckSquare, label: t("nav.timeCardApproval"), href: "/admin/time-card-approval" },
+    time_card_approval: { icon: CheckSquare, label: t("nav.timeCardApproval"), href: "/admin/time-card-approval" },
     time_admin: { icon: Clock, label: t("nav.timeAdmin"), href: "/admin/time" },
     catalog: { icon: BookMarked, label: t("nav.catalog"), href: "/catalog" },
     plant_cards: { icon: Leaf, label: "Plant Library", href: "/plant-cards" },
-    work_orders: { icon: HardHat, label: "Work Orders", href: "/work-orders" },
+    work_orders: { icon: HardHat, label: t("nav.workOrders"), href: "/work-orders" },
     calendar: { icon: Calendar, label: t("nav.calendar"), href: "/calendar" },
     budget_settings: { icon: DollarSign, label: t("nav.budgetPricing"), href: "/mors-budget" },
     tools: { icon: Snowflake, label: t("nav.tools"), href: "/tools" },
-  plow_mapper: { icon: Snowflake, label: t("nav.plowMapper"), href: "/tools/plow-mapper" },
-  maintenance_routes: { icon: Route, label: "Maintenance Routes", href: "/maintenance-routes" },
-  manager_dashboard: { icon: BarChart2, label: "Manager Dashboard", href: "/manager-dashboard" },
-  daily_plan: { icon: CalendarDays, label: "Daily Plan", href: "/daily-plan" },
+    plow_mapper: { icon: Snowflake, label: t("nav.plowMapper"), href: "/tools/plow-mapper" },
+    maintenance_routes: { icon: Route, label: t("nav.maintenanceRoutes"), href: "/maintenance-routes" },
+    manager_dashboard: { icon: BarChart2, label: t("nav.managerDashboard"), href: "/manager-dashboard" },
+    day_briefing: { icon: CalendarDays, label: t("nav.dayBriefing"), href: "/daily-plan" },
   };
 
   type NavSection = { label: string; items: string[] };
@@ -419,35 +417,49 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const sectionLabels: Record<string, string> = {
     "MY SPACE": t("nav.sections.mySpace"),
     "SALES": t("nav.sections.sales"),
-    "OPERATIONS": t("nav.sections.operations"),
-    "RESOURCES": t("nav.sections.resources"),
+    "WORK": t("nav.sections.work"),
+    "FINANCE": t("nav.sections.finance"),
+    "PEOPLE": t("nav.sections.people"),
+    "COMPANY": t("nav.sections.company"),
+    "SETTINGS & SYSTEM": t("nav.sections.settingsSystem"),
     "ADMIN": t("nav.sections.admin"),
   };
 
   const sidebarSections: NavSection[] = [
-    { label: "MY SPACE", items: ["home", "my_hours", "my_day", "messages"] },
-    { label: "SALES", items: ["customers", "consultations", "estimates", "jobs"] },
-    { label: "OPERATIONS", items: ["manager_dashboard", "todos", "work_orders", "daily_plan", "scheduling", "maintenance_routes", "time_tracking", "equipment"] },
-    { label: "RESOURCES", items: ["sops", "education", "testing", "tools"] },
-    { label: "ADMIN", items: ["admin", "employees", "vendors", "hiring", "invoices", "reports", "budget_settings", "customer_messages", "customer_blasts"] },
+    { label: "MY SPACE", items: ["home", "my_hours", "my_day", "messages", "todos"] },
+    { label: "SALES", items: ["customers", "consultations", "estimates"] },
+    { label: "WORK", items: ["jobs", "manager_dashboard", "work_orders", "day_briefing", "scheduling", "maintenance_routes", "time_tracking", "equipment"] },
+    { label: "FINANCE", items: ["invoices", "reports"] },
+    { label: "PEOPLE", items: ["employees", "hiring"] },
+    { label: "COMPANY", items: ["sops", "education", "testing", "tools", "vendors"] },
+    { label: "SETTINGS & SYSTEM", items: ["budget_settings"] },
+    { label: "ADMIN", items: ["admin", "customer_messages", "customer_blasts"] },
   ];
 
   const getSectionsForRole = (role: string): NavSection[] => {
     const isAdmin = role === "Admin" || (user as any)?.isMasterAdmin;
     const isManager = role === "Manager";
     if (!isAdmin) {
-      const base = sidebarSections.filter(s => s.label !== "ADMIN");
+      const adminOnlySections = ["FINANCE", "PEOPLE", "SETTINGS & SYSTEM", "ADMIN"];
+      const base = sidebarSections.filter(s => !adminOnlySections.includes(s.label));
       if (!isManager) {
-        // Crew (and other non-manager roles): hide Work Orders, Manager Dashboard,
-        // and Daily Plan from OPERATIONS, and hide Customers/Consultations/Estimates from SALES.
+        // Crew: hide Work Orders, Manager Dashboard, Day Briefing from WORK,
+        // hide Customers/Consultations/Estimates from SALES,
+        // hide Vendors from COMPANY, and drop any resulting empty sections.
         return base
           .map(s => {
-            if (s.label === "OPERATIONS") return { ...s, items: s.items.filter(i => !["work_orders", "manager_dashboard", "daily_plan"].includes(i)) };
+            if (s.label === "WORK") return { ...s, items: s.items.filter(i => !["work_orders", "manager_dashboard", "day_briefing"].includes(i)) };
             if (s.label === "SALES") return { ...s, items: s.items.filter(i => !["customers", "consultations", "estimates"].includes(i)) };
+            if (s.label === "COMPANY") return { ...s, items: s.items.filter(i => i !== "vendors") };
             return s;
-          });
+          })
+          .filter(s => s.items.length > 0);
       }
-      return base;
+      // Manager: filter vendors from COMPANY (vendors was Admin-only before)
+      return base.map(s => {
+        if (s.label === "COMPANY") return { ...s, items: s.items.filter(i => i !== "vendors") };
+        return s;
+      });
     }
     return sidebarSections;
   };
@@ -493,9 +505,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       todos: tNav("nav.tasks"),
       hiring: tNav("nav.hiring"),
       employees: tNav("nav.employees"),
+      vendors: tNav("nav.vendors"),
       my_profile: tNav("nav.myProfile"),
       jobs: tNav("nav.jobs"),
-      scheduling: tNav("nav.scheduling"),
+      scheduling: tNav("nav.dispatchBoard"),
+      day_briefing: tNav("nav.dayBriefing"),
       my_day: tNav("nav.myDay"),
       my_hours: tNav("nav.myHours"),
       estimates: tNav("nav.estimates"),
@@ -512,13 +526,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       marketing: tNav("nav.marketing"),
       forms: tNav("nav.forms"),
       inbox: "Customer Inbox",
-      messages: "Messages",
+      messages: tNav("nav.messages"),
+      customer_messages: tNav("nav.customerMessages"),
+      customer_blasts: tNav("nav.customerBlasts"),
       admin: tNav("nav.adminPanel"),
-      time_reports: tNav("nav.timeReports"),
-      worksheet_review: tNav("nav.worksheetReview"),
       time_card_approval: tNav("nav.timeCardApproval"),
       catalog: tNav("nav.catalog"),
-      work_orders: "Work Orders",
+      work_orders: tNav("nav.workOrders"),
+      maintenance_routes: tNav("nav.maintenanceRoutes"),
+      manager_dashboard: tNav("nav.managerDashboard"),
       budget_settings: tNav("nav.budgetPricing"),
       tools: tNav("nav.tools"),
       plow_mapper: tNav("nav.plowMapper"),
@@ -527,8 +543,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     const navSectionLabels: Record<string, string> = React.useMemo(() => ({
       "MY SPACE": tNav("nav.sections.mySpace"),
       "SALES": tNav("nav.sections.sales"),
-      "OPERATIONS": tNav("nav.sections.operations"),
-      "RESOURCES": tNav("nav.sections.resources"),
+      "WORK": tNav("nav.sections.work"),
+      "FINANCE": tNav("nav.sections.finance"),
+      "PEOPLE": tNav("nav.sections.people"),
+      "COMPANY": tNav("nav.sections.company"),
+      "SETTINGS & SYSTEM": tNav("nav.sections.settingsSystem"),
       "ADMIN": tNav("nav.sections.admin"),
     }), [currentLang]);
     

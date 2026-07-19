@@ -49,16 +49,26 @@
     "catalog": "Catálogo de Artículos",
     "budgetPricing": "Presupuesto y Precios",
     "sections": {
-      "work": "VENTAS",
-      "people": "PERSONAS",
-      "company": "EMPRESA",
+      "work": "Trabajo",
+      "people": "Personas",
+      "company": "Empresa",
       "admin": "Admin",
       "mySpace": "Mi Espacio",
       "sales": "Ventas",
       "operations": "Operaciones",
-      "resources": "Recursos"
+      "resources": "Recursos",
+      "finance": "Finanzas",
+      "settingsSystem": "Configuración y Sistema"
     },
-    "timeAdmin": "Administración de Tiempo"
+    "timeAdmin": "Administración de Tiempo",
+    "dispatchBoard": "Panel de Despacho",
+    "dayBriefing": "Resumen del Día",
+    "vendors": "Proveedores",
+    "workOrders": "Órdenes de Trabajo",
+    "maintenanceRoutes": "Rutas de Mantenimiento",
+    "managerDashboard": "Panel del Gerente",
+    "customerMessages": "Mensajes al Cliente",
+    "customerBlasts": "Mensajes Masivos"
   },
   "common": {
     "save": "Guardar",

@@ -49,16 +49,26 @@
     "catalog": "Item Catalog",
     "budgetPricing": "Budget & Pricing",
     "sections": {
-      "work": "SALES",
-      "people": "PEOPLE",
-      "company": "COMPANY",
+      "work": "Work",
+      "people": "People",
+      "company": "Company",
       "admin": "Admin",
       "mySpace": "My Space",
       "sales": "Sales",
       "operations": "Operations",
-      "resources": "Resources"
+      "resources": "Resources",
+      "finance": "Finance",
+      "settingsSystem": "Settings & System"
     },
-    "timeAdmin": "Time Admin"
+    "timeAdmin": "Time Admin",
+    "dispatchBoard": "Dispatch Board",
+    "dayBriefing": "Day Briefing",
+    "vendors": "Vendors",
+    "workOrders": "Work Orders",
+    "maintenanceRoutes": "Maintenance Routes",
+    "managerDashboard": "Manager Dashboard",
+    "customerMessages": "Customer Messages",
+    "customerBlasts": "Customer Blasts"
   },
   "common": {
     "save": "Save",
