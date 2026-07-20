@@ -1,16 +1,7 @@
 import { useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/hooks/use-auth";
-import {
-  BookOpen,
-  Zap,
-  FolderOpen,
-  ExternalLink,
-  GraduationCap,
-  Brain,
-  Wrench,
-  Building2,
-} from "lucide-react";
+import { BookOpen, Zap, FolderOpen, ExternalLink, GraduationCap, Brain, Wrench, Building2 } from "lucide-react";
 
 type CompanyCard = {
   id: string;

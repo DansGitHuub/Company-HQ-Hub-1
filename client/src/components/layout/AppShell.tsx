@@ -424,6 +424,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     document_library: { icon: FolderOpen, label: t("nav.documentLibrary"), href: "/admin/documents" },
     shared_links: { icon: ExternalLink, label: t("nav.sharedLinks"), href: "/admin/shared-links" },
     company_hub: { icon: Building2, label: t("nav.companyHub"), href: "/company" },
+    settings_hub: { icon: Shield, label: t("nav.settingsAndSystem"), href: "/settings-system" },
   };
 
   type NavSection = { label: string; items: string[] };
@@ -445,7 +446,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     { label: "FINANCE", items: ["invoices", "reports", "qbo_export"] },
     { label: "PEOPLE", items: ["employees", "hiring", "user_management", "access_requests", "agreement_templates"] },
     { label: "COMPANY", items: ["company_hub"] },
-    { label: "SETTINGS & SYSTEM", items: ["budget_settings", "admin"] },
+    { label: "SETTINGS & SYSTEM", items: ["settings_hub"] },
   ];
 
   const getSectionsForRole = (role: string): NavSection[] => {
@@ -489,6 +490,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     : displaySections.flatMap(s => s.items.filter(id => internalNavItems[id]).map(id => ({ id, ...internalNavItems[id] })));
 
   const getIsActive = (item: { id: string; href: string }) => {
+    if (item.id === "settings_hub") {
+      return (
+        location === "/settings-system" ||
+        location === "/admin" ||
+        location.startsWith("/admin/") ||
+        location === "/mors-budget"
+      );
+    }
     if (item.id === "company_hub") {
       const companyPaths = ["/company", "/sops", "/training", "/customer-resources", "/tools", "/vendors", "/admin/sop-pipeline", "/admin/documents", "/admin/shared-links"];
       return companyPaths.some(p => location === p || location.startsWith(p + "/"));
@@ -562,6 +571,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       document_library: tNav("nav.documentLibrary"),
       shared_links: tNav("nav.sharedLinks"),
       company_hub: tNav("nav.companyHub"),
+      settings_hub: tNav("nav.settingsAndSystem"),
     }), [currentLang]);
 
     const navSectionLabels: Record<string, string> = React.useMemo(() => ({

@@ -32,6 +32,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/customer-resources": "Customer Resources",
   "/training": "Training & Knowledge",
   "/admin": "Settings & System",
+  "/settings-system": "Settings & System",
   "/company": "Company",
   "/employees": "Employees",
   "/hiring": "Hiring",
@@ -77,6 +78,7 @@ function DocumentTitleSetter() {
 import Home from "@/pages/Home";
 import AuthPage from "@/pages/auth-page";
 import AdminPanel from "@/pages/AdminPanel";
+import SettingsSystemHub from "@/pages/SettingsSystemHub";
 import CustomerMessagesInbox from "@/pages/CustomerMessagesInbox";
 import CustomerBlasts from "@/pages/CustomerBlasts";
 import CustomerHub from "@/pages/CustomerHub";
@@ -301,6 +303,7 @@ function AppRoutes() {
         </Route>
         <Route path="/customer-hub/:section?" component={CustomerHub} />
         <Route path="/applicant" component={ApplicantPortal} />
+        <ProtectedRoute path="/settings-system" component={SettingsSystemHub} allowedRoles={ADMIN_ONLY} />
         <ProtectedRoute path="/admin" component={AdminPanel} allowedRoles={ADMIN_ONLY} />
         <Route path="/sops" component={SOPs} />
         <Route path="/materials"><Redirect to="/catalog" /></Route>
