@@ -426,6 +426,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     company_hub: { icon: Building2, label: t("nav.companyHub"), href: "/company" },
     settings_hub: { icon: Shield, label: t("nav.settingsAndSystem"), href: "/settings-system" },
     finance_hub: { icon: DollarSign, label: t("nav.financeHub"), href: "/finance" },
+    people_hub: { icon: Users, label: t("nav.peopleHub"), href: "/people" },
   };
 
   type NavSection = { label: string; items: string[] };
@@ -445,7 +446,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     { label: "SALES", items: ["customers", "consultations", "estimates", "customer_messages", "customer_blasts"] },
     { label: "WORK", items: ["jobs", "manager_dashboard", "work_orders", "day_briefing", "scheduling", "maintenance_routes", "time_admin", "maintenance_reports", "time_tracking", "equipment"] },
     { label: "FINANCE", items: ["finance_hub"] },
-    { label: "PEOPLE", items: ["employees", "hiring", "user_management", "access_requests", "agreement_templates"] },
+    { label: "PEOPLE", items: ["people_hub"] },
     { label: "COMPANY", items: ["company_hub"] },
     { label: "SETTINGS & SYSTEM", items: ["settings_hub"] },
   ];
@@ -506,6 +507,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     if (item.id === "finance_hub") {
       const financePaths = ["/finance", "/invoices", "/reports", "/admin/qbo-export"];
       return financePaths.some(p => location === p || location.startsWith(p + "/"));
+    }
+    if (item.id === "people_hub") {
+      const peoplePaths = ["/people", "/employees", "/hiring", "/admin/users", "/admin/access-requests", "/admin/agreements"];
+      return peoplePaths.some(p => location === p || location.startsWith(p + "/"));
     }
     if (item.href === "/tools" && item.id === "tools") {
       return location.startsWith("/tools");
@@ -578,6 +583,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       company_hub: tNav("nav.companyHub"),
       settings_hub: tNav("nav.settingsAndSystem"),
       finance_hub: tNav("nav.financeHub"),
+      people_hub: tNav("nav.peopleHub"),
     }), [currentLang]);
 
     const navSectionLabels: Record<string, string> = React.useMemo(() => ({

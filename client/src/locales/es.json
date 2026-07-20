@@ -79,7 +79,35 @@
     "sharedLinks": "Vínculos Externos",
     "maintenanceReports": "Reportes de Mantenimiento",
     "companyHub": "Empresa",
-    "financeHub": "Finanzas"
+    "financeHub": "Finanzas",
+    "peopleHub": "Personas"
+  },
+  "peopleHub": {
+    "title": "Personas",
+    "subtitle": "Empleados, contratación y gestión de acceso.",
+    "noAccess": "No tienes acceso a las herramientas de Personas.",
+    "cards": {
+      "employees": {
+        "name": "Empleados",
+        "desc": "Registros de empleados, perfiles y gestión de RRHH."
+      },
+      "hiring": {
+        "name": "Contratación",
+        "desc": "Pipeline de candidatos, entrevistas, ofertas y onboarding."
+      },
+      "userManagement": {
+        "name": "Gestión de Usuarios",
+        "desc": "Administra cuentas del sistema, roles y permisos."
+      },
+      "accessRequests": {
+        "name": "Solicitudes de Acceso",
+        "desc": "Revisa y aprueba solicitudes de acceso pendientes."
+      },
+      "agreementTemplates": {
+        "name": "Plantillas de Acuerdo",
+        "desc": "Plantillas de acuerdos por puesto y firma digital."
+      }
+    }
   },
   "financeHub": {
     "title": "Finanzas",

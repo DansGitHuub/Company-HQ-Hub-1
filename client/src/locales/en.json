@@ -79,7 +79,35 @@
     "sharedLinks": "External Share Links",
     "maintenanceReports": "Maintenance Reports",
     "companyHub": "Company",
-    "financeHub": "Finance"
+    "financeHub": "Finance",
+    "peopleHub": "People"
+  },
+  "peopleHub": {
+    "title": "People",
+    "subtitle": "Employees, hiring, and access management.",
+    "noAccess": "You don't have access to People tools.",
+    "cards": {
+      "employees": {
+        "name": "Employees",
+        "desc": "Employee records, profiles, and HR management."
+      },
+      "hiring": {
+        "name": "Hiring",
+        "desc": "Applicant pipeline, interviews, offers, and onboarding."
+      },
+      "userManagement": {
+        "name": "User Management",
+        "desc": "Manage system accounts, roles, and permissions."
+      },
+      "accessRequests": {
+        "name": "Access Requests",
+        "desc": "Review and approve pending account access requests."
+      },
+      "agreementTemplates": {
+        "name": "Agreement Templates",
+        "desc": "Position-based agreement templates and digital signing."
+      }
+    }
   },
   "financeHub": {
     "title": "Finance",
