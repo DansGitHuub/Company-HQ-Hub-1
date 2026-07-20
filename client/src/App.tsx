@@ -34,6 +34,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/admin": "Settings & System",
   "/settings-system": "Settings & System",
   "/company": "Company",
+  "/finance": "Finance",
   "/employees": "Employees",
   "/hiring": "Hiring",
   "/invoices": "Invoices",
@@ -96,6 +97,7 @@ import VendorsImport from "@/pages/VendorsImport";
 import FormHub from "@/pages/FormHub";
 import JobList from "@/pages/jobs/index";
 import JobDetail from "@/pages/jobs/show";
+import FinanceHub from "@/pages/FinanceHub";
 import InvoiceList from "@/pages/invoices/index";
 import InvoiceDetail from "@/pages/invoices/show";
 import EstimateList from "@/pages/estimates/index";
@@ -327,6 +329,7 @@ function AppRoutes() {
         <Route path="/hq"><Redirect to="/?tab=company-hq" /></Route>
         <ProtectedRoute path="/jobs" component={JobList} allowedRoles={STAFF_ROLES} />
         <ProtectedRoute path="/jobs/:id" component={JobDetail} allowedRoles={STAFF_ROLES} />
+        <ProtectedRoute path="/finance" component={FinanceHub} allowedRoles={ADMIN_OR_MANAGER} />
         <ProtectedRoute path="/invoices" component={InvoiceList} allowedRoles={ADMIN_OR_MANAGER} />
         <ProtectedRoute path="/invoices/:id" component={InvoiceDetail} allowedRoles={ADMIN_OR_MANAGER} />
         <ProtectedRoute path="/estimates" component={EstimateList} allowedRoles={ADMIN_OR_MANAGER} />

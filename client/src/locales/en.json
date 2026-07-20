@@ -78,7 +78,27 @@
     "documentLibrary": "Document Library",
     "sharedLinks": "External Share Links",
     "maintenanceReports": "Maintenance Reports",
-    "companyHub": "Company"
+    "companyHub": "Company",
+    "financeHub": "Finance"
+  },
+  "financeHub": {
+    "title": "Finance",
+    "subtitle": "Invoices, reports, and financial exports.",
+    "noAccess": "You don't have access to Finance tools.",
+    "cards": {
+      "invoices": {
+        "name": "Invoices",
+        "desc": "Create, send, and manage customer invoices."
+      },
+      "reports": {
+        "name": "Reports",
+        "desc": "Revenue, job costing, crew hours, and business analytics."
+      },
+      "qboExport": {
+        "name": "QuickBooks Export",
+        "desc": "Review and export time entries to QuickBooks Online."
+      }
+    }
   },
   "companyHub": {
     "title": "Company",

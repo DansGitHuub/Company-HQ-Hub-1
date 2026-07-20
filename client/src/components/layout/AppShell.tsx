@@ -425,6 +425,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     shared_links: { icon: ExternalLink, label: t("nav.sharedLinks"), href: "/admin/shared-links" },
     company_hub: { icon: Building2, label: t("nav.companyHub"), href: "/company" },
     settings_hub: { icon: Shield, label: t("nav.settingsAndSystem"), href: "/settings-system" },
+    finance_hub: { icon: DollarSign, label: t("nav.financeHub"), href: "/finance" },
   };
 
   type NavSection = { label: string; items: string[] };
@@ -443,7 +444,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     { label: "MY SPACE", items: ["home", "my_hours", "my_day", "messages", "todos"] },
     { label: "SALES", items: ["customers", "consultations", "estimates", "customer_messages", "customer_blasts"] },
     { label: "WORK", items: ["jobs", "manager_dashboard", "work_orders", "day_briefing", "scheduling", "maintenance_routes", "time_admin", "maintenance_reports", "time_tracking", "equipment"] },
-    { label: "FINANCE", items: ["invoices", "reports", "qbo_export"] },
+    { label: "FINANCE", items: ["finance_hub"] },
     { label: "PEOPLE", items: ["employees", "hiring", "user_management", "access_requests", "agreement_templates"] },
     { label: "COMPANY", items: ["company_hub"] },
     { label: "SETTINGS & SYSTEM", items: ["settings_hub"] },
@@ -453,7 +454,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     const isAdmin = role === "Admin" || (user as any)?.isMasterAdmin;
     const isManager = role === "Manager";
     if (!isAdmin) {
-      const adminOnlySections = ["FINANCE", "PEOPLE", "SETTINGS & SYSTEM"];
+      const adminOnlySections = ["PEOPLE", "SETTINGS & SYSTEM"];
       const base = sidebarSections.filter(s => !adminOnlySections.includes(s.label));
       if (!isManager) {
         // Crew: hide admin-only items from visible sections
@@ -501,6 +502,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     if (item.id === "company_hub") {
       const companyPaths = ["/company", "/sops", "/training", "/customer-resources", "/tools", "/vendors", "/admin/sop-pipeline", "/admin/documents", "/admin/shared-links"];
       return companyPaths.some(p => location === p || location.startsWith(p + "/"));
+    }
+    if (item.id === "finance_hub") {
+      const financePaths = ["/finance", "/invoices", "/reports", "/admin/qbo-export"];
+      return financePaths.some(p => location === p || location.startsWith(p + "/"));
     }
     if (item.href === "/tools" && item.id === "tools") {
       return location.startsWith("/tools");
@@ -572,6 +577,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       shared_links: tNav("nav.sharedLinks"),
       company_hub: tNav("nav.companyHub"),
       settings_hub: tNav("nav.settingsAndSystem"),
+      finance_hub: tNav("nav.financeHub"),
     }), [currentLang]);
 
     const navSectionLabels: Record<string, string> = React.useMemo(() => ({

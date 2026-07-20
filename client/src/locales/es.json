@@ -78,7 +78,27 @@
     "documentLibrary": "Biblioteca de Documentos",
     "sharedLinks": "Vínculos Externos",
     "maintenanceReports": "Reportes de Mantenimiento",
-    "companyHub": "Empresa"
+    "companyHub": "Empresa",
+    "financeHub": "Finanzas"
+  },
+  "financeHub": {
+    "title": "Finanzas",
+    "subtitle": "Facturas, reportes y exportaciones financieras.",
+    "noAccess": "No tienes acceso a las herramientas de Finanzas.",
+    "cards": {
+      "invoices": {
+        "name": "Facturas",
+        "desc": "Crea, envía y administra facturas de clientes."
+      },
+      "reports": {
+        "name": "Reportes",
+        "desc": "Ingresos, costos de trabajo, horas de cuadrilla y analíticas."
+      },
+      "qboExport": {
+        "name": "Exportar a QuickBooks",
+        "desc": "Revisa y exporta entradas de tiempo a QuickBooks Online."
+      }
+    }
   },
   "companyHub": {
     "title": "Empresa",
