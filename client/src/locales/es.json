@@ -68,7 +68,16 @@
     "maintenanceRoutes": "Rutas de Mantenimiento",
     "managerDashboard": "Panel del Gerente",
     "customerMessages": "Mensajes al Cliente",
-    "customerBlasts": "Mensajes Masivos"
+    "customerBlasts": "Mensajes Masivos",
+    "settingsAndSystem": "Configuración y Sistema",
+    "userManagement": "Gestión de Usuarios",
+    "accessRequests": "Solicitudes de Acceso",
+    "agreementTemplates": "Plantillas de Acuerdos",
+    "qboExport": "Exportación a QuickBooks",
+    "sopPipeline": "Canal de POE",
+    "documentLibrary": "Biblioteca de Documentos",
+    "sharedLinks": "Vínculos Externos",
+    "maintenanceReports": "Reportes de Mantenimiento"
   },
   "common": {
     "save": "Guardar",

@@ -168,7 +168,7 @@ const MODULES: ModuleInfo[] = [
     issues: ["Uses hardcoded demo data — not connected to database", "No create/edit/delete for campaigns", "Needs real CRUD operations"],
   },
   {
-    id: "admin", name: "Admin Panel", icon: Shield, status: "operational",
+    id: "admin", name: "Settings & System", icon: Shield, status: "operational",
     section: "system",
     description: "Central administration with user management, branding, AI agents, and diagnostics.",
     capabilities: ["User management", "Role assignment", "Company branding", "Sidebar ordering", "AI agent management", "Suggestion review", "System diagnostics (Master Admin)"],

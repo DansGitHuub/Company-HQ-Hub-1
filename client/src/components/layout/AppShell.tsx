@@ -62,6 +62,11 @@ import {
   Route,
   MoreHorizontal,
   Mic,
+  ExternalLink,
+  FolderOpen,
+  FileSignature,
+  Upload,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -192,9 +197,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       tips: ["Coming soon", "Connect business tools", "Sync data automatically"]
     },
     admin: {
-      title: t("nav.adminPanel"),
-      description: "Manage users, approve access requests, and configure settings.",
-      tips: ["Create user accounts", "Approve role requests", "Company branding"]
+      title: t("nav.settingsAndSystem"),
+      description: "Configure company settings, automation, integrations, and system health.",
+      tips: ["Company branding & divisions", "Business rules & automation", "System status & diagnostics"]
     },
     tools: {
       title: t("nav.tools"),
@@ -397,9 +402,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     messages: { icon: MessageSquare, label: t("nav.messages"), href: "/messages" },
     customer_messages: { icon: MessageSquare, label: t("nav.customerMessages"), href: "/customer-messages" },
     customer_blasts: { icon: Megaphone, label: t("nav.customerBlasts"), href: "/customer-blasts" },
-    admin: { icon: Shield, label: t("nav.adminPanel"), href: "/admin" },
+    admin: { icon: Shield, label: t("nav.settingsAndSystem"), href: "/admin" },
     time_card_approval: { icon: CheckSquare, label: t("nav.timeCardApproval"), href: "/admin/time-card-approval" },
     time_admin: { icon: Clock, label: t("nav.timeAdmin"), href: "/admin/time" },
+    maintenance_reports: { icon: ClipboardList, label: t("nav.maintenanceReports"), href: "/admin/maintenance-reports" },
     catalog: { icon: BookMarked, label: t("nav.catalog"), href: "/catalog" },
     plant_cards: { icon: Leaf, label: "Plant Library", href: "/plant-cards" },
     work_orders: { icon: HardHat, label: t("nav.workOrders"), href: "/work-orders" },
@@ -410,6 +416,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     maintenance_routes: { icon: Route, label: t("nav.maintenanceRoutes"), href: "/maintenance-routes" },
     manager_dashboard: { icon: BarChart2, label: t("nav.managerDashboard"), href: "/manager-dashboard" },
     day_briefing: { icon: CalendarDays, label: t("nav.dayBriefing"), href: "/daily-plan" },
+    user_management: { icon: Users, label: t("nav.userManagement"), href: "/admin/users" },
+    access_requests: { icon: Shield, label: t("nav.accessRequests"), href: "/admin/access-requests" },
+    agreement_templates: { icon: FileSignature, label: t("nav.agreementTemplates"), href: "/admin/agreements" },
+    qbo_export: { icon: Upload, label: t("nav.qboExport"), href: "/admin/qbo-export" },
+    sop_pipeline: { icon: Zap, label: t("nav.sopPipeline"), href: "/admin/sop-pipeline" },
+    document_library: { icon: FolderOpen, label: t("nav.documentLibrary"), href: "/admin/documents" },
+    shared_links: { icon: ExternalLink, label: t("nav.sharedLinks"), href: "/admin/shared-links" },
   };
 
   type NavSection = { label: string; items: string[] };
@@ -422,42 +435,40 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     "PEOPLE": t("nav.sections.people"),
     "COMPANY": t("nav.sections.company"),
     "SETTINGS & SYSTEM": t("nav.sections.settingsSystem"),
-    "ADMIN": t("nav.sections.admin"),
   };
 
   const sidebarSections: NavSection[] = [
     { label: "MY SPACE", items: ["home", "my_hours", "my_day", "messages", "todos"] },
-    { label: "SALES", items: ["customers", "consultations", "estimates"] },
-    { label: "WORK", items: ["jobs", "manager_dashboard", "work_orders", "day_briefing", "scheduling", "maintenance_routes", "time_tracking", "equipment"] },
-    { label: "FINANCE", items: ["invoices", "reports"] },
-    { label: "PEOPLE", items: ["employees", "hiring"] },
-    { label: "COMPANY", items: ["sops", "education", "testing", "tools", "vendors"] },
-    { label: "SETTINGS & SYSTEM", items: ["budget_settings"] },
-    { label: "ADMIN", items: ["admin", "customer_messages", "customer_blasts"] },
+    { label: "SALES", items: ["customers", "consultations", "estimates", "customer_messages", "customer_blasts"] },
+    { label: "WORK", items: ["jobs", "manager_dashboard", "work_orders", "day_briefing", "scheduling", "maintenance_routes", "time_admin", "maintenance_reports", "time_tracking", "equipment"] },
+    { label: "FINANCE", items: ["invoices", "reports", "qbo_export"] },
+    { label: "PEOPLE", items: ["employees", "hiring", "user_management", "access_requests", "agreement_templates"] },
+    { label: "COMPANY", items: ["sops", "sop_pipeline", "document_library", "shared_links", "education", "testing", "tools", "vendors"] },
+    { label: "SETTINGS & SYSTEM", items: ["budget_settings", "admin"] },
   ];
 
   const getSectionsForRole = (role: string): NavSection[] => {
     const isAdmin = role === "Admin" || (user as any)?.isMasterAdmin;
     const isManager = role === "Manager";
     if (!isAdmin) {
-      const adminOnlySections = ["FINANCE", "PEOPLE", "SETTINGS & SYSTEM", "ADMIN"];
+      const adminOnlySections = ["FINANCE", "PEOPLE", "SETTINGS & SYSTEM"];
       const base = sidebarSections.filter(s => !adminOnlySections.includes(s.label));
       if (!isManager) {
-        // Crew: hide Work Orders, Manager Dashboard, Day Briefing from WORK,
-        // hide Customers/Consultations/Estimates from SALES,
-        // hide Vendors from COMPANY, and drop any resulting empty sections.
+        // Crew: hide admin-only items from visible sections
         return base
           .map(s => {
-            if (s.label === "WORK") return { ...s, items: s.items.filter(i => !["work_orders", "manager_dashboard", "day_briefing"].includes(i)) };
-            if (s.label === "SALES") return { ...s, items: s.items.filter(i => !["customers", "consultations", "estimates"].includes(i)) };
-            if (s.label === "COMPANY") return { ...s, items: s.items.filter(i => i !== "vendors") };
+            if (s.label === "WORK") return { ...s, items: s.items.filter(i => !["work_orders", "manager_dashboard", "day_briefing", "time_admin", "maintenance_reports"].includes(i)) };
+            if (s.label === "SALES") return { ...s, items: s.items.filter(i => !["customers", "consultations", "estimates", "customer_messages", "customer_blasts"].includes(i)) };
+            if (s.label === "COMPANY") return { ...s, items: s.items.filter(i => !["vendors", "sop_pipeline", "document_library", "shared_links"].includes(i)) };
             return s;
           })
           .filter(s => s.items.length > 0);
       }
-      // Manager: filter vendors from COMPANY (vendors was Admin-only before)
+      // Manager: hide strictly-admin items from visible sections
       return base.map(s => {
-        if (s.label === "COMPANY") return { ...s, items: s.items.filter(i => i !== "vendors") };
+        if (s.label === "WORK") return { ...s, items: s.items.filter(i => i !== "time_admin") };
+        if (s.label === "SALES") return { ...s, items: s.items.filter(i => !["customer_messages", "customer_blasts"].includes(i)) };
+        if (s.label === "COMPANY") return { ...s, items: s.items.filter(i => !["vendors", "sop_pipeline", "document_library", "shared_links"].includes(i)) };
         return s;
       });
     }
@@ -529,8 +540,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       messages: tNav("nav.messages"),
       customer_messages: tNav("nav.customerMessages"),
       customer_blasts: tNav("nav.customerBlasts"),
-      admin: tNav("nav.adminPanel"),
+      admin: tNav("nav.settingsAndSystem"),
       time_card_approval: tNav("nav.timeCardApproval"),
+      time_admin: tNav("nav.timeAdmin"),
+      maintenance_reports: tNav("nav.maintenanceReports"),
       catalog: tNav("nav.catalog"),
       work_orders: tNav("nav.workOrders"),
       maintenance_routes: tNav("nav.maintenanceRoutes"),
@@ -538,6 +551,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       budget_settings: tNav("nav.budgetPricing"),
       tools: tNav("nav.tools"),
       plow_mapper: tNav("nav.plowMapper"),
+      user_management: tNav("nav.userManagement"),
+      access_requests: tNav("nav.accessRequests"),
+      agreement_templates: tNav("nav.agreementTemplates"),
+      qbo_export: tNav("nav.qboExport"),
+      sop_pipeline: tNav("nav.sopPipeline"),
+      document_library: tNav("nav.documentLibrary"),
+      shared_links: tNav("nav.sharedLinks"),
     }), [currentLang]);
 
     const navSectionLabels: Record<string, string> = React.useMemo(() => ({
@@ -548,7 +568,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       "PEOPLE": tNav("nav.sections.people"),
       "COMPANY": tNav("nav.sections.company"),
       "SETTINGS & SYSTEM": tNav("nav.sections.settingsSystem"),
-      "ADMIN": tNav("nav.sections.admin"),
     }), [currentLang]);
     
     return (
@@ -603,23 +622,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <div key={section.label || "workspace"} className={cn(sectionIdx > 0 ? "mt-4" : "")}>
             {section.label && (
               <>
-                {section.label === "ADMIN" && (
-                  <hr className="mx-3 mb-3 border-white/10" />
-                )}
-                <div className={cn(
-                  "px-4 py-1.5 mb-1",
-                  section.label === "ADMIN" && "mx-1 rounded-md bg-black/20"
-                )}>
-                  {section.label === "ADMIN" ? (
-                    <span className="flex items-center gap-1.5 text-[10px] font-bold tracking-[0.15em] uppercase text-rose-500" data-testid="section-header-admin">
-                      <Shield className="h-3 w-3 flex-shrink-0" />
-                      {navSectionLabels[section.label] || section.label}
-                    </span>
-                  ) : (
-                    <span className="text-[10px] font-bold tracking-[0.15em] uppercase text-sidebar-foreground/40" data-testid={`section-header-${section.label.toLowerCase().replace(/ /g, '-')}`}>
-                      {navSectionLabels[section.label] || section.label}
-                    </span>
-                  )}
+                <div className="px-4 py-1.5 mb-1">
+                  <span className="text-[10px] font-bold tracking-[0.15em] uppercase text-sidebar-foreground/40" data-testid={`section-header-${section.label.toLowerCase().replace(/ /g, '-')}`}>
+                    {navSectionLabels[section.label] || section.label}
+                  </span>
                 </div>
               </>
             )}

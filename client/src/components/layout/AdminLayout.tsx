@@ -5,25 +5,17 @@ import AIAssistantPanel from "@/components/AIAssistantPanel";
 import {
   ArrowLeft,
   Shield,
-  Clock,
   ClipboardList,
   ClipboardCheck,
-  Upload,
   Archive,
   AlertTriangle,
-  BarChart2,
-  Users,
-  Megaphone,
   FileSignature,
   Building2,
   Layers,
   Tag,
   FileText,
   DollarSign,
-  BookOpen,
-  Leaf,
   Zap,
-  ExternalLink,
   Wrench,
   CheckCircle,
   Sparkles,
@@ -39,7 +31,6 @@ import {
   SlidersHorizontal,
   FlagTriangleRight,
   MessageSquareWarning,
-  Library,
   HeartPulse, Brain,
 } from "lucide-react";
 
@@ -66,20 +57,7 @@ const ADMIN_GROUPS: AdminNavGroup[] = [
     labelColor: "text-green-600 dark:text-green-400",
     items: [
       { value: "overdue", label: "Overdue Items", icon: AlertTriangle, href: "/overdue" },
-      { value: "time-admin", label: "Time Admin", icon: Clock, href: "/admin/time" },
-      { value: "qbo-export", label: "QuickBooks Export", icon: Upload, href: "/admin/qbo-export" },
       { value: "archive", label: "Time Archive", icon: Archive, href: "/admin/archive" },
-      { value: "maintenance-reports", label: "Maintenance Reports", icon: BarChart2, href: "/admin/maintenance-reports" },
-    ],
-  },
-  {
-    id: "people",
-    label: "People",
-    labelColor: "text-blue-600 dark:text-blue-400",
-    items: [
-      { value: "users", label: "User Management", icon: Users, tab: "users" },
-      { value: "requests", label: "Access Requests", icon: Megaphone, tab: "requests" },
-      { value: "agreements", label: "Agreement Templates", icon: FileSignature, tab: "agreements" },
     ],
   },
   {
@@ -100,12 +78,9 @@ const ADMIN_GROUPS: AdminNavGroup[] = [
     label: "Catalogs & Integrations",
     labelColor: "text-teal-600 dark:text-teal-400",
     items: [
-      { value: "document-library", label: "Document Library", icon: Library, href: "/admin/documents" },
       { value: "work-areas", label: "Work Areas", icon: Layers, href: "/admin/work-areas" },
       { value: "service-types", label: "Service Types", icon: Tag, href: "/admin/service-types" },
       { value: "quickbooks", label: "QuickBooks Online", icon: DollarSign, tab: "quickbooks" },
-      { value: "catalog-link", label: "Item Catalog", icon: BookOpen, href: "/catalog" },
-      { value: "plant-cards-link", label: "Plant Library", icon: Leaf, href: "/plant-cards" },
       { value: "cc-reconciliation", label: "CompanyCam Reconciliation Queue", icon: Camera, href: "/admin/companycam-reconciliation" },
       { value: "cc-health", label: "CompanyCam Webhook Health", icon: Activity, href: "/admin/companycam-health" },
     ],
@@ -117,15 +92,6 @@ const ADMIN_GROUPS: AdminNavGroup[] = [
     items: [
       { value: "automation-center", label: "Automation Center", icon: Zap, href: "/admin/automation-center" },
       { value: "feature-flags", label: "Feature Flags", icon: FlagTriangleRight, href: "/admin/feature-flags" },
-    ],
-  },
-  {
-    id: "content-sops",
-    label: "Content & SOPs",
-    labelColor: "text-amber-600 dark:text-amber-400",
-    items: [
-      { value: "sop-pipeline", label: "SOP Pipeline", icon: Zap, tab: "sop-pipeline" },
-      { value: "shared-links", label: "External Share Links", icon: ExternalLink, tab: "shared-links" },
     ],
   },
   {
@@ -199,14 +165,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const cleanLocation = location.split("?")[0];
     if (item.href) {
       const cleanHref = item.href.split("?")[0];
-      if (cleanHref === "/admin/time") {
-        if (item.value === "time-reports")
-          return cleanLocation === "/admin/time" && (window.location.search.includes("tab=reports") || window.location.hash.includes("reports"));
-        if (item.value === "worksheet-review")
-          return cleanLocation === "/admin/time" && window.location.search.includes("tab=worksheet");
-        if (item.value === "time-admin")
-          return cleanLocation === "/admin/time" && !window.location.search.includes("tab=reports") && !window.location.search.includes("tab=worksheet");
-      }
       return cleanLocation === cleanHref || cleanLocation.startsWith(cleanHref + "/");
     }
     if (item.tab) {

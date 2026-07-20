@@ -31,7 +31,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/sops": "SOP Library",
   "/customer-resources": "Customer Resources",
   "/training": "Training & Knowledge",
-  "/admin": "Admin Panel",
+  "/admin": "Settings & System",
   "/employees": "Employees",
   "/hiring": "Hiring",
   "/invoices": "Invoices",
@@ -180,6 +180,11 @@ import AdminInbox from "@/pages/AdminInbox";
 import DocumentLibraryPage from "@/pages/admin/DocumentLibraryPage";
 import SetupWizardPage from "@/pages/admin/SetupWizardPage";
 import AIKnowledgePage from "@/pages/admin/AIKnowledgePage";
+import UserManagementPage from "@/pages/admin/UserManagementPage";
+import AccessRequestsPage from "@/pages/admin/AccessRequestsPage";
+import AgreementTemplatesPage from "@/pages/admin/AgreementTemplatesPage";
+import SopPipelinePage from "@/pages/admin/SopPipelinePage";
+import SharedLinksPage from "@/pages/admin/SharedLinksPage";
 
 const ADMIN_ONLY = ["Admin"];
 const ADMIN_OR_MANAGER = ["Admin", "Manager"];
@@ -359,6 +364,11 @@ function AppRoutes() {
         <ProtectedRoute path="/admin/companycam-health" component={CompanyCamHealth} allowedRoles={ADMIN_ONLY} />
         <ProtectedRoute path="/admin/system-health" component={SystemHealthPage} allowedRoles={ADMIN_ONLY} />
         <ProtectedRoute path="/admin/maintenance-reports" component={MaintenanceReportsPage} allowedRoles={ADMIN_OR_MANAGER} />
+        <ProtectedRoute path="/admin/users" component={UserManagementPage} allowedRoles={ADMIN_ONLY} />
+        <ProtectedRoute path="/admin/access-requests" component={AccessRequestsPage} allowedRoles={ADMIN_ONLY} />
+        <ProtectedRoute path="/admin/agreements" component={AgreementTemplatesPage} allowedRoles={ADMIN_ONLY} />
+        <ProtectedRoute path="/admin/sop-pipeline" component={SopPipelinePage} allowedRoles={ADMIN_ONLY} />
+        <ProtectedRoute path="/admin/shared-links" component={SharedLinksPage} allowedRoles={ADMIN_ONLY} />
         <Route path="/budget-settings"><Redirect to="/mors-budget?tab=mark-up" /></Route>
         <Route path="/time" component={TimeTracking} />
         <ProtectedRoute path="/manager-dashboard" component={ManagerDashboard} allowedRoles={ADMIN_OR_MANAGER} />

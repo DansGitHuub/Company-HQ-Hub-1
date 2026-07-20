@@ -112,7 +112,7 @@ const adminWalkthrough: WalkthroughStep[] = [
     ]
   },
   {
-    title: "Admin Panel",
+    title: "Settings & System",
     description: "Manage users, review access requests, and configure system settings. Only admins can access this area.",
     icon: <Shield className="h-8 w-8" />,
     path: "/admin",

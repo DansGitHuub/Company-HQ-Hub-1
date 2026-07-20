@@ -1,18 +1,18 @@
 # i18n Coverage Report
-_Generated: 2026-07-16 18:58:22_
+_Generated: 2026-07-20 00:44:57_
 
 ## Overall Summary
 
 | Metric | Value |
 |---|---|
-| TSX files scanned | 270 |
-| Files with `useTranslation` | 59 / 270 (22%) |
-| Files with NO translation | 211 |
-| Detected t() calls (translated) | 1648 |
-| Detected hardcoded lines (untranslated) | 4011 |
+| TSX files scanned | 274 |
+| Files with `useTranslation` | 58 / 274 (21%) |
+| Files with NO translation | 216 |
+| Detected t() calls (translated) | 1652 |
+| Detected hardcoded lines (untranslated) | 4038 |
 | Approx string-level coverage | **29%** |
-| en.json flat keys | 2271 |
-| es.json keys with value | 2271 |
+| en.json flat keys | 2295 |
+| es.json keys with value | 2295 |
 | en keys missing/blank in es | 0 |
 | t("key") in code missing from en.json | 12 |
 
@@ -32,11 +32,11 @@ _Generated: 2026-07-16 18:58:22_
 | `(root)` | 0 | 2 | ░░░░░░░░░░░░░░░░░░░░ 0% | 1 |
 | `hooks` | 0 | 3 | ░░░░░░░░░░░░░░░░░░░░ 0% | 1 |
 | `lib` | 0 | 1 | ░░░░░░░░░░░░░░░░░░░░ 0% | 0 |
+| `pages/admin` | 2 | 29 | █░░░░░░░░░░░░░░░░░░░ 7% | 434 |
 | `components` | 3 | 43 | █░░░░░░░░░░░░░░░░░░░ 7% | 537 |
-| `pages/admin` | 2 | 24 | ██░░░░░░░░░░░░░░░░░░ 8% | 383 |
 | `pages/jobs` | 3 | 13 | █████░░░░░░░░░░░░░░░ 23% | 215 |
-| `pages` | 35 | 72 | ██████████░░░░░░░░░░ 49% | 2060 |
-| `components/layout` | 1 | 2 | ██████████░░░░░░░░░░ 50% | 88 |
+| `pages` | 34 | 71 | ██████████░░░░░░░░░░ 48% | 2033 |
+| `components/layout` | 1 | 2 | ██████████░░░░░░░░░░ 50% | 91 |
 | `components/dashboard` | 1 | 2 | ██████████░░░░░░░░░░ 50% | 40 |
 | `pages/my-day` | 1 | 1 | ████████████████████ 100% | 43 |
 | `pages/customers` | 3 | 3 | ████████████████████ 100% | 41 |
@@ -50,7 +50,7 @@ _Generated: 2026-07-16 18:58:22_
 
 | File | Hardcoded Lines | Has t()? |
 |---|---|---|
-| `client/src/pages/AdminPanel.tsx` | 209 | ✓ |
+| `client/src/pages/AdminPanel.tsx` | 199 | ✓ |
 | `client/src/pages/Forms.tsx` | 182 | ✓ |
 | `client/src/components/SOPBuilder.tsx` | 135 | ✗ |
 | `client/src/pages/Hiring.tsx` | 120 | ✓ |
@@ -60,9 +60,9 @@ _Generated: 2026-07-16 18:58:22_
 | `client/src/pages/PlowSiteMapper.tsx` | 69 | ✓ |
 | `client/src/pages/ProcessAuditor.tsx` | 65 | ✗ |
 | `client/src/pages/Employees.tsx` | 58 | ✓ |
+| `client/src/components/layout/AppShell.tsx` | 57 | ✓ |
 | `client/src/pages/Consultations.tsx` | 56 | ✗ |
 | `client/src/pages/Calculator.tsx` | 53 | ✓ |
-| `client/src/components/layout/AppShell.tsx` | 53 | ✓ |
 | `client/src/pages/PublicApplicationForm.tsx` | 50 | ✗ |
 | `client/src/pages/Education.tsx` | 49 | ✓ |
 | `client/src/pages/EquipmentTracker.tsx` | 49 | ✓ |

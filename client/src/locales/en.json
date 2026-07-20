@@ -68,7 +68,16 @@
     "maintenanceRoutes": "Maintenance Routes",
     "managerDashboard": "Manager Dashboard",
     "customerMessages": "Customer Messages",
-    "customerBlasts": "Customer Blasts"
+    "customerBlasts": "Customer Blasts",
+    "settingsAndSystem": "Settings & System",
+    "userManagement": "User Management",
+    "accessRequests": "Access Requests",
+    "agreementTemplates": "Agreement Templates",
+    "qboExport": "QuickBooks Export",
+    "sopPipeline": "SOP Pipeline",
+    "documentLibrary": "Document Library",
+    "sharedLinks": "External Share Links",
+    "maintenanceReports": "Maintenance Reports"
   },
   "common": {
     "save": "Save",

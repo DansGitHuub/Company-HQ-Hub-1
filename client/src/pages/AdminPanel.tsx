@@ -697,18 +697,7 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
       label: "Daily Operations",
       items: [
         { value: "time-reports", label: "Time Reports", icon: ClipboardList, href: "/admin/time-reports" },
-        { value: "time-admin", label: "Time Admin", icon: Clock, href: "/admin/time" },
-        { value: "worksheet-review", label: "Worksheet Review", icon: ClipboardCheck, href: "/worksheet-review" },
-        { value: "qbo-export", label: "QuickBooks Export", icon: Upload, href: "/admin/qbo-export" },
         { value: "archive", label: "Time Archive", icon: Archive, href: "/admin/archive" },
-      ],
-    },
-    {
-      label: "People",
-      items: [
-        { value: "users", label: t("nav.employees"), icon: Users },
-        { value: "requests", label: "Access Requests", icon: Megaphone, badge: pendingRequests.length > 0 ? pendingRequests.length : undefined },
-        { value: "agreements", label: "Agreement Templates", icon: FileSignature },
       ],
     },
     {
@@ -723,7 +712,6 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
         { value: "regional-settings", label: "Regional & Seasonal", icon: Globe, href: "/admin/regional-settings" },
         { value: "notification-center", label: "Notification Center", icon: Bell, href: "/admin/notification-center" },
         { value: "feedback-reports", label: "Bug Reports & Feedback", icon: MessageSquareWarning, href: "/admin/feedback" },
-        { value: "admin-tools", label: "Admin Tools", icon: Wrench, href: "/tools" },
       ],
     },
     {
@@ -732,8 +720,6 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
         { value: "work-areas", label: "Work Areas", icon: Layers, href: "/admin/work-areas" },
         { value: "service-types", label: "Service Types", icon: Tag, href: "/admin/service-types" },
         { value: "quickbooks", label: "QuickBooks Online", icon: DollarSign },
-        { value: "catalog-link", label: "Item Catalog", icon: BookOpen, href: "/catalog" },
-        { value: "plant-cards-link", label: "Plant Library", icon: Leaf, href: "/plant-cards" },
         { value: "cc-reconciliation", label: "CompanyCam Reconciliation Queue", icon: Camera, href: "/admin/companycam-reconciliation" },
         { value: "cc-health", label: "CompanyCam Webhook Health", icon: Activity, href: "/admin/companycam-health" },
       ],
@@ -743,14 +729,6 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
       items: [
         { value: "automation-center", label: "Automation Center", icon: Zap, href: "/admin/automation-center" },
         { value: "feature-flags", label: "Feature Flags", icon: FlagTriangleRight, href: "/admin/feature-flags" },
-      ],
-    },
-    {
-      label: "Content & SOPs",
-      items: [
-        { value: "sop-pipeline", label: "SOP Pipeline", icon: Zap },
-        { value: "documents", label: "Document Library", icon: FileText },
-        { value: "shared-links", label: "External Share Links", icon: ExternalLink },
       ],
     },
     {
@@ -780,11 +758,9 @@ function AdminSidebar({ activeTab, setActiveTab, pendingRequests, isMasterAdmin,
   const groupLabelColor = (label: string) => {
     switch (label) {
       case "Daily Operations": return "text-green-600 dark:text-green-400";
-      case "People": return "text-blue-600 dark:text-blue-400";
       case "Company Settings": return "text-purple-600 dark:text-purple-400";
       case "Catalogs & Integrations": return "text-teal-600 dark:text-teal-400";
       case "Automation & Flags": return "text-indigo-600 dark:text-indigo-400";
-      case "Content & SOPs": return "text-amber-600 dark:text-amber-400";
       case "AI & Automation Tools": return "text-fuchsia-600 dark:text-fuchsia-400";
       case "System Health & Data Quality": return "text-slate-600 dark:text-slate-400";
       default: return "text-muted-foreground/60";
@@ -1091,7 +1067,7 @@ export default function AdminPanel() {
     { id: "marketing", label: "Marketing", icon: Megaphone },
     { id: "help", label: "Help", icon: HelpCircle },
     { id: "integrations", label: "Integrations", icon: Settings },
-    { id: "admin", label: "Admin Panel", icon: Shield },
+    { id: "admin", label: "Settings & System", icon: Shield },
   ];
 
   const defaultOrder = allSidebarItems.map(item => item.id);
@@ -1316,7 +1292,7 @@ export default function AdminPanel() {
       <div className="rounded-xl bg-gradient-to-r from-green-700 to-emerald-600 px-6 py-5 text-white flex justify-between items-center shadow-md">
         <div>
           <h1 className="text-2xl font-heading font-bold flex items-center gap-3">
-            <Shield className="w-7 h-7" /> {t("nav.adminPanel")}
+            <Shield className="w-7 h-7" /> {t("nav.settingsAndSystem")}
             {isMasterAdmin && (
               <Badge className="bg-white/20 text-white border-white/30 text-xs">
                 <Crown className="w-3 h-3 mr-1" /> Master
@@ -1366,15 +1342,9 @@ export default function AdminPanel() {
       <div className="block md:hidden">
         <Select value={activeTab} onValueChange={(v) => {
           if (v === "time-reports") { navigate("/admin/time-reports"); return; }
-          if (v === "time-admin") { navigate("/admin/time"); return; }
-          if (v === "worksheet-review") { navigate("/worksheet-review"); return; }
-          if (v === "qbo-export") { navigate("/admin/qbo-export"); return; }
           if (v === "archive") { navigate("/admin/archive"); return; }
           if (v === "work-areas") { navigate("/admin/work-areas"); return; }
           if (v === "service-types") { navigate("/admin/service-types"); return; }
-          if (v === "catalog-link") { navigate("/catalog"); return; }
-          if (v === "plant-cards-link") { navigate("/plant-cards"); return; }
-          if (v === "admin-tools") { navigate("/tools"); return; }
           if (v === "business-rules") { navigate("/admin/business-rules"); return; }
           if (v === "regional-settings") { navigate("/admin/regional-settings"); return; }
           if (v === "notification-center") { navigate("/admin/notification-center"); return; }
@@ -1390,16 +1360,7 @@ export default function AdminPanel() {
             <SelectGroup>
               <SelectLabel>Daily Operations</SelectLabel>
               <SelectItem value="time-reports">Time Reports</SelectItem>
-              <SelectItem value="time-admin">Time Admin</SelectItem>
-              <SelectItem value="worksheet-review">Worksheet Review</SelectItem>
-              <SelectItem value="qbo-export">QuickBooks Export</SelectItem>
               <SelectItem value="archive">Time Archive</SelectItem>
-            </SelectGroup>
-            <SelectGroup>
-              <SelectLabel>People</SelectLabel>
-              <SelectItem value="users">{t("nav.employees")}</SelectItem>
-              <SelectItem value="requests">Access Requests</SelectItem>
-              <SelectItem value="agreements">Agreement Templates</SelectItem>
             </SelectGroup>
             <SelectGroup>
               <SelectLabel>Settings</SelectLabel>
@@ -1410,24 +1371,15 @@ export default function AdminPanel() {
               <SelectItem value="estimate-templates">Estimate Templates</SelectItem>
               <SelectItem value="terms">Terms &amp; Conditions</SelectItem>
               <SelectItem value="quickbooks">QuickBooks Online</SelectItem>
-              <SelectItem value="catalog-link">Item Catalog</SelectItem>
-              <SelectItem value="plant-cards-link">Plant Library</SelectItem>
               <SelectItem value="business-rules">Business Rules</SelectItem>
               <SelectItem value="regional-settings">Regional &amp; Seasonal</SelectItem>
               <SelectItem value="notification-center">Notification Center</SelectItem>
-              <SelectItem value="feedback-reports">Bug Reports & Feedback</SelectItem>
-              <SelectItem value="admin-tools">Admin Tools</SelectItem>
+              <SelectItem value="feedback-reports">Bug Reports &amp; Feedback</SelectItem>
             </SelectGroup>
             <SelectGroup>
               <SelectLabel>Automation &amp; Flags</SelectLabel>
               <SelectItem value="automation-center">Automation Center</SelectItem>
               <SelectItem value="feature-flags">Feature Flags</SelectItem>
-            </SelectGroup>
-            <SelectGroup>
-              <SelectLabel>Content &amp; SOPs</SelectLabel>
-              <SelectItem value="sop-pipeline">SOP Pipeline</SelectItem>
-              <SelectItem value="documents">Document Library</SelectItem>
-              <SelectItem value="shared-links">External Share Links</SelectItem>
             </SelectGroup>
             <SelectGroup>
               <SelectLabel>AI &amp; Automation Tools</SelectLabel>
