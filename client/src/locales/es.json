@@ -77,7 +77,47 @@
     "sopPipeline": "Canal de POE",
     "documentLibrary": "Biblioteca de Documentos",
     "sharedLinks": "Vínculos Externos",
-    "maintenanceReports": "Reportes de Mantenimiento"
+    "maintenanceReports": "Reportes de Mantenimiento",
+    "companyHub": "Empresa"
+  },
+  "companyHub": {
+    "title": "Empresa",
+    "subtitle": "Bibliotecas, herramientas y recursos para tu equipo.",
+    "noAccess": "No tienes acceso a ningún recurso de la empresa.",
+    "cards": {
+      "sopLibrary": {
+        "name": "Biblioteca de POE",
+        "desc": "Procedimientos operativos estándar y base de conocimiento del equipo."
+      },
+      "sopPipeline": {
+        "name": "Flujo de POE",
+        "desc": "Creación, programación y publicación de POE con inteligencia artificial."
+      },
+      "documentLibrary": {
+        "name": "Biblioteca de Documentos",
+        "desc": "Almacenamiento, compartición y gestión centralizada de documentos."
+      },
+      "sharedLinks": {
+        "name": "Links Compartidos Externos",
+        "desc": "Links para compartir recursos con clientes y socios."
+      },
+      "customerResources": {
+        "name": "Recursos para Clientes",
+        "desc": "Contenido educativo y guías de cuidado para clientes."
+      },
+      "training": {
+        "name": "Capacitación y Conocimiento",
+        "desc": "Cuestionarios, módulos de entrenamiento y herramientas de aprendizaje."
+      },
+      "tools": {
+        "name": "Herramientas",
+        "desc": "Herramientas especializadas para estimaciones, mapas y trabajo de campo."
+      },
+      "vendors": {
+        "name": "Proveedores",
+        "desc": "Directorio de proveedores y gestión de contactos."
+      }
+    }
   },
   "common": {
     "save": "Guardar",

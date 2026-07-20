@@ -32,6 +32,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/customer-resources": "Customer Resources",
   "/training": "Training & Knowledge",
   "/admin": "Settings & System",
+  "/company": "Company",
   "/employees": "Employees",
   "/hiring": "Hiring",
   "/invoices": "Invoices",
@@ -185,6 +186,7 @@ import AccessRequestsPage from "@/pages/admin/AccessRequestsPage";
 import AgreementTemplatesPage from "@/pages/admin/AgreementTemplatesPage";
 import SopPipelinePage from "@/pages/admin/SopPipelinePage";
 import SharedLinksPage from "@/pages/admin/SharedLinksPage";
+import CompanyHub from "@/pages/CompanyHub";
 
 const ADMIN_ONLY = ["Admin"];
 const ADMIN_OR_MANAGER = ["Admin", "Manager"];
@@ -369,6 +371,7 @@ function AppRoutes() {
         <ProtectedRoute path="/admin/agreements" component={AgreementTemplatesPage} allowedRoles={ADMIN_ONLY} />
         <ProtectedRoute path="/admin/sop-pipeline" component={SopPipelinePage} allowedRoles={ADMIN_ONLY} />
         <ProtectedRoute path="/admin/shared-links" component={SharedLinksPage} allowedRoles={ADMIN_ONLY} />
+        <ProtectedRoute path="/company" component={CompanyHub} allowedRoles={STAFF_ROLES} />
         <Route path="/budget-settings"><Redirect to="/mors-budget?tab=mark-up" /></Route>
         <Route path="/time" component={TimeTracking} />
         <ProtectedRoute path="/manager-dashboard" component={ManagerDashboard} allowedRoles={ADMIN_OR_MANAGER} />

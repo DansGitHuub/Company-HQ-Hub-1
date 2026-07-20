@@ -77,7 +77,47 @@
     "sopPipeline": "SOP Pipeline",
     "documentLibrary": "Document Library",
     "sharedLinks": "External Share Links",
-    "maintenanceReports": "Maintenance Reports"
+    "maintenanceReports": "Maintenance Reports",
+    "companyHub": "Company"
+  },
+  "companyHub": {
+    "title": "Company",
+    "subtitle": "Libraries, tools, and resources for your team.",
+    "noAccess": "You don't have access to any company resources.",
+    "cards": {
+      "sopLibrary": {
+        "name": "SOP Library",
+        "desc": "Standard operating procedures and team knowledge base."
+      },
+      "sopPipeline": {
+        "name": "SOP Pipeline",
+        "desc": "AI-powered SOP creation, scheduling, and publishing."
+      },
+      "documentLibrary": {
+        "name": "Document Library",
+        "desc": "Centralized document storage, sharing, and management."
+      },
+      "sharedLinks": {
+        "name": "External Share Links",
+        "desc": "Shareable links for sending resources to customers and partners."
+      },
+      "customerResources": {
+        "name": "Customer Resources",
+        "desc": "Educational content and care guides for customers."
+      },
+      "training": {
+        "name": "Training & Knowledge",
+        "desc": "Quizzes, training modules, and employee learning tools."
+      },
+      "tools": {
+        "name": "Tools",
+        "desc": "Specialized tools for estimating, mapping, and field work."
+      },
+      "vendors": {
+        "name": "Vendors",
+        "desc": "Vendor directory and contact management."
+      }
+    }
   },
   "common": {
     "save": "Save",

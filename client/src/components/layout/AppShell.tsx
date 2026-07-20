@@ -423,6 +423,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     sop_pipeline: { icon: Zap, label: t("nav.sopPipeline"), href: "/admin/sop-pipeline" },
     document_library: { icon: FolderOpen, label: t("nav.documentLibrary"), href: "/admin/documents" },
     shared_links: { icon: ExternalLink, label: t("nav.sharedLinks"), href: "/admin/shared-links" },
+    company_hub: { icon: Building2, label: t("nav.companyHub"), href: "/company" },
   };
 
   type NavSection = { label: string; items: string[] };
@@ -443,7 +444,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     { label: "WORK", items: ["jobs", "manager_dashboard", "work_orders", "day_briefing", "scheduling", "maintenance_routes", "time_admin", "maintenance_reports", "time_tracking", "equipment"] },
     { label: "FINANCE", items: ["invoices", "reports", "qbo_export"] },
     { label: "PEOPLE", items: ["employees", "hiring", "user_management", "access_requests", "agreement_templates"] },
-    { label: "COMPANY", items: ["sops", "sop_pipeline", "document_library", "shared_links", "education", "testing", "tools", "vendors"] },
+    { label: "COMPANY", items: ["company_hub"] },
     { label: "SETTINGS & SYSTEM", items: ["budget_settings", "admin"] },
   ];
 
@@ -459,7 +460,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           .map(s => {
             if (s.label === "WORK") return { ...s, items: s.items.filter(i => !["work_orders", "manager_dashboard", "day_briefing", "time_admin", "maintenance_reports"].includes(i)) };
             if (s.label === "SALES") return { ...s, items: s.items.filter(i => !["customers", "consultations", "estimates", "customer_messages", "customer_blasts"].includes(i)) };
-            if (s.label === "COMPANY") return { ...s, items: s.items.filter(i => !["vendors", "sop_pipeline", "document_library", "shared_links"].includes(i)) };
             return s;
           })
           .filter(s => s.items.length > 0);
@@ -468,7 +468,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       return base.map(s => {
         if (s.label === "WORK") return { ...s, items: s.items.filter(i => i !== "time_admin") };
         if (s.label === "SALES") return { ...s, items: s.items.filter(i => !["customer_messages", "customer_blasts"].includes(i)) };
-        if (s.label === "COMPANY") return { ...s, items: s.items.filter(i => !["vendors", "sop_pipeline", "document_library", "shared_links"].includes(i)) };
         return s;
       });
     }
@@ -490,6 +489,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     : displaySections.flatMap(s => s.items.filter(id => internalNavItems[id]).map(id => ({ id, ...internalNavItems[id] })));
 
   const getIsActive = (item: { id: string; href: string }) => {
+    if (item.id === "company_hub") {
+      const companyPaths = ["/company", "/sops", "/training", "/customer-resources", "/tools", "/vendors", "/admin/sop-pipeline", "/admin/documents", "/admin/shared-links"];
+      return companyPaths.some(p => location === p || location.startsWith(p + "/"));
+    }
     if (item.href === "/tools" && item.id === "tools") {
       return location.startsWith("/tools");
     }
@@ -558,6 +561,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       sop_pipeline: tNav("nav.sopPipeline"),
       document_library: tNav("nav.documentLibrary"),
       shared_links: tNav("nav.sharedLinks"),
+      company_hub: tNav("nav.companyHub"),
     }), [currentLang]);
 
     const navSectionLabels: Record<string, string> = React.useMemo(() => ({
