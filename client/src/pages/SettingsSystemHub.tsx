@@ -1,7 +1,7 @@
 import { useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/hooks/use-auth";
-import { LayoutDashboard, TrendingUp, ClipboardList, Clock, ClipboardCheck, Upload, Archive, AlertTriangle, Building2, Layers, FileText, FileSignature, SlidersHorizontal, MessageSquareWarning, Wrench, Tag, DollarSign, BookOpen, Leaf, Camera, Activity, Zap, FlagTriangleRight, Brain, Sparkles, Bot, Puzzle, CheckCircle, HelpCircle, GitMerge, Eye, AlertCircle, HeartPulse, Shield } from "lucide-react";
+import { LayoutDashboard, TrendingUp, ClipboardCheck, Archive, AlertTriangle, Building2, Layers, FileText, FileSignature, SlidersHorizontal, MessageSquareWarning, Wrench, Tag, DollarSign, BookOpen, Leaf, Camera, Activity, Zap, FlagTriangleRight, Brain, Sparkles, Bot, Puzzle, CheckCircle, HelpCircle, GitMerge, Eye, AlertCircle, HeartPulse, Shield } from "lucide-react";
 
 type SettingsCard = {
   id: string;
@@ -60,10 +60,6 @@ const SECTIONS: SettingsSection[] = [
     iconColor: "text-green-600 dark:text-green-400",
     badge: "⭐ Quick access",
     cards: [
-      { id: "timeReports", icon: ClipboardList, nameKey: "settingsHub.cards.timeReports.name", descKey: "settingsHub.cards.timeReports.desc", href: "/admin/time-reports" },
-      { id: "timeAdmin", icon: Clock, nameKey: "settingsHub.cards.timeAdmin.name", descKey: "settingsHub.cards.timeAdmin.desc", href: "/admin/time" },
-      { id: "worksheetReview", icon: ClipboardCheck, nameKey: "settingsHub.cards.worksheetReview.name", descKey: "settingsHub.cards.worksheetReview.desc", href: "/worksheet-review" },
-      { id: "qboExport", icon: Upload, nameKey: "settingsHub.cards.qboExport.name", descKey: "settingsHub.cards.qboExport.desc", href: "/admin/qbo-export" },
       { id: "timeArchive", icon: Archive, nameKey: "settingsHub.cards.timeArchive.name", descKey: "settingsHub.cards.timeArchive.desc", href: "/admin/archive" },
       { id: "overdueItems", icon: AlertTriangle, nameKey: "settingsHub.cards.overdueItems.name", descKey: "settingsHub.cards.overdueItems.desc", href: "/overdue" },
     ],
