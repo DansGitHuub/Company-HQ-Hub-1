@@ -427,6 +427,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     settings_hub: { icon: Shield, label: t("nav.settingsAndSystem"), href: "/settings-system" },
     finance_hub: { icon: DollarSign, label: t("nav.financeHub"), href: "/finance" },
     people_hub: { icon: Users, label: t("nav.peopleHub"), href: "/people" },
+    sales_hub: { icon: Contact, label: t("nav.salesHub"), href: "/sales" },
   };
 
   type NavSection = { label: string; items: string[] };
@@ -443,7 +444,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const sidebarSections: NavSection[] = [
     { label: "MY SPACE", items: ["home", "my_hours", "my_day", "messages", "todos"] },
-    { label: "SALES", items: ["customers", "consultations", "estimates", "customer_messages", "customer_blasts"] },
+    { label: "SALES", items: ["sales_hub"] },
     { label: "WORK", items: ["jobs", "manager_dashboard", "work_orders", "day_briefing", "scheduling", "maintenance_routes", "time_admin", "maintenance_reports", "time_tracking", "equipment"] },
     { label: "FINANCE", items: ["finance_hub"] },
     { label: "PEOPLE", items: ["people_hub"] },
@@ -462,7 +463,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         return base
           .map(s => {
             if (s.label === "WORK") return { ...s, items: s.items.filter(i => !["work_orders", "manager_dashboard", "day_briefing", "time_admin", "maintenance_reports"].includes(i)) };
-            if (s.label === "SALES") return { ...s, items: s.items.filter(i => !["customers", "consultations", "estimates", "customer_messages", "customer_blasts"].includes(i)) };
+            if (s.label === "SALES") return { ...s, items: [] };
+            if (s.label === "FINANCE") return { ...s, items: [] };
             return s;
           })
           .filter(s => s.items.length > 0);
@@ -511,6 +513,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     if (item.id === "people_hub") {
       const peoplePaths = ["/people", "/employees", "/hiring", "/admin/users", "/admin/access-requests", "/admin/agreements"];
       return peoplePaths.some(p => location === p || location.startsWith(p + "/"));
+    }
+    if (item.id === "sales_hub") {
+      const salesPaths = ["/sales", "/customers", "/consultations", "/estimates", "/customer-messages", "/customer-blasts"];
+      return salesPaths.some(p => location === p || location.startsWith(p + "/"));
     }
     if (item.href === "/tools" && item.id === "tools") {
       return location.startsWith("/tools");
@@ -584,6 +590,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       settings_hub: tNav("nav.settingsAndSystem"),
       finance_hub: tNav("nav.financeHub"),
       people_hub: tNav("nav.peopleHub"),
+      sales_hub: tNav("nav.salesHub"),
     }), [currentLang]);
 
     const navSectionLabels: Record<string, string> = React.useMemo(() => ({

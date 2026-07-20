@@ -80,7 +80,35 @@
     "maintenanceReports": "Reportes de Mantenimiento",
     "companyHub": "Empresa",
     "financeHub": "Finanzas",
-    "peopleHub": "Personas"
+    "peopleHub": "Personas",
+    "salesHub": "Ventas"
+  },
+  "salesHub": {
+    "title": "Ventas",
+    "subtitle": "Clientes, consultas, estimados y comunicaciones.",
+    "noAccess": "No tienes acceso a las herramientas de Ventas.",
+    "cards": {
+      "customers": {
+        "name": "Clientes",
+        "desc": "Registros de clientes, propiedades y gestión de relaciones."
+      },
+      "consultations": {
+        "name": "Consultas",
+        "desc": "Pipeline de ventas, seguimiento de leads y agenda de consultas."
+      },
+      "estimates": {
+        "name": "Estimados",
+        "desc": "Crea, envía y gestiona estimados de proyectos."
+      },
+      "customerMessages": {
+        "name": "Mensajes de Clientes",
+        "desc": "Bandeja de entrada para comunicaciones directas con clientes."
+      },
+      "customerBlasts": {
+        "name": "Mensajes Masivos",
+        "desc": "Envía mensajes y anuncios masivos a clientes."
+      }
+    }
   },
   "peopleHub": {
     "title": "Personas",

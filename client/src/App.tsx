@@ -36,6 +36,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/company": "Company",
   "/finance": "Finance",
   "/people": "People",
+  "/sales": "Sales",
   "/employees": "Employees",
   "/hiring": "Hiring",
   "/invoices": "Invoices",
@@ -100,6 +101,7 @@ import JobList from "@/pages/jobs/index";
 import JobDetail from "@/pages/jobs/show";
 import FinanceHub from "@/pages/FinanceHub";
 import PeopleHub from "@/pages/PeopleHub";
+import SalesHub from "@/pages/SalesHub";
 import InvoiceList from "@/pages/invoices/index";
 import InvoiceDetail from "@/pages/invoices/show";
 import EstimateList from "@/pages/estimates/index";
@@ -312,6 +314,7 @@ function AppRoutes() {
         <Route path="/sops" component={SOPs} />
         <Route path="/materials"><Redirect to="/catalog" /></Route>
         <ProtectedRoute path="/people" component={PeopleHub} allowedRoles={ADMIN_ONLY} />
+        <ProtectedRoute path="/sales" component={SalesHub} allowedRoles={ADMIN_OR_MANAGER} />
         <ProtectedRoute path="/hiring" component={Hiring} allowedRoles={ADMIN_OR_MANAGER} />
         <ProtectedRoute path="/marketing" component={Marketing} allowedRoles={ADMIN_OR_MANAGER} />
         <ProtectedRoute path="/forms" component={Forms} allowedRoles={TOOL_FORMS_ROLES} />

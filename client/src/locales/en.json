@@ -80,7 +80,35 @@
     "maintenanceReports": "Maintenance Reports",
     "companyHub": "Company",
     "financeHub": "Finance",
-    "peopleHub": "People"
+    "peopleHub": "People",
+    "salesHub": "Sales"
+  },
+  "salesHub": {
+    "title": "Sales",
+    "subtitle": "Customers, consultations, estimates, and outreach.",
+    "noAccess": "You don't have access to Sales tools.",
+    "cards": {
+      "customers": {
+        "name": "Customers",
+        "desc": "Customer records, properties, and relationship management."
+      },
+      "consultations": {
+        "name": "Consultations",
+        "desc": "Sales pipeline, lead tracking, and consultation scheduling."
+      },
+      "estimates": {
+        "name": "Estimates",
+        "desc": "Create, send, and manage project estimates."
+      },
+      "customerMessages": {
+        "name": "Customer Messages",
+        "desc": "Inbox for direct customer communications."
+      },
+      "customerBlasts": {
+        "name": "Customer Blasts",
+        "desc": "Send mass messages and announcements to customers."
+      }
+    }
   },
   "peopleHub": {
     "title": "People",
