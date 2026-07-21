@@ -76,6 +76,7 @@ import { registerJobTemplateRoutes } from "./jobTemplateRoutes";
 import { registerWorkOrderRoutes } from "./workOrderRoutes";
 import { registerDailyPlanRoutes } from "./dailyPlanRoutes";
 import { registerAdminDashboardRoutes } from "./adminDashboardRoutes";
+import { registerRolePermissionsRoutes } from "./rolePermissionsRoutes";
 import { searchProductImages } from "./imageSearchService";
 import { sendMaintenanceReminderEmail, sendSOPEmail, sendMessageNotificationEmail, sendCustomerNotificationEmail, sendNewApplicationNotificationEmail, sendApplicationLinkEmail, sendPasswordResetNotificationEmail, sendHiringStageEmail } from "./email";
 import { getAppUrl } from "./emailService";
@@ -127,6 +128,7 @@ export async function registerRoutes(
   registerJobRoutes(app, requireAuth);
   registerInvoiceRoutes(app, requireAuth);
   registerReportRoutes(app, requireAuth);
+  registerRolePermissionsRoutes(app, requireAuth, requireAdmin);
   await registerConsultationRoutes(app, requireAuth);
   registerFollowUpRoutes(app, requireAuth);
   await registerServiceTypesRoutes(app, requireAuth, requireAdmin);

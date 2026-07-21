@@ -262,3 +262,22 @@ export function requireRole(...roles: (string | string[])[]): RequestHandler {
     return res.status(403).json({ message: "Insufficient permissions" });
   };
 }
+
+/**
+ * Permission-based middleware that checks the configurable role_permissions table.
+ * Master Admin always passes. Customer role never passes an internal permission.
+ * Import hasPermission from permissionCache for inline handler checks.
+ */
+export function requirePermission(perm: string): RequestHandler {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    if (!req.isAuthenticated() || !req.user) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    const { hasPermission } = await import("./permissionCache");
+    const user = req.user as any;
+    if (!hasPermission(user, perm)) {
+      return res.status(403).json({ message: "Access denied." });
+    }
+    next();
+  };
+}

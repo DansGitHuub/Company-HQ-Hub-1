@@ -84,6 +84,8 @@ import { runCustomerSatisfactionMigration } from "./migrations/customerSatisfact
 import { runMessageBlastsMigration, runMessageBlastsConstraintsMigration, runMessageBlastsChannelsMigration } from "./migrations/messageBlasts";
 import { runMaintenanceRoutesMigration } from "./migrations/maintenanceRoutes";
 import { runSmsConsentMigration } from "./migrations/smsConsent";
+import { runRolePermissionsMigration } from "./migrations/rolePermissions";
+import { loadPermissionCache } from "./permissionCache";
 import { registerMaintenanceRouteRoutes } from "./maintenanceRouteRoutes";
 import { seedSetupWizardProgress, registerSetupWizardRoutes } from "./setupWizardRoutes";
 import { syncCCProjectsFromApi } from "./companyCamRoutes";
@@ -276,6 +278,8 @@ app.use((req, res, next) => {
   await runMessageBlastsChannelsMigration();
   await runMaintenanceRoutesMigration();
   await runSmsConsentMigration();
+  await runRolePermissionsMigration();
+  await loadPermissionCache();
 
   // ── Step 3: Register routes and seeds ──────────────────────────────────────
   // Public pages must come before registerRoutes (which sets up the catch-all).

@@ -246,6 +246,7 @@
       "estimateTemplates": { "name": "Plantillas de Estimados", "desc": "Plantillas predeterminadas para nuevos estimados." },
       "termsConditions": { "name": "Términos y Condiciones", "desc": "Términos legales para clientes." },
       "businessRules": { "name": "Reglas de Negocio", "desc": "Configuración financiera, de horarios y flujo de trabajo." },
+      "permissionsMatrix": { "name": "Permisos por Rol", "desc": "Configura quién puede ver qué en cada rol." },
       "feedbackReports": { "name": "Reportes y Comentarios", "desc": "Revisar errores y sugerencias del personal." },
       "adminTools": { "name": "Herramientas Admin", "desc": "Constructor de formularios y utilidades administrativas." },
       "workAreas": { "name": "Áreas de Trabajo", "desc": "Definir zonas de servicio para trabajos y equipos." },
@@ -2659,5 +2660,53 @@
     "cancel": "Cancelar",
     "saved": "Respuesta guardada",
     "saveFailed": "No se pudo guardar"
+  },
+  "permissionsMatrix": {
+    "pageTitle": "Matriz de Permisos por Rol",
+    "pageSubtitle": "Configura qué roles tienen acceso a cada área. Los cambios se aplican de inmediato en el servidor.",
+    "masterAdminNote": "El Master Admin siempre tiene acceso completo y no aparece aquí.",
+    "customerNote": "El rol Cliente está bloqueado — siempre tiene acceso solo al portal.",
+    "adminSettingsNote": "El Admin siempre tiene Administrar Configuración — esta celda está bloqueada.",
+    "saveSuccess": "Permiso actualizado",
+    "saveError": "Error al actualizar permiso",
+    "locked": "Bloqueado",
+    "permissions": {
+      "see_finance": "Ver Finanzas",
+      "see_people_hr": "Ver Personas / RRHH",
+      "see_hiring": "Ver Contratación",
+      "see_customers": "Ver Clientes",
+      "see_jobs_work": "Ver Trabajos",
+      "see_time_reports": "Ver Reportes de Tiempo",
+      "manage_content": "Gestionar Contenido",
+      "manage_equipment": "Gestionar Equipos",
+      "approve_work": "Aprobar Trabajo",
+      "manage_marketing": "Gestionar Marketing",
+      "manage_settings": "Administrar Configuración",
+      "manage_spanish_content": "Gestionar Contenido en Español"
+    },
+    "permissionDesc": {
+      "see_finance": "Facturas, reportes, presupuesto MORS",
+      "see_people_hr": "Registros de empleados, formularios de RRHH",
+      "see_hiring": "Candidatos, proceso de contratación",
+      "see_customers": "Lista y detalle de clientes",
+      "see_jobs_work": "Trabajos, pipeline, programación",
+      "see_time_reports": "Datos de tiempo de todos los empleados",
+      "manage_content": "Crear/editar SOPs y recursos",
+      "manage_equipment": "Acceso de escritura a equipos",
+      "approve_work": "Aprobar hojas de trabajo y rutas",
+      "manage_marketing": "Campañas, consultas, clientes potenciales",
+      "manage_settings": "Panel de administración, configuración del sistema",
+      "manage_spanish_content": "Aprobación de traducciones al español"
+    },
+    "roles": {
+      "Customer": "Cliente",
+      "New Hire": "Nuevo Empleado",
+      "Crew": "Cuadrilla",
+      "Crew Lead": "Jefe de Cuadrilla",
+      "HR": "RRHH",
+      "Sales": "Ventas",
+      "Manager": "Gerente",
+      "Admin": "Administrador"
+    }
   }
 }

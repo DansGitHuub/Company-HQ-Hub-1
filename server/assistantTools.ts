@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { pool } from "./db";
+import { hasPermission } from "./permissionCache";
 
 const TOOLS_REQUIRING_CONFIRMATION = [
   "createTask",
@@ -577,35 +578,45 @@ function checkPermission(user: any, toolName: string): { allowed: boolean; reaso
     "getDailyBriefing", "navigateTo", "openRecord", "lookupVIN",
     "getMessages", "getCalendarEvents", "getJobs", "getNotes",
     "searchPlantCards",
-    // New read-only tools available to all internal roles (scoped internally per role)
     "searchKnowledgeBase", "getEmployeeHours",
   ];
   if (readOnlyTools.includes(toolName)) return { allowed: true };
 
   if (role === "Customer") return { allowed: false, reason: "This action is not available for customer accounts." };
 
-  // Financial, HR, and hiring tools — Admin/Manager only
-  const adminManagerOnly = [
-    "getInvoices", "getInvoiceAgingSummary",
-    "getRevenueReport", "getJobCostSummary",
-    "getOvertimeReport",
-    "searchCandidates", "getHiringPipelineSummary",
-    "createSop",
-  ];
-  if (adminManagerOnly.includes(toolName)) {
-    if (!["Admin", "Master Admin", "Manager"].includes(role)) {
-      return { allowed: false, reason: "This information is only available to Admin and Manager roles." };
+  // Finance tools — gated by see_finance permission
+  const financeTools = ["getInvoices", "getInvoiceAgingSummary", "getRevenueReport", "getJobCostSummary", "getOvertimeReport"];
+  if (financeTools.includes(toolName)) {
+    if (!hasPermission(user, "see_finance")) {
+      return { allowed: false, reason: "This information is only available to users with Finance access." };
     }
     return { allowed: true };
   }
 
+  // Hiring tools — gated by see_hiring permission
+  const hiringTools = ["searchCandidates", "getHiringPipelineSummary"];
+  if (hiringTools.includes(toolName)) {
+    if (!hasPermission(user, "see_hiring")) {
+      return { allowed: false, reason: "This information is only available to users with Hiring access." };
+    }
+    return { allowed: true };
+  }
+
+  // Content management — gated by manage_content permission
+  if (toolName === "createSop") {
+    if (!hasPermission(user, "manage_content")) {
+      return { allowed: false, reason: "Only users with Content Management access can create SOPs." };
+    }
+    return { allowed: true };
+  }
+
+  // Plant cards — Admin-only (not in the configurable matrix)
   if (toolName === "createPlantCard") {
     if (!["Admin", "Master Admin"].includes(role)) return { allowed: false, reason: "Only admins can create plant cards." };
     return { allowed: true };
   }
 
   if (["createTask"].includes(toolName)) {
-    if (role === "Customer") return { allowed: false, reason: "Customers cannot create tasks." };
     return { allowed: true };
   }
 
@@ -613,13 +624,18 @@ function checkPermission(user: any, toolName: string): { allowed: boolean; reaso
     return { allowed: true };
   }
 
+  // Equipment management — gated by manage_equipment permission
   if (["createEquipment"].includes(toolName)) {
-    if (!["Admin", "Master Admin", "Manager"].includes(role)) return { allowed: false, reason: "Only managers and admins can add equipment." };
+    if (!hasPermission(user, "manage_equipment")) {
+      return { allowed: false, reason: "Only users with Equipment Management access can add equipment." };
+    }
     return { allowed: true };
   }
 
   if (["logEquipmentService", "updateEquipmentHours", "submitRepairRequest"].includes(toolName)) {
-    if (!["Admin", "Master Admin", "Manager", "Crew Lead", "Crew"].includes(role)) return { allowed: false, reason: "You don't have permission to perform this equipment action." };
+    if (!["Admin", "Master Admin", "Manager", "Crew Lead", "Crew"].includes(role)) {
+      return { allowed: false, reason: "You don't have permission to perform this equipment action." };
+    }
     return { allowed: true };
   }
 

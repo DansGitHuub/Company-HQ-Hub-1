@@ -1,7 +1,7 @@
 import { useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/hooks/use-auth";
-import { LayoutDashboard, TrendingUp, ClipboardCheck, Archive, AlertTriangle, Building2, Layers, FileText, FileSignature, SlidersHorizontal, MessageSquareWarning, Wrench, Tag, DollarSign, BookOpen, Leaf, Camera, Activity, Zap, FlagTriangleRight, Brain, Sparkles, Bot, Puzzle, CheckCircle, HelpCircle, GitMerge, Eye, AlertCircle, HeartPulse, Shield } from "lucide-react";
+import { LayoutDashboard, TrendingUp, ClipboardCheck, Archive, AlertTriangle, Building2, Layers, FileText, FileSignature, SlidersHorizontal, MessageSquareWarning, Wrench, Tag, DollarSign, BookOpen, Leaf, Camera, Activity, Zap, FlagTriangleRight, Brain, Sparkles, Bot, Puzzle, CheckCircle, HelpCircle, GitMerge, Eye, AlertCircle, HeartPulse, Shield, ShieldCheck } from "lucide-react";
 
 type SettingsCard = {
   id: string;
@@ -78,6 +78,7 @@ const SECTIONS: SettingsSection[] = [
       { id: "estimateTemplates", icon: FileText, nameKey: "settingsHub.cards.estimateTemplates.name", descKey: "settingsHub.cards.estimateTemplates.desc", href: "/admin?tab=estimate-templates" },
       { id: "termsConditions", icon: FileSignature, nameKey: "settingsHub.cards.termsConditions.name", descKey: "settingsHub.cards.termsConditions.desc", href: "/admin?tab=terms" },
       { id: "businessRules", icon: SlidersHorizontal, nameKey: "settingsHub.cards.businessRules.name", descKey: "settingsHub.cards.businessRules.desc", href: "/admin/business-rules" },
+      { id: "permissionsMatrix", icon: ShieldCheck, nameKey: "settingsHub.cards.permissionsMatrix.name", descKey: "settingsHub.cards.permissionsMatrix.desc", href: "/admin/permissions" },
       { id: "feedbackReports", icon: MessageSquareWarning, nameKey: "settingsHub.cards.feedbackReports.name", descKey: "settingsHub.cards.feedbackReports.desc", href: "/admin/feedback" },
     ],
   },

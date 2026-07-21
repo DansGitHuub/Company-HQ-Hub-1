@@ -246,6 +246,7 @@
       "estimateTemplates": { "name": "Estimate Templates", "desc": "Default templates for new estimates." },
       "termsConditions": { "name": "Terms & Conditions", "desc": "Customer-facing legal terms." },
       "businessRules": { "name": "Business Rules", "desc": "Financial, scheduling, and workflow settings." },
+      "permissionsMatrix": { "name": "Role Permissions", "desc": "Configure who can see what across every role." },
       "feedbackReports": { "name": "Bug Reports & Feedback", "desc": "Review staff-submitted bugs and suggestions." },
       "adminTools": { "name": "Admin Tools", "desc": "Form builder and admin utility tools." },
       "workAreas": { "name": "Work Areas", "desc": "Define service zones for jobs and crews." },
@@ -2659,5 +2660,53 @@
     "cancel": "Cancel",
     "saved": "Answer saved",
     "saveFailed": "Could not save"
+  },
+  "permissionsMatrix": {
+    "pageTitle": "Role Permissions Matrix",
+    "pageSubtitle": "Configure which roles have access to each area. Changes take effect immediately, server-side.",
+    "masterAdminNote": "Master Admin always has full access and is not shown here.",
+    "customerNote": "Customer role is locked — always has portal-only access.",
+    "adminSettingsNote": "Admin always has Manage Settings — this cell is locked on.",
+    "saveSuccess": "Permission updated",
+    "saveError": "Failed to update permission",
+    "locked": "Locked",
+    "permissions": {
+      "see_finance": "See Finance",
+      "see_people_hr": "See People / HR",
+      "see_hiring": "See Hiring",
+      "see_customers": "See Customers",
+      "see_jobs_work": "See Jobs & Work",
+      "see_time_reports": "See Time Reports",
+      "manage_content": "Manage Content",
+      "manage_equipment": "Manage Equipment",
+      "approve_work": "Approve Work",
+      "manage_marketing": "Manage Marketing",
+      "manage_settings": "Manage Settings",
+      "manage_spanish_content": "Manage Spanish Content"
+    },
+    "permissionDesc": {
+      "see_finance": "Invoices, reports, MORS budget",
+      "see_people_hr": "Employee records, HR forms",
+      "see_hiring": "Candidates, hiring pipeline",
+      "see_customers": "Customer list and detail",
+      "see_jobs_work": "Jobs, work pipeline, scheduling",
+      "see_time_reports": "All-employee time data, QBO export",
+      "manage_content": "Create/edit SOPs and resources",
+      "manage_equipment": "Equipment write access",
+      "approve_work": "Approve worksheets and route days",
+      "manage_marketing": "Campaigns, consultations, leads",
+      "manage_settings": "Admin panel, system config",
+      "manage_spanish_content": "Spanish translation approval"
+    },
+    "roles": {
+      "Customer": "Customer",
+      "New Hire": "New Hire",
+      "Crew": "Crew",
+      "Crew Lead": "Crew Lead",
+      "HR": "HR",
+      "Sales": "Sales",
+      "Manager": "Manager",
+      "Admin": "Admin"
+    }
   }
 }

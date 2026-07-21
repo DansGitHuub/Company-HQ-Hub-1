@@ -1,9 +1,9 @@
 import { Express } from "express";
 import { pool } from "./db";
-import { requireRole } from "./auth";
+import { requirePermission } from "./auth";
 
 export function registerReportRoutes(app: Express, requireAuth: any) {
-  const requireAdminOrManager = requireRole("Admin", "Manager");
+  const requireAdminOrManager = requirePermission("see_finance");
 
   // ── REVENUE REPORT ──────────────────────────────────────────────────────────
   app.get("/api/reports/revenue", requireAuth, requireAdminOrManager, async (req, res) => {

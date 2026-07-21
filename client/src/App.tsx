@@ -167,6 +167,7 @@ import MessagesPage from "@/pages/Messages";
 import TimeReports from "@/pages/admin/TimeReports";
 import ServiceTypesPage from "@/pages/admin/ServiceTypesPage";
 import BusinessRulesPage from "@/pages/admin/BusinessRulesPage";
+import PermissionsMatrixPage from "@/pages/admin/PermissionsMatrixPage";
 import RegionalSettingsPage from "@/pages/admin/RegionalSettingsPage";
 import NotificationCenterPage from "@/pages/admin/NotificationCenterPage";
 import AutomationCenterPage from "@/pages/admin/AutomationCenterPage";
@@ -370,6 +371,7 @@ function AppRoutes() {
         <ProtectedRoute path="/admin/service-types" component={ServiceTypesPage} allowedRoles={ADMIN_ONLY} />
         <ProtectedRoute path="/admin/setup-wizard" component={SetupWizardPage} allowedRoles={ADMIN_ONLY} />
         <ProtectedRoute path="/admin/business-rules" component={BusinessRulesPage} allowedRoles={ADMIN_ONLY} />
+        <ProtectedRoute path="/admin/permissions" component={PermissionsMatrixPage} allowedRoles={ADMIN_ONLY} />
         <ProtectedRoute path="/admin/ai-knowledge" component={AIKnowledgePage} allowedRoles={ADMIN_ONLY} />
         <ProtectedRoute path="/admin/automation-center" component={AutomationCenterPage} allowedRoles={ADMIN_ONLY} />
         <ProtectedRoute path="/admin/regional-settings" component={RegionalSettingsPage} allowedRoles={ADMIN_ONLY} />

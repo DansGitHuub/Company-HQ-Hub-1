@@ -6,6 +6,7 @@ import { storage } from "./storage";
 import { sendHiringStageEmail, sendHiringWelcomeEmail, sendNewHireAccountEmail, sendZoomInterviewEmail, sendInPersonInterviewEmail, sendHiredNotificationEmail } from "./email";
 import { getAppUrl, sendOfferAcceptanceEmail, sendEmail } from "./emailService";
 import { hashPassword } from "./auth";
+import { hasPermission } from "./permissionCache";
 import { createZoomMeeting, isZoomConfigured } from "./zoomService";
 import { sendInterviewSms, sendStageSms, sendHireSms, isSmsConfigured } from "./smsService";
 import { createCalendarEvent, refreshAccessToken, isTokenExpired } from "./googleOAuth";
@@ -450,18 +451,14 @@ async function executeHireFlow(candidateId: string, startDate?: string, sendEmai
 
 export function registerHiringRoutes(app: Express, requireAuth: RequestHandler) {
   const requireHRAccess: RequestHandler = (req: any, res, next) => {
-    const role = req.user?.role;
-    const isMasterAdmin = req.user?.isMasterAdmin;
-    if (!["Admin", "Manager"].includes(role) && !isMasterAdmin) {
+    if (!hasPermission(req.user, "see_hiring")) {
       return res.status(403).json({ message: "Not authorized" });
     }
     next();
   };
 
   const requireManagerAccess: RequestHandler = (req: any, res, next) => {
-    const role = req.user?.role;
-    const isMasterAdmin = req.user?.isMasterAdmin;
-    if (!["Admin", "Manager"].includes(role) && !isMasterAdmin) {
+    if (!hasPermission(req.user, "see_hiring")) {
       return res.status(403).json({ message: "Not authorized" });
     }
     next();

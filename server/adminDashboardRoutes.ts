@@ -1,4 +1,5 @@
 import { pool } from "./db";
+import { hasPermission } from "./permissionCache";
 import type { Express } from "express";
 
 // ── Local copies of dailyPlanRoutes.ts overlap helpers ──────────────────────

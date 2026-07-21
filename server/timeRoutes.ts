@@ -1,5 +1,6 @@
 import { Express } from "express";
 import { pool } from "./db";
+import { hasPermission } from "./permissionCache";
 
 export function registerTimeRoutes(app: Express, requireAuth: any) {
 
@@ -417,8 +418,8 @@ export function registerTimeRoutes(app: Express, requireAuth: any) {
   // ── Admin: Time Reports ─────────────────────────────────────────────────────
   app.get("/api/admin/time-reports", requireAuth, async (req, res) => {
     const requestingUser = req.user as any;
-    if (requestingUser.role !== "Admin" && !requestingUser.isMasterAdmin) {
-      return res.status(403).json({ message: "Admin access required" });
+    if (!hasPermission(requestingUser, "see_time_reports")) {
+      return res.status(403).json({ message: "Access denied." });
     }
 
     const { user_id, job_id, customer, date_from, date_to, year, work_area } = req.query as Record<string, string>;

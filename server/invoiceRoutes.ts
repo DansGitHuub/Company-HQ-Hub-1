@@ -1,6 +1,6 @@
 import { Express } from "express";
 import { pool } from "./db";
-import { requireRole } from "./auth";
+import { requirePermission } from "./auth";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import { sendEmail, escapeHtml } from "./emailService";
 
@@ -210,7 +210,7 @@ export async function sendInvoiceById(invoiceId: string) {
 export function registerInvoiceRoutes(app: Express, requireAuth: any) {
 
   // ── LIST ──────────────────────────────────────────────────────────────────────
-  app.get("/api/invoices", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
+  app.get("/api/invoices", requireAuth, requirePermission("see_finance"), async (req, res) => {
     const { status, customer_id, job_id, date_from, date_to, search } = req.query as Record<string, string>;
 
     try {
@@ -253,7 +253,7 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
   });
 
   // ── SINGLE ────────────────────────────────────────────────────────────────────
-  app.get("/api/invoices/:id", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
+  app.get("/api/invoices/:id", requireAuth, requirePermission("see_finance"), async (req, res) => {
     try {
       let resolvedId = req.params.id;
       if (/^INV-\d+$/i.test(resolvedId)) {
@@ -294,7 +294,7 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
   });
 
   // ── CREATE ────────────────────────────────────────────────────────────────────
-  app.post("/api/invoices", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
+  app.post("/api/invoices", requireAuth, requirePermission("see_finance"), async (req, res) => {
     const {
       customer_id, job_id, issued_date, due_date,
       tax_rate = 0, discount_amount = 0, notes, terms, customer_message, customer_response, customer_response_at, customer_response_note, line_items = [],
@@ -370,7 +370,7 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
   });
 
   // ── UPDATE ────────────────────────────────────────────────────────────────────
-  app.put("/api/invoices/:id", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
+  app.put("/api/invoices/:id", requireAuth, requirePermission("see_finance"), async (req, res) => {
     const {
       customer_id, job_id, status, issued_date, due_date,
       tax_rate, discount_amount, notes, terms, customer_message, customer_response,
@@ -450,7 +450,7 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
   });
 
   // ── PATCH STATUS ──────────────────────────────────────────────────────────────
-  app.patch("/api/invoices/:id/status", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
+  app.patch("/api/invoices/:id/status", requireAuth, requirePermission("see_finance"), async (req, res) => {
     const { status } = req.body;
     if (!status) return res.status(400).json({ message: "status required" });
     try {
@@ -478,7 +478,7 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
   });
 
   // ── DELETE (void) ─────────────────────────────────────────────────────────────
-  app.delete("/api/invoices/:id", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
+  app.delete("/api/invoices/:id", requireAuth, requirePermission("see_finance"), async (req, res) => {
     try {
       const preVoid = await pool.query(`SELECT invoice_number, total FROM invoices WHERE id=$1`, [req.params.id]);
       await pool.query(
@@ -500,7 +500,7 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
   });
 
   // ── ADD PAYMENT ───────────────────────────────────────────────────────────────
-  app.post("/api/invoices/:id/payments", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
+  app.post("/api/invoices/:id/payments", requireAuth, requirePermission("see_finance"), async (req, res) => {
     const { amount, payment_method = "cash", payment_date, reference_number, notes } = req.body;
     if (!amount) return res.status(400).json({ message: "amount required" });
 
@@ -539,7 +539,7 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
   });
 
   // ── DELETE PAYMENT ────────────────────────────────────────────────────────────
-  app.delete("/api/payments/:paymentId", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
+  app.delete("/api/payments/:paymentId", requireAuth, requirePermission("see_finance"), async (req, res) => {
     try {
       const preDelete = await pool.query(
         `SELECT p.amount, p.payment_method, p.invoice_id, i.invoice_number
@@ -572,7 +572,7 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
   });
 
   // ── SEND ──────────────────────────────────────────────────────────────────────
-  app.patch("/api/invoices/:id/send", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
+  app.patch("/api/invoices/:id/send", requireAuth, requirePermission("see_finance"), async (req, res) => {
     try {
       const invoice = await sendInvoiceById(req.params.id);
       if (!invoice) return res.status(404).json({ message: "Not found" });
@@ -583,7 +583,7 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
   });
 
   // ── CUSTOMER RESPONSE (accept / decline / changes_requested) ──────────────────
-  app.patch("/api/invoices/:id/response", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
+  app.patch("/api/invoices/:id/response", requireAuth, requirePermission("see_finance"), async (req, res) => {
     const { status, customer_response, customer_response_note } = req.body;
     const VALID = ["accepted", "declined", "changes_requested"];
     if (!status || !VALID.includes(status)) {
@@ -608,7 +608,7 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
   });
 
   // ── MARK PAID ─────────────────────────────────────────────────────────────────
-  app.patch("/api/invoices/:id/paid", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
+  app.patch("/api/invoices/:id/paid", requireAuth, requirePermission("see_finance"), async (req, res) => {
     try {
       const { rows } = await pool.query(`
         UPDATE invoices
@@ -631,7 +631,7 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
   });
 
   // ── PDF GENERATION ────────────────────────────────────────────────────────────
-  app.get("/api/invoices/:id/pdf", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
+  app.get("/api/invoices/:id/pdf", requireAuth, requirePermission("see_finance"), async (req, res) => {
     try {
       let resolvedId = req.params.id;
       if (/^INV-\d+$/i.test(resolvedId)) {
