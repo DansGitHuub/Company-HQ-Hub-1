@@ -428,6 +428,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     finance_hub: { icon: DollarSign, label: t("nav.financeHub"), href: "/finance" },
     people_hub: { icon: Users, label: t("nav.peopleHub"), href: "/people" },
     sales_hub: { icon: Contact, label: t("nav.salesHub"), href: "/sales" },
+    work_hub: { icon: Briefcase, label: t("nav.workHub"), href: "/work" },
   };
 
   type NavSection = { label: string; items: string[] };
@@ -445,7 +446,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const sidebarSections: NavSection[] = [
     { label: "MY SPACE", items: ["home", "my_hours", "my_day", "messages", "todos"] },
     { label: "SALES", items: ["sales_hub"] },
-    { label: "WORK", items: ["jobs", "manager_dashboard", "work_orders", "day_briefing", "scheduling", "maintenance_routes", "time_admin", "maintenance_reports", "time_tracking", "equipment"] },
+    { label: "WORK", items: ["work_hub"] },
     { label: "FINANCE", items: ["finance_hub"] },
     { label: "PEOPLE", items: ["people_hub"] },
     { label: "COMPANY", items: ["company_hub"] },
@@ -495,6 +496,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const getIsActive = (item: { id: string; href: string }) => {
     if (item.id === "settings_hub") {
+      const workAdminPaths = ["/admin/time", "/admin/maintenance-reports"];
+      if (workAdminPaths.some(p => location === p || location.startsWith(p + "/"))) return false;
       return (
         location === "/settings-system" ||
         location === "/admin" ||
@@ -517,6 +520,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     if (item.id === "sales_hub") {
       const salesPaths = ["/sales", "/customers", "/consultations", "/estimates", "/customer-messages", "/customer-blasts"];
       return salesPaths.some(p => location === p || location.startsWith(p + "/"));
+    }
+    if (item.id === "work_hub") {
+      const workPaths = ["/work", "/jobs", "/work-orders", "/scheduling", "/daily-plan", "/maintenance-routes", "/admin/time", "/admin/maintenance-reports", "/manager-dashboard", "/time", "/equipment"];
+      return workPaths.some(p => location === p || location.startsWith(p + "/"));
     }
     if (item.href === "/tools" && item.id === "tools") {
       return location.startsWith("/tools");
@@ -591,6 +598,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       finance_hub: tNav("nav.financeHub"),
       people_hub: tNav("nav.peopleHub"),
       sales_hub: tNav("nav.salesHub"),
+      work_hub: tNav("nav.workHub"),
     }), [currentLang]);
 
     const navSectionLabels: Record<string, string> = React.useMemo(() => ({

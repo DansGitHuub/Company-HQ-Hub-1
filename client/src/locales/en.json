@@ -81,7 +81,31 @@
     "companyHub": "Company",
     "financeHub": "Finance",
     "peopleHub": "People",
-    "salesHub": "Sales"
+    "salesHub": "Sales",
+    "workHub": "Work"
+  },
+  "workHub": {
+    "title": "Work",
+    "subtitle": "Jobs, scheduling, time tracking, and equipment.",
+    "noAccess": "You don't have access to Work tools.",
+    "sections": {
+      "jobsScheduling": "Jobs & Scheduling",
+      "oversight": "Oversight",
+      "timeRecords": "Time & Records",
+      "resources": "Resources"
+    },
+    "cards": {
+      "jobs": { "name": "Jobs", "desc": "View and manage active jobs and work assignments." },
+      "workOrders": { "name": "Work Orders", "desc": "Create and track maintenance and service work orders." },
+      "dispatchBoard": { "name": "Dispatch Board", "desc": "Weekly crew dispatch calendar and job scheduling." },
+      "dayBriefing": { "name": "Day Briefing", "desc": "Daily plan view with crew assignments and priorities." },
+      "maintenanceRoutes": { "name": "Maintenance Routes", "desc": "Manage recurring maintenance route stops and visits." },
+      "managerDashboard": { "name": "Manager Dashboard", "desc": "Team performance overview and operational metrics." },
+      "teamTimeTracking": { "name": "Team Time Tracking", "desc": "Clock in/out, job time, and live elapsed timers." },
+      "timeAdmin": { "name": "Time Admin", "desc": "Review, approve, and manage all employee time entries." },
+      "maintenanceReports": { "name": "Maintenance Reports", "desc": "Maintenance visit history and route performance reports." },
+      "equipment": { "name": "Equipment", "desc": "Fleet health, asset tracking, and equipment records." }
+    }
   },
   "salesHub": {
     "title": "Sales",

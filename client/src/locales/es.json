@@ -81,7 +81,31 @@
     "companyHub": "Empresa",
     "financeHub": "Finanzas",
     "peopleHub": "Personas",
-    "salesHub": "Ventas"
+    "salesHub": "Ventas",
+    "workHub": "Trabajo"
+  },
+  "workHub": {
+    "title": "Trabajo",
+    "subtitle": "Trabajos, despacho, registro de tiempo y equipo.",
+    "noAccess": "No tienes acceso a las herramientas de Trabajo.",
+    "sections": {
+      "jobsScheduling": "Trabajos y Despacho",
+      "oversight": "Supervisión",
+      "timeRecords": "Tiempo y Registros",
+      "resources": "Recursos"
+    },
+    "cards": {
+      "jobs": { "name": "Trabajos", "desc": "Ver y gestionar trabajos activos y asignaciones." },
+      "workOrders": { "name": "Órdenes de Trabajo", "desc": "Crear y rastrear órdenes de mantenimiento y servicio." },
+      "dispatchBoard": { "name": "Tablero de Despacho", "desc": "Calendario semanal de despacho de cuadrillas y programación." },
+      "dayBriefing": { "name": "Plan del Día", "desc": "Vista diaria con asignaciones de cuadrilla y prioridades." },
+      "maintenanceRoutes": { "name": "Rutas de Mantenimiento", "desc": "Gestiona paradas y visitas de rutas de mantenimiento recurrentes." },
+      "managerDashboard": { "name": "Panel de Gerente", "desc": "Resumen de desempeño del equipo y métricas operativas." },
+      "teamTimeTracking": { "name": "Registro de Tiempo", "desc": "Entrada/salida, tiempo por trabajo y temporizadores en vivo." },
+      "timeAdmin": { "name": "Admin de Tiempo", "desc": "Revisar, aprobar y gestionar entradas de tiempo de empleados." },
+      "maintenanceReports": { "name": "Reportes de Mantenimiento", "desc": "Historial de visitas de mantenimiento y reportes de rutas." },
+      "equipment": { "name": "Equipo", "desc": "Salud de flota, rastreo de activos y registros de equipo." }
+    }
   },
   "salesHub": {
     "title": "Ventas",
