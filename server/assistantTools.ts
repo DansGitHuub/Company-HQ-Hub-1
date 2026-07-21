@@ -10,6 +10,7 @@ const TOOLS_REQUIRING_CONFIRMATION = [
   "submitRepairRequest",
   "createNote",
   "createPlantCard",
+  "createSop",
 ];
 
 const STATUS_REQUIRING_CONFIRMATION = ["completed", "cancelled"];
@@ -381,6 +382,148 @@ export const allToolDefinitions: OpenAI.Chat.Completions.ChatCompletionTool[] = 
       },
     },
   },
+
+  // ── A. INVOICES ─────────────────────────────────────────────────────────────
+  {
+    type: "function",
+    function: {
+      name: "getInvoices",
+      description: "List or search invoices. Use when the user asks about invoices, outstanding balances, unpaid bills, past-due amounts, or specific customer invoices. Admin/Manager only.",
+      parameters: {
+        type: "object",
+        properties: {
+          status: { type: "string", description: "Filter by invoice status: draft, sent, paid, overdue, void" },
+          customerName: { type: "string", description: "Filter by customer name (partial match)" },
+          overdueOnly: { type: "boolean", description: "If true, only return past-due invoices with a balance remaining" },
+          limit: { type: "integer", description: "Max number of results to return (default 20)" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "getInvoiceAgingSummary",
+      description: "Get accounts receivable aging summary — outstanding balances bucketed by days past due (current, 1-30, 31-60, 61-90, 90+). Use when asked about 'aging', 'AR summary', 'overdue amounts', 'who owes money', or total outstanding receivables. Admin/Manager only.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+
+  // ── B. FINANCIAL REPORTS ────────────────────────────────────────────────────
+  {
+    type: "function",
+    function: {
+      name: "getRevenueReport",
+      description: "Get monthly revenue summary for the past 12 months — gross billed, collected, and outstanding by month, plus year-to-date totals. Use for 'revenue', 'sales totals', 'how much have we billed', 'monthly income', 'YTD revenue' questions. Admin/Manager only.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "getJobCostSummary",
+      description: "Get job costing data — hours worked, crew size, and invoiced amounts per job. Use for 'job profitability', 'cost per job', 'how many hours on job X', 'job costing' questions. Admin/Manager only.",
+      parameters: {
+        type: "object",
+        properties: {
+          jobName: { type: "string", description: "Optional filter by job title or client name (partial match)" },
+          limitDays: { type: "integer", description: "Lookback window in days (default 90)" },
+        },
+      },
+    },
+  },
+
+  // ── C. PEOPLE / TIME ────────────────────────────────────────────────────────
+  {
+    type: "function",
+    function: {
+      name: "getEmployeeHours",
+      description: "Get hours worked by employee. Admin/Manager see all employees; Crew sees only their own hours. Use for 'how many hours has X worked', 'hours this week', 'time summary by employee', 'billable vs shop hours'. Supports date range filtering.",
+      parameters: {
+        type: "object",
+        properties: {
+          employeeName: { type: "string", description: "Optional: filter by employee name (partial match). Leave blank for all employees." },
+          dateFrom: { type: "string", description: "Start date YYYY-MM-DD (default: start of current week)" },
+          dateTo: { type: "string", description: "End date YYYY-MM-DD (default: today)" },
+          groupByJob: { type: "boolean", description: "If true, also break down each employee's hours by job" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "getOvertimeReport",
+      description: "Show employees who worked more than 40 hours in a week. Use for 'overtime', 'who is over 40 hours', 'overtime risk', 'overworked employees'. Reviews the last 4 weeks by default. Admin/Manager only.",
+      parameters: {
+        type: "object",
+        properties: {
+          weeksBack: { type: "integer", description: "How many weeks back to check (default 4)" },
+        },
+      },
+    },
+  },
+
+  // ── D. HIRING ────────────────────────────────────────────────────────────────
+  {
+    type: "function",
+    function: {
+      name: "searchCandidates",
+      description: "Search the hiring pipeline for candidates/applicants. Use when asked about applicants, candidates, who applied for a job, interview pipeline, or hiring status of a specific person. Admin/Manager only.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Search by candidate name or applied position (partial match)" },
+          stage: { type: "string", description: "Filter by pipeline stage, e.g. 'Application Received', 'Phone Screen', 'Interview Scheduled', 'Offer Extended', 'Hired', 'Rejected'" },
+          recentOnly: { type: "boolean", description: "If true, only return candidates from the last 30 days" },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "getHiringPipelineSummary",
+      description: "Get a high-level hiring pipeline overview — total applicants, breakdown by stage, by position, and most recent applications. Admin/Manager only.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+
+  // ── E. KNOWLEDGE BASE ────────────────────────────────────────────────────────
+  {
+    type: "function",
+    function: {
+      name: "searchKnowledgeBase",
+      description: "Search full content of SOPs, care guides, and customer resources for relevant information. Searches document body text, not just titles. Use when asked 'do we have a procedure for X', 'how do we handle Y', 'is there a guide for Z', or any knowledge/policy/process lookup. All internal roles can search SOPs and resources; Admin/Manager also search uploaded documents.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "The topic, keyword, or question to search for" },
+          scope: { type: "string", description: "Optional: 'sops', 'resources', or 'all' (default 'all')" },
+        },
+        required: ["query"],
+      },
+    },
+  },
+
+  // ── F. SOP BUILDER ────────────────────────────────────────────────────────────
+  {
+    type: "function",
+    function: {
+      name: "createSop",
+      description: "Save a completed SOP to the SOP library. ONLY call this AFTER you have guided the user through the full SOP content step by step and they have confirmed the final result. Admin/Manager only. Always confirm before saving.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "SOP title — clear, action-oriented (e.g. 'How to Install a Block Retaining Wall')" },
+          category: { type: "string", description: "Category, e.g. 'Installation', 'Maintenance', 'Safety', 'Equipment', 'Customer Service', 'Operations', 'HR'" },
+          superCategory: { type: "string", description: "Optional top-level grouping, e.g. 'Field Operations', 'Administrative', 'Safety'" },
+          content: { type: "string", description: "Full SOP content in markdown. Must include: an Overview paragraph, numbered Steps, and any Safety Notes or Materials/Tools needed." },
+        },
+        required: ["title", "category", "content"],
+      },
+    },
+  },
 ];
 
 const MODULE_ROUTES: Record<string, string> = {
@@ -434,10 +577,27 @@ function checkPermission(user: any, toolName: string): { allowed: boolean; reaso
     "getDailyBriefing", "navigateTo", "openRecord", "lookupVIN",
     "getMessages", "getCalendarEvents", "getJobs", "getNotes",
     "searchPlantCards",
+    // New read-only tools available to all internal roles (scoped internally per role)
+    "searchKnowledgeBase", "getEmployeeHours",
   ];
   if (readOnlyTools.includes(toolName)) return { allowed: true };
 
   if (role === "Customer") return { allowed: false, reason: "This action is not available for customer accounts." };
+
+  // Financial, HR, and hiring tools — Admin/Manager only
+  const adminManagerOnly = [
+    "getInvoices", "getInvoiceAgingSummary",
+    "getRevenueReport", "getJobCostSummary",
+    "getOvertimeReport",
+    "searchCandidates", "getHiringPipelineSummary",
+    "createSop",
+  ];
+  if (adminManagerOnly.includes(toolName)) {
+    if (!["Admin", "Master Admin", "Manager"].includes(role)) {
+      return { allowed: false, reason: "This information is only available to Admin and Manager roles." };
+    }
+    return { allowed: true };
+  }
 
   if (toolName === "createPlantCard") {
     if (!["Admin", "Master Admin"].includes(role)) return { allowed: false, reason: "Only admins can create plant cards." };
@@ -986,6 +1146,328 @@ export async function executeTool(toolName: string, toolArgs: any, user: any): P
             message: `Plant card for "${card.common_name}" has been created and published. You can add photos by going to the Plant Library and opening the card.`,
           },
           navigationTarget: "/plant-cards",
+        };
+      }
+
+      // ── A. INVOICES ──────────────────────────────────────────────────────────
+      case "getInvoices": {
+        let sql = `SELECT i.id, i.invoice_number,
+          COALESCE(NULLIF(c.company_name, ''), c.first_name || ' ' || COALESCE(c.last_name, ''), 'Unknown') AS customer_name,
+          ROUND(COALESCE(i.total, 0)::numeric, 2) AS total,
+          ROUND(COALESCE(i.balance_due, 0)::numeric, 2) AS balance_due,
+          ROUND(COALESCE(i.amount_paid, 0)::numeric, 2) AS amount_paid,
+          i.status, i.due_date, i.issued_date
+        FROM invoices i
+        LEFT JOIN customers c ON c.id = i.customer_id
+        WHERE i.status != 'void'`;
+        const invParams: any[] = [];
+        let invIdx = 1;
+        if (toolArgs.status) { sql += ` AND i.status = $${invIdx++}`; invParams.push(toolArgs.status); }
+        if (toolArgs.customerName) {
+          sql += ` AND (c.company_name ILIKE $${invIdx} OR (c.first_name || ' ' || COALESCE(c.last_name,'')) ILIKE $${invIdx})`;
+          invParams.push(`%${toolArgs.customerName}%`); invIdx++;
+        }
+        if (toolArgs.overdueOnly) {
+          sql += ` AND i.due_date < CURRENT_DATE AND i.balance_due > 0`;
+        }
+        sql += ` ORDER BY i.due_date ASC NULLS LAST LIMIT $${invIdx}`;
+        invParams.push(Math.min(toolArgs.limit || 20, 50));
+        const invRes = await pool.query(sql, invParams);
+        const totalOut = invRes.rows.reduce((s: number, r: any) => s + parseFloat(r.balance_due || 0), 0);
+        return { result: { invoices: invRes.rows, count: invRes.rows.length, total_outstanding: Math.round(totalOut * 100) / 100 } };
+      }
+
+      case "getInvoiceAgingSummary": {
+        const agRes = await pool.query(`
+          SELECT
+            COUNT(*) FILTER (WHERE balance_due > 0 AND (due_date IS NULL OR due_date >= CURRENT_DATE))::int AS current_count,
+            ROUND(COALESCE(SUM(balance_due) FILTER (WHERE balance_due > 0 AND (due_date IS NULL OR due_date >= CURRENT_DATE)), 0)::numeric, 2) AS current_amount,
+            COUNT(*) FILTER (WHERE balance_due > 0 AND due_date < CURRENT_DATE AND due_date >= CURRENT_DATE - INTERVAL '30 days')::int AS days_1_30_count,
+            ROUND(COALESCE(SUM(balance_due) FILTER (WHERE balance_due > 0 AND due_date < CURRENT_DATE AND due_date >= CURRENT_DATE - INTERVAL '30 days'), 0)::numeric, 2) AS days_1_30_amount,
+            COUNT(*) FILTER (WHERE balance_due > 0 AND due_date < CURRENT_DATE - INTERVAL '30 days' AND due_date >= CURRENT_DATE - INTERVAL '60 days')::int AS days_31_60_count,
+            ROUND(COALESCE(SUM(balance_due) FILTER (WHERE balance_due > 0 AND due_date < CURRENT_DATE - INTERVAL '30 days' AND due_date >= CURRENT_DATE - INTERVAL '60 days'), 0)::numeric, 2) AS days_31_60_amount,
+            COUNT(*) FILTER (WHERE balance_due > 0 AND due_date < CURRENT_DATE - INTERVAL '60 days' AND due_date >= CURRENT_DATE - INTERVAL '90 days')::int AS days_61_90_count,
+            ROUND(COALESCE(SUM(balance_due) FILTER (WHERE balance_due > 0 AND due_date < CURRENT_DATE - INTERVAL '60 days' AND due_date >= CURRENT_DATE - INTERVAL '90 days'), 0)::numeric, 2) AS days_61_90_amount,
+            COUNT(*) FILTER (WHERE balance_due > 0 AND due_date < CURRENT_DATE - INTERVAL '90 days')::int AS days_90_plus_count,
+            ROUND(COALESCE(SUM(balance_due) FILTER (WHERE balance_due > 0 AND due_date < CURRENT_DATE - INTERVAL '90 days'), 0)::numeric, 2) AS days_90_plus_amount
+          FROM invoices
+          WHERE status NOT IN ('void', 'draft', 'paid')
+        `);
+        const ag = agRes.rows[0];
+        const totalOutstanding = [ag.current_amount, ag.days_1_30_amount, ag.days_31_60_amount, ag.days_61_90_amount, ag.days_90_plus_amount]
+          .reduce((s, v) => s + parseFloat(v || 0), 0);
+        return {
+          result: {
+            aging: {
+              current: { label: "Current (not yet due)", count: ag.current_count, amount: parseFloat(ag.current_amount) },
+              days_1_30: { label: "1-30 days past due", count: ag.days_1_30_count, amount: parseFloat(ag.days_1_30_amount) },
+              days_31_60: { label: "31-60 days past due", count: ag.days_31_60_count, amount: parseFloat(ag.days_31_60_amount) },
+              days_61_90: { label: "61-90 days past due", count: ag.days_61_90_count, amount: parseFloat(ag.days_61_90_amount) },
+              days_90_plus: { label: "90+ days past due", count: ag.days_90_plus_count, amount: parseFloat(ag.days_90_plus_amount) },
+            },
+            total_outstanding: Math.round(totalOutstanding * 100) / 100,
+            as_of: new Date().toISOString().split("T")[0],
+          }
+        };
+      }
+
+      // ── B. FINANCIAL REPORTS ─────────────────────────────────────────────────
+      case "getRevenueReport": {
+        const [monthly, ytd] = await Promise.all([
+          pool.query(`
+            SELECT
+              TO_CHAR(DATE_TRUNC('month', issued_date), 'Mon YYYY') AS month,
+              DATE_TRUNC('month', issued_date)::date AS month_start,
+              COUNT(*)::int AS invoice_count,
+              ROUND(COALESCE(SUM(total), 0)::numeric, 2) AS gross_revenue,
+              ROUND(COALESCE(SUM(amount_paid), 0)::numeric, 2) AS collected,
+              ROUND(COALESCE(SUM(balance_due), 0)::numeric, 2) AS outstanding
+            FROM invoices
+            WHERE status NOT IN ('void', 'draft')
+              AND issued_date >= NOW() - INTERVAL '12 months'
+              AND issued_date IS NOT NULL
+            GROUP BY DATE_TRUNC('month', issued_date)
+            ORDER BY month_start DESC
+          `),
+          pool.query(`
+            SELECT
+              ROUND(COALESCE(SUM(total), 0)::numeric, 2) AS ytd_gross,
+              ROUND(COALESCE(SUM(amount_paid), 0)::numeric, 2) AS ytd_collected,
+              ROUND(COALESCE(SUM(balance_due), 0)::numeric, 2) AS ytd_outstanding,
+              COUNT(*)::int AS ytd_invoice_count
+            FROM invoices
+            WHERE status NOT IN ('void', 'draft')
+              AND issued_date >= DATE_TRUNC('year', NOW())
+          `),
+        ]);
+        return { result: { monthly: monthly.rows, ytd: ytd.rows[0], generated_at: new Date().toISOString().split("T")[0] } };
+      }
+
+      case "getJobCostSummary": {
+        const lookbackDays = Math.min(toolArgs.limitDays || 90, 365);
+        const jcParams: any[] = [lookbackDays];
+        let jcWhere = "";
+        if (toolArgs.jobName) {
+          jcWhere = ` AND (j.title ILIKE $2 OR j.client ILIKE $2)`;
+          jcParams.push(`%${toolArgs.jobName}%`);
+        }
+        const jcRes = await pool.query(`
+          SELECT j.id, COALESCE(NULLIF(j.title,''), j.client, 'Untitled') AS job_name, j.client, j.type, j.status,
+            ROUND(COALESCE(j.value, 0)::numeric, 2) AS estimated_value,
+            ROUND(COALESCE(SUM(te.duration_minutes) FILTER (WHERE te.clock_out IS NOT NULL), 0) / 60.0, 1) AS hours_worked,
+            COUNT(DISTINCT te.user_id) FILTER (WHERE te.clock_out IS NOT NULL) AS crew_count,
+            COUNT(DISTINCT i.id)::int AS invoice_count,
+            ROUND(COALESCE(SUM(DISTINCT i.total), 0)::numeric, 2) AS invoiced_total
+          FROM jobs j
+          LEFT JOIN time_entries te ON te.job_id = j.id
+          LEFT JOIN invoices i ON i.job_id = j.id AND i.status NOT IN ('void', 'draft')
+          WHERE j.status != 'cancelled'
+            AND j.created_at >= NOW() - ($1::int * INTERVAL '1 day')
+            ${jcWhere}
+          GROUP BY j.id, j.title, j.client, j.type, j.status, j.value
+          ORDER BY j.created_at DESC
+          LIMIT 20
+        `, jcParams);
+        return { result: { jobs: jcRes.rows, count: jcRes.rows.length, lookback_days: lookbackDays } };
+      }
+
+      // ── C. PEOPLE / TIME ─────────────────────────────────────────────────────
+      case "getEmployeeHours": {
+        const isHoursAdmin = ["Admin", "Manager", "Master Admin"].includes(user.role);
+        const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1);
+        const dateFrom = toolArgs.dateFrom || weekStart.toISOString().split("T")[0];
+        const dateTo = toolArgs.dateTo || new Date().toISOString().split("T")[0];
+        const ehParams: any[] = [dateFrom, dateTo];
+        let ehWhere = "";
+        if (!isHoursAdmin) {
+          ehWhere = ` AND te.user_id = $3`;
+          ehParams.push(user.id);
+        } else if (toolArgs.employeeName) {
+          ehWhere = ` AND u.name ILIKE $3`;
+          ehParams.push(`%${toolArgs.employeeName}%`);
+        }
+        const ehRes = await pool.query(`
+          SELECT u.name AS employee_name,
+            COUNT(DISTINCT te.clock_in::date)::int AS days_worked,
+            ROUND(COALESCE(SUM(te.duration_minutes), 0) / 60.0, 1) AS total_hours,
+            ROUND(COALESCE(SUM(te.duration_minutes) FILTER (WHERE te.entry_type = 'billable'), 0) / 60.0, 1) AS billable_hours,
+            ROUND(COALESCE(SUM(te.duration_minutes) FILTER (WHERE te.entry_type = 'shop_time'), 0) / 60.0, 1) AS shop_hours,
+            ROUND(COALESCE(SUM(te.duration_minutes) FILTER (WHERE te.entry_type = 'drive_time'), 0) / 60.0, 1) AS drive_hours
+          FROM time_entries te
+          LEFT JOIN users u ON u.id = te.user_id
+          WHERE te.clock_out IS NOT NULL
+            AND te.duration_minutes > 0
+            AND te.clock_in::date >= $1
+            AND te.clock_in::date <= $2
+            ${ehWhere}
+          GROUP BY u.id, u.name
+          ORDER BY total_hours DESC
+          LIMIT 25
+        `, ehParams);
+        const result: any = { period: { from: dateFrom, to: dateTo }, employees: ehRes.rows, count: ehRes.rows.length };
+        if (toolArgs.groupByJob && isHoursAdmin) {
+          const gjParams: any[] = [dateFrom, dateTo];
+          let gjWhere = "";
+          if (toolArgs.employeeName) { gjWhere = ` AND u.name ILIKE $3`; gjParams.push(`%${toolArgs.employeeName}%`); }
+          const gjRes = await pool.query(`
+            SELECT u.name AS employee_name,
+              COALESCE(NULLIF(j.title,''), j.client, 'No Job / Shop') AS job_name,
+              ROUND(COALESCE(SUM(te.duration_minutes), 0) / 60.0, 1) AS hours
+            FROM time_entries te
+            LEFT JOIN users u ON u.id = te.user_id
+            LEFT JOIN jobs j ON j.id = te.job_id
+            WHERE te.clock_out IS NOT NULL AND te.duration_minutes > 0
+              AND te.clock_in::date >= $1 AND te.clock_in::date <= $2
+              ${gjWhere}
+            GROUP BY u.id, u.name, j.id, j.title, j.client
+            ORDER BY u.name, hours DESC
+            LIMIT 100
+          `, gjParams);
+          result.by_job = gjRes.rows;
+        }
+        return { result };
+      }
+
+      case "getOvertimeReport": {
+        const weeksBack = Math.min(toolArgs.weeksBack || 4, 12);
+        const otRes = await pool.query(`
+          SELECT u.name AS employee_name,
+            DATE_TRUNC('week', te.clock_in)::date AS week_start,
+            (DATE_TRUNC('week', te.clock_in) + INTERVAL '6 days')::date AS week_end,
+            ROUND(SUM(te.duration_minutes) / 60.0, 1) AS total_hours,
+            GREATEST(ROUND(SUM(te.duration_minutes) / 60.0 - 40, 1), 0) AS overtime_hours
+          FROM time_entries te
+          LEFT JOIN users u ON u.id = te.user_id
+          WHERE te.clock_out IS NOT NULL
+            AND te.duration_minutes > 0
+            AND te.clock_in >= NOW() - ($1::int * INTERVAL '1 week')
+          GROUP BY u.id, u.name, DATE_TRUNC('week', te.clock_in)
+          HAVING SUM(te.duration_minutes) / 60.0 > 40
+          ORDER BY week_start DESC, total_hours DESC
+        `, [weeksBack]);
+        const totalOT = otRes.rows.reduce((s: number, r: any) => s + parseFloat(r.overtime_hours || 0), 0);
+        return {
+          result: {
+            overtime_entries: otRes.rows,
+            count: otRes.rows.length,
+            total_overtime_hours: Math.round(totalOT * 10) / 10,
+            weeks_reviewed: weeksBack,
+            message: otRes.rows.length === 0 ? `No employees exceeded 40 hours/week in the last ${weeksBack} week(s).` : undefined,
+          }
+        };
+      }
+
+      // ── D. HIRING ─────────────────────────────────────────────────────────────
+      case "searchCandidates": {
+        let candSql = `SELECT id, name, role, stage, applied_date, rating, source, email FROM candidates WHERE 1=1`;
+        const candParams: any[] = [];
+        let candIdx = 1;
+        if (toolArgs.query) {
+          candSql += ` AND (name ILIKE $${candIdx} OR role ILIKE $${candIdx})`;
+          candParams.push(`%${toolArgs.query}%`); candIdx++;
+        }
+        if (toolArgs.stage) {
+          candSql += ` AND stage ILIKE $${candIdx++}`;
+          candParams.push(`%${toolArgs.stage}%`);
+        }
+        if (toolArgs.recentOnly) {
+          candSql += ` AND applied_date >= NOW() - INTERVAL '30 days'`;
+        }
+        candSql += ` ORDER BY applied_date DESC NULLS LAST LIMIT 20`;
+        const candRes = await pool.query(candSql, candParams);
+        return { result: { candidates: candRes.rows, count: candRes.rows.length } };
+      }
+
+      case "getHiringPipelineSummary": {
+        const [stages, recent, positions, totals] = await Promise.all([
+          pool.query(`SELECT stage, COUNT(*)::int AS count FROM candidates GROUP BY stage ORDER BY count DESC`),
+          pool.query(`SELECT id, name, role, stage, applied_date, rating, source FROM candidates ORDER BY applied_date DESC NULLS LAST LIMIT 6`),
+          pool.query(`SELECT COALESCE(NULLIF(role,''), 'Unknown') AS position, COUNT(*)::int AS count FROM candidates GROUP BY role ORDER BY count DESC LIMIT 8`),
+          pool.query(`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE stage = 'Hired')::int AS hired, COUNT(*) FILTER (WHERE applied_date >= NOW() - INTERVAL '30 days')::int AS last_30_days FROM candidates`),
+        ]);
+        return {
+          result: {
+            total_candidates: totals.rows[0]?.total || 0,
+            total_hired: totals.rows[0]?.hired || 0,
+            applied_last_30_days: totals.rows[0]?.last_30_days || 0,
+            by_stage: stages.rows,
+            by_position: positions.rows,
+            recent_applicants: recent.rows,
+          }
+        };
+      }
+
+      // ── E. KNOWLEDGE BASE ─────────────────────────────────────────────────────
+      case "searchKnowledgeBase": {
+        const isKbAdmin = ["Admin", "Manager", "Master Admin"].includes(user.role);
+        const kbQuery = `%${toolArgs.query}%`;
+        const scope = toolArgs.scope || "all";
+        const kbResults: any = { query: toolArgs.query };
+        const searches: Promise<void>[] = [];
+
+        if (scope === "all" || scope === "sops") {
+          const sopSql = isKbAdmin
+            ? `SELECT id, title, category, super_category, LEFT(content, 500) AS content_preview FROM sops WHERE title ILIKE $1 OR category ILIKE $1 OR content ILIKE $1 ORDER BY title LIMIT 5`
+            : `SELECT id, title, category, super_category, LEFT(content, 500) AS content_preview FROM sops WHERE title ILIKE $1 OR category ILIKE $1 ORDER BY title LIMIT 5`;
+          searches.push(pool.query(sopSql, [kbQuery]).then(r => { kbResults.sops = r.rows; }));
+        }
+
+        if (scope === "all" || scope === "resources") {
+          searches.push(
+            pool.query(
+              `SELECT id, title, description, category, type, season,
+                LEFT(COALESCE(content, description, ''), 500) AS content_preview
+               FROM customer_resources
+               WHERE is_published = true
+                 AND (title ILIKE $1 OR description ILIKE $1 OR content ILIKE $1)
+               ORDER BY title LIMIT 5`,
+              [kbQuery]
+            ).then(r => { kbResults.resources = r.rows; })
+          );
+        }
+
+        if (isKbAdmin && (scope === "all" || scope === "documents")) {
+          searches.push(
+            pool.query(
+              `SELECT id, file_name AS title, category, home_entity_type, created_at
+               FROM documents WHERE file_name ILIKE $1 OR category ILIKE $1
+               ORDER BY created_at DESC LIMIT 5`,
+              [kbQuery]
+            ).then(r => { kbResults.documents = r.rows; })
+          );
+        }
+
+        await Promise.all(searches);
+
+        const total = (kbResults.sops?.length || 0) + (kbResults.resources?.length || 0) + (kbResults.documents?.length || 0);
+        kbResults.total_results = total;
+        if (total === 0) kbResults.message = `No matches found for "${toolArgs.query}". Try a broader keyword or phrase.`;
+        return { result: kbResults };
+      }
+
+      // ── F. SOP BUILDER ────────────────────────────────────────────────────────
+      case "createSop": {
+        const catRow = await pool.query(
+          `SELECT id FROM sop_categories WHERE name ILIKE $1 LIMIT 1`,
+          [`%${toolArgs.category}%`]
+        );
+        const categoryId = catRow.rows[0]?.id || null;
+        const sopInsert = await pool.query(
+          `INSERT INTO sops (title, category, category_id, super_category, content, last_updated)
+           VALUES ($1, $2, $3, $4, $5, NOW())
+           RETURNING id, title, category`,
+          [toolArgs.title, toolArgs.category, categoryId, toolArgs.superCategory || null, toolArgs.content]
+        );
+        const saved = sopInsert.rows[0];
+        return {
+          result: {
+            success: true,
+            sopId: saved.id,
+            title: saved.title,
+            category: saved.category,
+            message: `SOP "${saved.title}" has been saved to the ${saved.category} category. You can view and edit it in the SOP Library.`,
+          },
+          navigationTarget: "/sops",
         };
       }
 
