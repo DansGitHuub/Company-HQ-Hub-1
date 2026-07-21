@@ -1831,7 +1831,13 @@
   },
   "home": {
     "tabMyWorkspace": "Mi espacio de trabajo",
-    "tabCompanyHQ": "HQ de la empresa"
+    "tabCompanyHQ": "HQ de la empresa",
+    "quickLinks": {
+      "myHours": "Mis Horas",
+      "myDay": "Mi Día",
+      "messages": "Mensajes",
+      "tasks": "Tareas"
+    }
   },
   "hq": {
     "subtitle": "Un equipo, una visión. Construyendo la empresa de paisajismo más respetada de la región.",

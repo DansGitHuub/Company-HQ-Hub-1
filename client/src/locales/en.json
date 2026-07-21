@@ -1831,7 +1831,13 @@
   },
   "home": {
     "tabMyWorkspace": "My Workspace",
-    "tabCompanyHQ": "Company HQ"
+    "tabCompanyHQ": "Company HQ",
+    "quickLinks": {
+      "myHours": "My Hours",
+      "myDay": "My Day",
+      "messages": "Messages",
+      "tasks": "Tasks"
+    }
   },
   "hq": {
     "subtitle": "One team, one vision. Building the most respected landscape company in the region.",

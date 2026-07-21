@@ -444,7 +444,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   const sidebarSections: NavSection[] = [
-    { label: "MY SPACE", items: ["home", "my_hours", "my_day", "messages", "todos"] },
+    { label: "MY SPACE", items: ["home"] },
     { label: "SALES", items: ["sales_hub"] },
     { label: "WORK", items: ["work_hub"] },
     { label: "FINANCE", items: ["finance_hub"] },
@@ -661,7 +661,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         )}
         {effectiveRole !== "Customer" ? displaySections.map((section, sectionIdx) => (
           <div key={section.label || "workspace"} className={cn(sectionIdx > 0 ? "mt-4" : "")}>
-            {section.label && (
+            {section.label && section.items.filter(id => internalNavItems[id]).length > 1 && (
               <>
                 <div className="px-4 py-1.5 mb-1">
                   <span className="text-[10px] font-bold tracking-[0.15em] uppercase text-sidebar-foreground/40" data-testid={`section-header-${section.label.toLowerCase().replace(/ /g, '-')}`}>
@@ -986,6 +986,23 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-1.5 lg:gap-2">
             {/* Clock In — first in cluster */}
             <TimeClock />
+
+            {/* Messages shortcut — lives here because it has no sidebar row */}
+            {effectiveRole !== "Customer" && (
+              <Link
+                href="/messages"
+                className="relative h-9 w-9 flex items-center justify-center rounded-xl hover:bg-muted transition-colors text-muted-foreground hover:text-foreground shrink-0"
+                data-testid="button-topbar-messages"
+                title={t("nav.messages")}
+              >
+                <MessageSquare className="h-5 w-5" />
+                {(dmUnreadData?.count ?? 0) > 0 && (
+                  <span className="absolute top-0.5 right-0.5 h-4 min-w-[16px] flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold px-0.5 leading-none pointer-events-none">
+                    {(dmUnreadData?.count ?? 0) > 99 ? "99+" : dmUnreadData?.count}
+                  </span>
+                )}
+              </Link>
+            )}
 
             {/* Unified notification center — single bell, three tabs */}
             <UnifiedNotificationCenter />

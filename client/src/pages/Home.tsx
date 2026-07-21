@@ -13,6 +13,10 @@ import {
   Minimize2,
   Check,
   AlertTriangle,
+  Clock,
+  Sun,
+  MessageSquare,
+  CheckSquare,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -160,6 +164,12 @@ export default function Home() {
     setIsEditing(false);
   }, [userRole, saveWidgets]);
 
+  const { data: dmUnreadData } = useQuery<{ count: number }>({
+    queryKey: ["/api/dm/unread-count"],
+    refetchInterval: 30000,
+  });
+  const dmUnreadCount = dmUnreadData?.count ?? 0;
+
   const available = getAvailableWidgets(userRole, user?.isMasterAdmin === true);
   const addedTypes = widgets.map((w) => w.widgetType);
   const notAdded = available.filter((w) => !addedTypes.includes(w.type));
@@ -270,6 +280,36 @@ export default function Home() {
                     )}
                   </Button>
                 </div>
+              </div>
+
+              {/* Quick-access links — formerly the MY SPACE sidebar rows */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { icon: Clock, labelKey: "home.quickLinks.myHours", href: "/my-hours", iconBg: "bg-blue-100 dark:bg-blue-900/30", iconColor: "text-blue-600 dark:text-blue-400" },
+                  { icon: Sun, labelKey: "home.quickLinks.myDay", href: "/my-day", iconBg: "bg-amber-100 dark:bg-amber-900/30", iconColor: "text-amber-600 dark:text-amber-400" },
+                  { icon: MessageSquare, labelKey: "home.quickLinks.messages", href: "/messages", iconBg: "bg-violet-100 dark:bg-violet-900/30", iconColor: "text-violet-600 dark:text-violet-400", badge: dmUnreadCount },
+                  { icon: CheckSquare, labelKey: "home.quickLinks.tasks", href: "/todos", iconBg: "bg-emerald-100 dark:bg-emerald-900/30", iconColor: "text-emerald-600 dark:text-emerald-400" },
+                ].map((link) => {
+                  const Icon = link.icon;
+                  return (
+                    <button
+                      key={link.href}
+                      onClick={() => navigate(link.href)}
+                      data-testid={`quicklink-${link.href.replace("/", "")}`}
+                      className="group flex items-center gap-3 rounded-xl border border-border bg-card p-3.5 text-left shadow-sm transition-all hover:shadow-md hover:border-primary/40 hover:-translate-y-0.5"
+                    >
+                      <div className={`shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-lg ${link.iconBg}`}>
+                        <Icon className={`w-4 h-4 ${link.iconColor}`} />
+                      </div>
+                      <span className="text-sm font-semibold text-foreground leading-tight flex-1">{t(link.labelKey)}</span>
+                      {"badge" in link && link.badge > 0 && (
+                        <span className="ml-auto shrink-0 h-5 min-w-[20px] flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold px-1 leading-none">
+                          {link.badge > 99 ? "99+" : link.badge}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
 
               <PinnedReportsSection />
