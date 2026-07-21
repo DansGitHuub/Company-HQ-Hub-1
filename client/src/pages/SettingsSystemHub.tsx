@@ -79,7 +79,6 @@ const SECTIONS: SettingsSection[] = [
       { id: "termsConditions", icon: FileSignature, nameKey: "settingsHub.cards.termsConditions.name", descKey: "settingsHub.cards.termsConditions.desc", href: "/admin?tab=terms" },
       { id: "businessRules", icon: SlidersHorizontal, nameKey: "settingsHub.cards.businessRules.name", descKey: "settingsHub.cards.businessRules.desc", href: "/admin/business-rules" },
       { id: "feedbackReports", icon: MessageSquareWarning, nameKey: "settingsHub.cards.feedbackReports.name", descKey: "settingsHub.cards.feedbackReports.desc", href: "/admin/feedback" },
-      { id: "adminTools", icon: Wrench, nameKey: "settingsHub.cards.adminTools.name", descKey: "settingsHub.cards.adminTools.desc", href: "/tools" },
     ],
   },
   {
