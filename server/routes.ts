@@ -1206,7 +1206,7 @@ Respond with a JSON object:
     }
   });
 
-  app.get("/api/sops", requireAuth, async (req, res) => {
+  app.get("/api/sops", requireAuth, requireRole("Admin", "Manager", "Crew"), async (req, res) => {
     try {
       const sops = await storage.getSops();
       res.json(sops);
@@ -4602,7 +4602,7 @@ Generate detailed information for this landscaping material.`;
   });
 
   // ── Hiring Analytics ─────────────────────────────────────────────────────────
-  app.get("/api/hiring/analytics", requireAuth, async (req, res) => {
+  app.get("/api/hiring/analytics", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     try {
       const [stageCounts, sourceCounts, recentHires, ratingDist, roleDist] = await Promise.all([
         pool.query(`
@@ -4649,7 +4649,7 @@ Generate detailed information for this landscaping material.`;
     }
   });
 
-  app.get("/api/candidates", requireAuth, async (req, res) => {
+  app.get("/api/candidates", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     try {
       const candidates = await storage.getCandidates();
       res.json(candidates);
@@ -4698,7 +4698,7 @@ Generate detailed information for this landscaping material.`;
     }
   });
 
-  app.post("/api/candidates", requireAuth, async (req, res) => {
+  app.post("/api/candidates", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     try {
       const candidate = await storage.createCandidate(req.body);
       res.status(201).json(candidate);
@@ -4707,7 +4707,7 @@ Generate detailed information for this landscaping material.`;
     }
   });
 
-  app.patch("/api/candidates/:id", requireAuth, async (req, res) => {
+  app.patch("/api/candidates/:id", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     try {
       const existing = await storage.getCandidate(req.params.id as string);
       const candidate = await storage.updateCandidate(req.params.id as string, req.body);
@@ -4747,7 +4747,7 @@ Generate detailed information for this landscaping material.`;
     }
   });
 
-  app.get("/api/candidates/:id", requireAuth, async (req, res) => {
+  app.get("/api/candidates/:id", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     try {
       const candidate = await storage.getCandidate(req.params.id as string);
       if (!candidate) return res.status(404).json({ message: "Candidate not found" });
@@ -4757,7 +4757,7 @@ Generate detailed information for this landscaping material.`;
     }
   });
 
-  app.delete("/api/candidates/:id", requireAuth, async (req, res) => {
+  app.delete("/api/candidates/:id", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     try {
       await storage.deleteCandidate(req.params.id as string);
       res.json({ success: true });
@@ -4766,7 +4766,7 @@ Generate detailed information for this landscaping material.`;
     }
   });
 
-  app.get("/api/candidates/:id/documents", requireAuth, async (req, res) => {
+  app.get("/api/candidates/:id/documents", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     try {
       const documents = await storage.getCandidateDocuments(req.params.id as string);
       res.json(documents);
@@ -4775,7 +4775,7 @@ Generate detailed information for this landscaping material.`;
     }
   });
 
-  app.post("/api/candidates/:id/documents", requireAuth, async (req, res) => {
+  app.post("/api/candidates/:id/documents", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     try {
       const doc = await storage.createCandidateDocument({
         candidateId: req.params.id as string,
@@ -4787,7 +4787,7 @@ Generate detailed information for this landscaping material.`;
     }
   });
 
-  app.patch("/api/candidate-documents/:id", requireAuth, async (req, res) => {
+  app.patch("/api/candidate-documents/:id", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     try {
       const doc = await storage.updateCandidateDocument(req.params.id as string, req.body);
       if (!doc) return res.status(404).json({ message: "Document not found" });
@@ -4797,7 +4797,7 @@ Generate detailed information for this landscaping material.`;
     }
   });
 
-  app.delete("/api/candidate-documents/:id", requireAuth, async (req, res) => {
+  app.delete("/api/candidate-documents/:id", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     try {
       await storage.deleteCandidateDocument(req.params.id as string);
       res.json({ success: true });
@@ -4807,7 +4807,7 @@ Generate detailed information for this landscaping material.`;
   });
 
   // Candidate notes
-  app.get("/api/candidates/:id/notes", requireAuth, async (req, res) => {
+  app.get("/api/candidates/:id/notes", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     try {
       const notes = await storage.getApplicantNotes(req.params.id);
       return res.json(notes);
@@ -4816,7 +4816,7 @@ Generate detailed information for this landscaping material.`;
     }
   });
 
-  app.post("/api/candidates/:id/notes", requireAuth, async (req, res) => {
+  app.post("/api/candidates/:id/notes", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     try {
       const actor = req.user as any;
       const note = await storage.createApplicantNote({
@@ -4832,7 +4832,7 @@ Generate detailed information for this landscaping material.`;
   });
 
   // Candidate communications
-  app.get("/api/candidates/:id/communications", requireAuth, async (req, res) => {
+  app.get("/api/candidates/:id/communications", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     try {
       const comms = await storage.getApplicantCommunications(req.params.id);
       return res.json(comms);
@@ -4841,7 +4841,7 @@ Generate detailed information for this landscaping material.`;
     }
   });
 
-  app.post("/api/candidates/:id/communications", requireAuth, async (req, res) => {
+  app.post("/api/candidates/:id/communications", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     try {
       const actor = req.user as any;
       const comm = await storage.createApplicantCommunication({

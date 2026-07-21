@@ -210,7 +210,7 @@ export async function sendInvoiceById(invoiceId: string) {
 export function registerInvoiceRoutes(app: Express, requireAuth: any) {
 
   // ── LIST ──────────────────────────────────────────────────────────────────────
-  app.get("/api/invoices", requireAuth, async (req, res) => {
+  app.get("/api/invoices", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     const { status, customer_id, job_id, date_from, date_to, search } = req.query as Record<string, string>;
 
     try {
@@ -253,7 +253,7 @@ export function registerInvoiceRoutes(app: Express, requireAuth: any) {
   });
 
   // ── SINGLE ────────────────────────────────────────────────────────────────────
-  app.get("/api/invoices/:id", requireAuth, async (req, res) => {
+  app.get("/api/invoices/:id", requireAuth, requireRole("Admin", "Manager"), async (req, res) => {
     try {
       let resolvedId = req.params.id;
       if (/^INV-\d+$/i.test(resolvedId)) {

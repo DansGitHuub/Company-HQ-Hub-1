@@ -1,10 +1,12 @@
 import { Express } from "express";
 import { pool } from "./db";
+import { requireRole } from "./auth";
 
 export function registerReportRoutes(app: Express, requireAuth: any) {
+  const requireAdminOrManager = requireRole("Admin", "Manager");
 
   // ── REVENUE REPORT ──────────────────────────────────────────────────────────
-  app.get("/api/reports/revenue", requireAuth, async (req, res) => {
+  app.get("/api/reports/revenue", requireAuth, requireAdminOrManager, async (req, res) => {
     const { date_from, date_to, division, statuses } = req.query as Record<string, string>;
     try {
       // Parse status list. "_all" → no status filter. Empty → default to realized work.
@@ -107,7 +109,7 @@ export function registerReportRoutes(app: Express, requireAuth: any) {
   });
 
   // ── INVOICE AGING ───────────────────────────────────────────────────────────
-  app.get("/api/reports/invoice-aging", requireAuth, async (req, res) => {
+  app.get("/api/reports/invoice-aging", requireAuth, requireAdminOrManager, async (req, res) => {
     const { as_of_date } = req.query as Record<string, string>;
     const asOf = as_of_date || new Date().toISOString().split("T")[0];
     try {
@@ -170,7 +172,7 @@ export function registerReportRoutes(app: Express, requireAuth: any) {
   });
 
   // ── CREW HOURS ───────────────────────────────────────────────────────────────
-  app.get("/api/reports/crew-hours", requireAuth, async (req, res) => {
+  app.get("/api/reports/crew-hours", requireAuth, requireAdminOrManager, async (req, res) => {
     const { date_from, date_to, user_id } = req.query as Record<string, string>;
     try {
       const params: any[] = [];
@@ -270,7 +272,7 @@ export function registerReportRoutes(app: Express, requireAuth: any) {
   });
 
   // ── TIME BY DIVISION ─────────────────────────────────────────────────────────
-  app.get("/api/reports/time-by-division", requireAuth, async (req, res) => {
+  app.get("/api/reports/time-by-division", requireAuth, requireAdminOrManager, async (req, res) => {
     const { date_from, date_to } = req.query as Record<string, string>;
     try {
       const params: any[] = [];
@@ -343,7 +345,7 @@ export function registerReportRoutes(app: Express, requireAuth: any) {
   });
 
   // ── MATERIALS SPEND ───────────────────────────────────────────────────────────
-  app.get("/api/reports/materials-spend", requireAuth, async (req, res) => {
+  app.get("/api/reports/materials-spend", requireAuth, requireAdminOrManager, async (req, res) => {
     const { date_from, date_to, division } = req.query as Record<string, string>;
     try {
       const params: any[] = [];
@@ -425,7 +427,7 @@ export function registerReportRoutes(app: Express, requireAuth: any) {
   // Win Rate uses sales_estimates.sent_at + customer_response ('accepted'/'declined').
   // Crew Utilization uses time_entries.job_id IS NOT NULL as "billable".
   // Maintenance Compliance uses jobs.division = 'Maintenance' + scheduled_date vs today.
-  app.get("/api/reports/at-a-glance", requireAuth, async (req: any, res) => {
+  app.get("/api/reports/at-a-glance", requireAuth, requireAdminOrManager, async (req: any, res) => {
     try {
       const [revenueYtd, totalAR, winRate, utilization, jobsByStage, maintCompliance] =
         await Promise.all([
@@ -574,7 +576,7 @@ export function registerReportRoutes(app: Express, requireAuth: any) {
   });
 
   // ── EQUIPMENT REPAIR COST ────────────────────────────────────────────────────
-  app.get("/api/reports/equipment-repair", requireAuth, async (req, res) => {
+  app.get("/api/reports/equipment-repair", requireAuth, requireAdminOrManager, async (req, res) => {
     const { date_from, date_to, equipment_id } = req.query as Record<string, string>;
     try {
       const params: any[] = [];
@@ -654,7 +656,7 @@ export function registerReportRoutes(app: Express, requireAuth: any) {
   // ── MATERIAL SHORTAGES ───────────────────────────────────────────────────────
   // Surfaces worksheets where crew flagged materials needed (checklist_materials_needed=true)
   // and any worksheet_materials entries logged that day.
-  app.get("/api/reports/material-shortages", requireAuth, async (req, res) => {
+  app.get("/api/reports/material-shortages", requireAuth, requireAdminOrManager, async (req, res) => {
     const { date_from, date_to, job_id } = req.query as Record<string, string>;
     try {
       const params: any[] = [];

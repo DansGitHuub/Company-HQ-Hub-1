@@ -313,7 +313,7 @@ function AppRoutes() {
         <Route path="/applicant" component={ApplicantPortal} />
         <ProtectedRoute path="/settings-system" component={SettingsSystemHub} allowedRoles={ADMIN_ONLY} />
         <ProtectedRoute path="/admin" component={AdminPanel} allowedRoles={ADMIN_ONLY} />
-        <Route path="/sops" component={SOPs} />
+        <ProtectedRoute path="/sops" component={SOPs} allowedRoles={STAFF_ROLES} />
         <Route path="/materials"><Redirect to="/catalog" /></Route>
         <ProtectedRoute path="/people" component={PeopleHub} allowedRoles={ADMIN_ONLY} />
         <ProtectedRoute path="/sales" component={SalesHub} allowedRoles={ADMIN_OR_MANAGER} />
@@ -401,8 +401,8 @@ function AppRoutes() {
         <ProtectedRoute path="/customers" component={CustomerList} allowedRoles={ADMIN_OR_MANAGER} />
         <ProtectedRoute path="/customers/:id" component={CustomerDetail} allowedRoles={ADMIN_OR_MANAGER} />
         <ProtectedRoute path="/tools/plow-mapper" component={() => <PlowSiteMapper />} allowedRoles={TOOL_PLOW_MAPPER_ROLES} />
-        <Route path="/tools/process-auditor" component={ProcessAuditor} />
-        <Route path="/tools/integration-wizard" component={IntegrationWizard} />
+        <ProtectedRoute path="/tools/process-auditor" component={ProcessAuditor} allowedRoles={ADMIN_ONLY} />
+        <ProtectedRoute path="/tools/integration-wizard" component={IntegrationWizard} allowedRoles={ADMIN_ONLY} />
         <ProtectedRoute path="/tools/calculator" component={() => <CalculatorPage />} allowedRoles={TOOL_CALCULATOR_ROLES} />
         <ProtectedRoute path="/tools/lead-qualifier" component={() => <LeadQualifier />} allowedRoles={TOOL_LEAD_QUALIFIER_ROLES} />
         <ProtectedRoute path="/tools" component={Tools} allowedRoles={STAFF_ROLES} />
@@ -410,7 +410,7 @@ function AppRoutes() {
         <Route path="/training" component={TestingKnowledge} />
         <ProtectedRoute path="/settings" component={SettingsPage} allowedRoles={ADMIN_OR_MANAGER} />
         <Route path="/messages" component={MessagesPage} />
-        <Route path="/customer-messages" component={CustomerMessagesInbox} />
+        <ProtectedRoute path="/customer-messages" component={CustomerMessagesInbox} allowedRoles={ADMIN_OR_MANAGER} />
         <ProtectedRoute path="/customer-blasts" component={CustomerBlasts} allowedRoles={ADMIN_OR_MANAGER} />
         <ProtectedRoute path="/catalog/import" component={CatalogImport} allowedRoles={ADMIN_OR_MANAGER} />
         <ProtectedRoute path="/catalog/:id" component={CatalogDetail} allowedRoles={ADMIN_OR_MANAGER} />
