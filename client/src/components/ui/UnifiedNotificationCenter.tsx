@@ -279,7 +279,7 @@ export function UnifiedNotificationCenter() {
             data-testid="button-unified-notifications"
             aria-label="Notifications"
           >
-            <Bell className="h-5 w-5" />
+            <Bell className="h-6 w-6" />
             {unreadCount > 0 && (
               <span className="absolute -top-1 -right-1 min-w-[17px] h-[17px] flex items-center justify-center bg-red-500 text-white text-[9px] font-bold rounded-full border-2 border-background px-0.5 leading-none">
                 {unreadCount > 99 ? "99+" : unreadCount}

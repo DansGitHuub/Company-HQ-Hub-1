@@ -61,6 +61,7 @@ import {
   Palette,
   ClipboardList,
   X,
+  Sun,
 } from "lucide-react";
 import type { WidgetSize } from "./widgetRegistry";
 
@@ -1484,6 +1485,120 @@ export function HiringWidget({ size }: WidgetProps) {
   );
 }
 
+export function MyDayWidget({ size }: WidgetProps) {
+  const { t } = useTranslation();
+  const today = useMemo(() => {
+    const n = new Date();
+    return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+  }, []);
+
+  const { data: activeEntry } = useQuery<any>({
+    queryKey: ["/api/time/active"],
+    refetchInterval: 15_000,
+  });
+
+  const { data: todayEntries = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/time/entries", "widget-today", today],
+    queryFn: async () => {
+      const r = await fetch(`/api/time/entries?start=${today}&end=${today}`, { credentials: "include" });
+      if (!r.ok) return [];
+      return r.json();
+    },
+    staleTime: 30_000,
+  });
+
+  const todayMinutes = useMemo(() => {
+    return todayEntries.reduce((sum: number, e: any) => {
+      if (!e.clock_in || !e.clock_out) return sum;
+      return sum + (new Date(e.clock_out).getTime() - new Date(e.clock_in).getTime()) / 60_000;
+    }, 0);
+  }, [todayEntries]);
+
+  function fmtHours(mins: number) {
+    if (mins < 1) return "0h";
+    const h = Math.floor(mins / 60);
+    const m = Math.round(mins % 60);
+    return h > 0 ? (m > 0 ? `${h}h ${m}m` : `${h}h`) : `${m}m`;
+  }
+
+  const isClockedIn = !!activeEntry;
+  const entryLabel = activeEntry?.work_area_name || activeEntry?.job_name;
+  const preview = size === "small" ? 2 : size === "medium" ? 3 : 5;
+  const typeColors: Record<string, string> = {
+    billable: "bg-green-500",
+    drive_time: "bg-blue-500",
+    shop_time: "bg-purple-500",
+    break: "bg-gray-400",
+  };
+
+  return (
+    <div className="h-full flex flex-col gap-2.5">
+      {/* Clock status strip */}
+      <div className={`flex items-center gap-2.5 rounded-lg px-3 py-2 ${isClockedIn ? "bg-green-500/10 border border-green-500/25" : "bg-muted/50 border border-border"}`}>
+        <span className={`h-2 w-2 rounded-full flex-shrink-0 ${isClockedIn ? "bg-green-500 animate-pulse" : "bg-muted-foreground/30"}`} />
+        <div className="flex-1 min-w-0">
+          <p className={`text-xs font-semibold leading-tight ${isClockedIn ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
+            {isClockedIn ? t("dashboard.widgets.myday.clockedIn") : t("dashboard.widgets.myday.clockedOut")}
+          </p>
+          {entryLabel && <p className="text-[10px] text-muted-foreground truncate">{entryLabel}</p>}
+        </div>
+        <div className="text-right flex-shrink-0">
+          <p className="text-xs font-bold">{fmtHours(todayMinutes)}</p>
+          <p className="text-[10px] text-muted-foreground">{t("dashboard.widgets.myday.today")}</p>
+        </div>
+      </div>
+
+      {/* Today's time entries */}
+      {isLoading ? (
+        <div className="flex items-center justify-center flex-1">
+          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+        </div>
+      ) : todayEntries.length === 0 ? (
+        <div className="flex-1 flex flex-col items-center justify-center gap-1 text-muted-foreground py-2">
+          <Clock className="h-6 w-6 opacity-25" />
+          <p className="text-xs">{t("dashboard.widgets.myday.noEntries")}</p>
+        </div>
+      ) : (
+        <div className="flex-1 space-y-1 min-h-0 overflow-hidden">
+          {todayEntries.slice(0, preview).map((e: any) => {
+            const mins = e.clock_out
+              ? (new Date(e.clock_out).getTime() - new Date(e.clock_in).getTime()) / 60_000
+              : null;
+            const label = e.work_area_name || e.job_name || e.entry_type;
+            return (
+              <div key={e.id} className="flex items-center gap-2 text-xs">
+                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${typeColors[e.entry_type] ?? "bg-muted-foreground"}`} />
+                <span className="truncate flex-1 text-muted-foreground">{label}</span>
+                <span className="flex-shrink-0 font-medium text-foreground">
+                  {mins !== null ? fmtHours(mins) : t("dashboard.widgets.myday.active")}
+                </span>
+              </div>
+            );
+          })}
+          {todayEntries.length > preview && (
+            <p className="text-[10px] text-muted-foreground pl-3.5">+{todayEntries.length - preview} {t("dashboard.widgets.myday.more")}</p>
+          )}
+        </div>
+      )}
+
+      {/* Quick actions */}
+      <div className="mt-auto pt-2 border-t flex items-center gap-2">
+        <Link href="/my-day" className="flex-1">
+          <div className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors font-medium cursor-pointer" data-testid="myday-widget-my-day-link">
+            <Sun className="h-3 w-3" /> {t("dashboard.widgets.myday.viewMyDay")}
+          </div>
+        </Link>
+        <div className="w-px h-3 bg-border flex-shrink-0" />
+        <Link href="/my-hours" className="flex-1">
+          <div className="flex items-center justify-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors font-medium cursor-pointer" data-testid="myday-widget-my-hours-link">
+            <Clock className="h-3 w-3" /> {t("dashboard.widgets.myday.viewHours")}
+          </div>
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 export const WIDGET_COMPONENTS: Record<string, React.ComponentType<WidgetProps>> = {
   messages: MessagesWidget,
   todos: TodosWidget,
@@ -1504,4 +1619,5 @@ export const WIDGET_COMPONENTS: Record<string, React.ComponentType<WidgetProps>>
   notes: NotesWidget,
   dailyagenda: DailyAgendaWidget,
   hiring: HiringWidget,
+  myday: MyDayWidget,
 };

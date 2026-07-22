@@ -876,6 +876,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-1.5 lg:gap-2">
+            {/* Calendar shortcut */}
+            <button
+              onClick={() => setIsCalendarOpen(true)}
+              className="h-9 w-9 flex items-center justify-center rounded-xl hover:bg-muted transition-colors text-muted-foreground hover:text-foreground shrink-0"
+              data-testid="button-topbar-calendar"
+              title={t("nav.calendar")}
+            >
+              <CalendarCheck className="h-5 w-5" />
+            </button>
+
             {/* Clock In — first in cluster */}
             <TimeClock />
 

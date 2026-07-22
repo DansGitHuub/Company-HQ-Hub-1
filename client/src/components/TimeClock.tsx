@@ -4,7 +4,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Clock, Square, ChevronDown, AlertTriangle } from "lucide-react";
+import { Clock, Square, ChevronDown, AlertTriangle, Play } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface TimeEntry {
@@ -314,10 +314,11 @@ export default function TimeClock() {
           onClick={() => clockOutMutation.mutate()}
           disabled={clockOutMutation.isPending}
           title="Clock Out"
-          className="h-7 w-7 flex items-center justify-center rounded-full bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 hover:bg-red-500/20 transition-colors"
+          className="flex items-center gap-1 h-7 px-2.5 rounded-full bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 hover:bg-red-500/20 transition-colors text-xs font-semibold"
           data-testid="button-clock-out"
         >
           <Square className="h-3 w-3 fill-current" />
+          <span className="hidden sm:inline">Clock Out</span>
         </button>
       </div>
     );
@@ -334,10 +335,10 @@ export default function TimeClock() {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
-          className="flex items-center gap-1.5 h-9 px-3 rounded-full border border-border bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground text-xs font-medium transition-colors"
+          className="flex items-center gap-1.5 h-9 px-3 rounded-full bg-green-600 hover:bg-green-700 text-white text-xs font-semibold transition-colors shadow-sm"
           data-testid="button-clock-in-trigger"
         >
-          <Clock className="h-3.5 w-3.5" />
+          <Play className="h-3.5 w-3.5 fill-current" />
           <span className="hidden sm:inline">Clock In</span>
           <ChevronDown className="h-3 w-3" />
         </button>

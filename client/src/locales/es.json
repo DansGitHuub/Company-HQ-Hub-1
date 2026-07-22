@@ -590,7 +590,8 @@
         "soppipeline": "Flujo de POEs",
         "notes": "Notas Rápidas",
         "dailyagenda": "Agenda Diaria",
-        "hiring": "Contratación"
+        "hiring": "Contratación",
+        "myday": "Mi Día"
       },
       "descriptions": {
         "messages": "Mensajes recientes de la bandeja de entrada",
@@ -611,7 +612,8 @@
         "soppipeline": "Estado y cola del flujo de POEs generado por IA",
         "notes": "Bloc de notas personal con recordatorios — hable o escriba para agregar notas",
         "dailyagenda": "Planifique su día — tareas, llamadas, clientes potenciales, delegar, equipos y más",
-        "hiring": "Nuevas solicitudes pendientes de revisión"
+        "hiring": "Nuevas solicitudes pendientes de revisión",
+        "myday": "Estado del reloj, horas de hoy y desglose de entradas de tiempo"
       },
       "messages": {
         "noMessagesYet": "Aún no hay mensajes",
@@ -649,6 +651,16 @@
           "p3_normal": "Normal",
           "p4_low": "Baja"
         }
+      },
+      "myday": {
+        "clockedIn": "Marcado Entrada",
+        "clockedOut": "Sin Marcar",
+        "today": "hoy",
+        "noEntries": "Sin entradas de tiempo hoy",
+        "active": "activo",
+        "more": "más",
+        "viewMyDay": "Mi Día",
+        "viewHours": "Mis Horas"
       },
       "pipeline": {
         "jobsCount_one": "{{count}} trabajo",

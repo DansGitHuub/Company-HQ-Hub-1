@@ -590,7 +590,8 @@
         "soppipeline": "SOP Pipeline",
         "notes": "Quick Notes",
         "dailyagenda": "Daily Agenda",
-        "hiring": "Hiring"
+        "hiring": "Hiring",
+        "myday": "My Day"
       },
       "descriptions": {
         "messages": "Recent inbox messages",
@@ -611,7 +612,8 @@
         "soppipeline": "AI-generated SOP pipeline status and queue",
         "notes": "Personal notepad with reminders — voice or type to add notes",
         "dailyagenda": "Plan your day — to-dos, calls, leads, delegate, equipment, and more",
-        "hiring": "New applications awaiting review"
+        "hiring": "New applications awaiting review",
+        "myday": "Clock status, today's hours, and time entry breakdown"
       },
       "messages": {
         "noMessagesYet": "No messages yet",
@@ -649,6 +651,16 @@
           "p3_normal": "Normal",
           "p4_low": "Low"
         }
+      },
+      "myday": {
+        "clockedIn": "Clocked In",
+        "clockedOut": "Not Clocked In",
+        "today": "today",
+        "noEntries": "No time entries today",
+        "active": "active",
+        "more": "more",
+        "viewMyDay": "My Day",
+        "viewHours": "My Hours"
       },
       "pipeline": {
         "jobsCount_one": "{{count}} job",

@@ -212,6 +212,15 @@ export const WIDGET_DEFINITIONS: WidgetDefinition[] = [
     defaultSize: "small",
     sizes: ["small", "medium"],
   },
+  {
+    type: "myday",
+    labelKey: "dashboard.widgets.titles.myday",
+    descriptionKey: "dashboard.widgets.descriptions.myday",
+    icon: ClipboardList,
+    roles: ["Admin", "Manager", "Crew", "HR", "Sales", "New Hire"],
+    defaultSize: "medium",
+    sizes: ["small", "medium", "large"],
+  },
 ];
 
 export function getDefaultWidgets(role: string): WidgetConfig[] {

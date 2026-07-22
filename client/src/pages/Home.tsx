@@ -283,9 +283,8 @@ export default function Home() {
               </div>
 
               {/* Quick-access links — formerly the MY SPACE sidebar rows */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {[
-                  { icon: Clock, labelKey: "home.quickLinks.myHours", href: "/my-hours", iconBg: "bg-blue-100 dark:bg-blue-900/30", iconColor: "text-blue-600 dark:text-blue-400" },
                   { icon: Sun, labelKey: "home.quickLinks.myDay", href: "/my-day", iconBg: "bg-amber-100 dark:bg-amber-900/30", iconColor: "text-amber-600 dark:text-amber-400" },
                   { icon: MessageSquare, labelKey: "home.quickLinks.messages", href: "/messages", iconBg: "bg-violet-100 dark:bg-violet-900/30", iconColor: "text-violet-600 dark:text-violet-400", badge: dmUnreadCount },
                   { icon: CheckSquare, labelKey: "home.quickLinks.tasks", href: "/todos", iconBg: "bg-emerald-100 dark:bg-emerald-900/30", iconColor: "text-emerald-600 dark:text-emerald-400" },
