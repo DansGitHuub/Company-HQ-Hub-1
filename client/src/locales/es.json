@@ -95,16 +95,46 @@
       "resources": "Recursos"
     },
     "cards": {
-      "jobs": { "name": "Trabajos", "desc": "Ver y gestionar trabajos activos y asignaciones." },
-      "workOrders": { "name": "Órdenes de Trabajo", "desc": "Crear y rastrear órdenes de mantenimiento y servicio." },
-      "dispatchBoard": { "name": "Tablero de Despacho", "desc": "Calendario semanal de despacho de cuadrillas y programación." },
-      "dayBriefing": { "name": "Plan del Día", "desc": "Vista diaria con asignaciones de cuadrilla y prioridades." },
-      "maintenanceRoutes": { "name": "Rutas de Mantenimiento", "desc": "Gestiona paradas y visitas de rutas de mantenimiento recurrentes." },
-      "managerDashboard": { "name": "Panel de Gerente", "desc": "Resumen de desempeño del equipo y métricas operativas." },
-      "teamTimeTracking": { "name": "Registro de Tiempo", "desc": "Entrada/salida, tiempo por trabajo y temporizadores en vivo." },
-      "timeAdmin": { "name": "Admin de Tiempo", "desc": "Revisar, aprobar y gestionar entradas de tiempo de empleados." },
-      "maintenanceReports": { "name": "Reportes de Mantenimiento", "desc": "Historial de visitas de mantenimiento y reportes de rutas." },
-      "equipment": { "name": "Equipo", "desc": "Salud de flota, rastreo de activos y registros de equipo." }
+      "jobs": {
+        "name": "Trabajos",
+        "desc": "Ver y gestionar trabajos activos y asignaciones."
+      },
+      "workOrders": {
+        "name": "Órdenes de Trabajo",
+        "desc": "Crear y rastrear órdenes de mantenimiento y servicio."
+      },
+      "dispatchBoard": {
+        "name": "Tablero de Despacho",
+        "desc": "Calendario semanal de despacho de cuadrillas y programación."
+      },
+      "dayBriefing": {
+        "name": "Plan del Día",
+        "desc": "Vista diaria con asignaciones de cuadrilla y prioridades."
+      },
+      "maintenanceRoutes": {
+        "name": "Rutas de Mantenimiento",
+        "desc": "Gestiona paradas y visitas de rutas de mantenimiento recurrentes."
+      },
+      "managerDashboard": {
+        "name": "Panel de Gerente",
+        "desc": "Resumen de desempeño del equipo y métricas operativas."
+      },
+      "teamTimeTracking": {
+        "name": "Registro de Tiempo",
+        "desc": "Entrada/salida, tiempo por trabajo y temporizadores en vivo."
+      },
+      "timeAdmin": {
+        "name": "Admin de Tiempo",
+        "desc": "Revisar, aprobar y gestionar entradas de tiempo de empleados."
+      },
+      "maintenanceReports": {
+        "name": "Reportes de Mantenimiento",
+        "desc": "Historial de visitas de mantenimiento y reportes de rutas."
+      },
+      "equipment": {
+        "name": "Equipo",
+        "desc": "Salud de flota, rastreo de activos y registros de equipo."
+      }
     }
   },
   "salesHub": {
@@ -233,45 +263,162 @@
       "systemHealth": "Salud del Sistema y Calidad de Datos"
     },
     "cards": {
-      "overview": { "name": "Resumen Administrativo", "desc": "Panel, pulso diario y progreso de configuración." },
-      "budgetPricing": { "name": "Presupuesto y Precios", "desc": "Presupuesto MORS, tarifas laborales y márgenes." },
-      "timeReports": { "name": "Reportes de Tiempo", "desc": "Ver y ajustar registros de entrada/salida de empleados." },
-      "timeAdmin": { "name": "Admin de Tiempo", "desc": "Gestionar y corregir entradas de tiempo individuales." },
-      "worksheetReview": { "name": "Revisión de Hojas de Trabajo", "desc": "Revisar las hojas de trabajo diarias del equipo." },
-      "qboExport": { "name": "Exportar a QuickBooks", "desc": "Exportar horas de nómina a QuickBooks Time." },
-      "timeArchive": { "name": "Archivo de Tiempo", "desc": "Archivar entradas de tiempo completadas antiguas." },
-      "overdueItems": { "name": "Elementos Vencidos", "desc": "Trabajos, facturas y tareas con fecha vencida." },
-      "companyBranding": { "name": "Identidad de la Empresa", "desc": "Nombre, logotipo y colores de marca." },
-      "divisionColors": { "name": "Colores de División", "desc": "Asignar colores a las divisiones de negocio." },
-      "estimateTemplates": { "name": "Plantillas de Estimados", "desc": "Plantillas predeterminadas para nuevos estimados." },
-      "termsConditions": { "name": "Términos y Condiciones", "desc": "Términos legales para clientes." },
-      "businessRules": { "name": "Reglas de Negocio", "desc": "Configuración financiera, de horarios y flujo de trabajo." },
-      "permissionsMatrix": { "name": "Permisos por Rol", "desc": "Configura quién puede ver qué en cada rol." },
-      "feedbackReports": { "name": "Reportes y Comentarios", "desc": "Revisar errores y sugerencias del personal." },
-      "adminTools": { "name": "Herramientas Admin", "desc": "Constructor de formularios y utilidades administrativas." },
-      "workAreas": { "name": "Áreas de Trabajo", "desc": "Definir zonas de servicio para trabajos y equipos." },
-      "serviceTypes": { "name": "Tipos de Servicio", "desc": "Categorías y etiquetas de servicio de trabajos." },
-      "quickbooksOnline": { "name": "QuickBooks Online", "desc": "Conectar y configurar la integración con QuickBooks." },
-      "itemCatalog": { "name": "Catálogo de Artículos", "desc": "Catálogo de materiales, mano de obra y equipo." },
-      "plantLibrary": { "name": "Biblioteca de Plantas", "desc": "Base de datos de fichas de plantas." },
-      "companyCamSync": { "name": "Sincronización CompanyCam", "desc": "Reconciliar fotos de CompanyCam." },
-      "companyCamHealth": { "name": "Salud de CompanyCam", "desc": "Monitorear el estado del webhook de CompanyCam." },
-      "automationCenter": { "name": "Centro de Automatización", "desc": "Activar automatizaciones de trabajos y facturas." },
-      "featureFlags": { "name": "Indicadores de Funciones", "desc": "Ocultar módulos en alfa a usuarios regulares." },
-      "aiKnowledge": { "name": "Base de Conocimiento IA", "desc": "Conocimiento de la empresa para el asistente de IA." },
-      "assistantAgents": { "name": "Agentes Asistentes", "desc": "Configurar el comportamiento del asistente de IA." },
-      "usageSummary": { "name": "Resumen de Uso", "desc": "Historial de tokens de IA y seguimiento de costos." },
-      "aiAgents": { "name": "Agentes de IA", "desc": "Definir y gestionar flujos de trabajo de agentes de IA." },
-      "integrationWizard": { "name": "Asistente de Integración", "desc": "Configuración guiada para conexiones con terceros." },
-      "todoUserMgmt": { "name": "Gestión de Tareas por Usuario", "desc": "Controlar qué roles pueden ver los tableros de tareas." },
-      "processAuditor": { "name": "Auditor de Procesos", "desc": "Ejecutar y revisar auditorías de cumplimiento." },
-      "articleReports": { "name": "Reportes de Artículos", "desc": "Artículos de ayuda marcados por usuarios." },
-      "customerDuplicates": { "name": "Clientes Duplicados", "desc": "Encontrar y fusionar registros duplicados de clientes." },
-      "appTesting": { "name": "Pruebas de la App", "desc": "Herramientas internas de prueba y QA." },
-      "systemStatus": { "name": "Estado del Sistema", "desc": "Estado en tiempo real de todas las integraciones." },
-      "systemHealthPage": { "name": "Salud del Sistema", "desc": "Monitoreo de la base de datos y salud del servidor." },
-      "securityAuditLog": { "name": "Registro de Auditoría de Seguridad", "desc": "Registro de eventos de seguridad y acciones de usuarios." },
-      "diagnostics": { "name": "Diagnósticos", "desc": "Diagnósticos profundos del sistema y herramientas de depuración." }
+      "overview": {
+        "name": "Resumen Administrativo",
+        "desc": "Panel, pulso diario y progreso de configuración."
+      },
+      "budgetPricing": {
+        "name": "Presupuesto y Precios",
+        "desc": "Presupuesto MORS, tarifas laborales y márgenes."
+      },
+      "timeReports": {
+        "name": "Reportes de Tiempo",
+        "desc": "Ver y ajustar registros de entrada/salida de empleados."
+      },
+      "timeAdmin": {
+        "name": "Admin de Tiempo",
+        "desc": "Gestionar y corregir entradas de tiempo individuales."
+      },
+      "worksheetReview": {
+        "name": "Revisión de Hojas de Trabajo",
+        "desc": "Revisar las hojas de trabajo diarias del equipo."
+      },
+      "qboExport": {
+        "name": "Exportar a QuickBooks",
+        "desc": "Exportar horas de nómina a QuickBooks Time."
+      },
+      "timeArchive": {
+        "name": "Archivo de Tiempo",
+        "desc": "Archivar entradas de tiempo completadas antiguas."
+      },
+      "overdueItems": {
+        "name": "Elementos Vencidos",
+        "desc": "Trabajos, facturas y tareas con fecha vencida."
+      },
+      "companyBranding": {
+        "name": "Identidad de la Empresa",
+        "desc": "Nombre, logotipo y colores de marca."
+      },
+      "divisionColors": {
+        "name": "Colores de División",
+        "desc": "Asignar colores a las divisiones de negocio."
+      },
+      "estimateTemplates": {
+        "name": "Plantillas de Estimados",
+        "desc": "Plantillas predeterminadas para nuevos estimados."
+      },
+      "termsConditions": {
+        "name": "Términos y Condiciones",
+        "desc": "Términos legales para clientes."
+      },
+      "businessRules": {
+        "name": "Reglas de Negocio",
+        "desc": "Configuración financiera, de horarios y flujo de trabajo."
+      },
+      "permissionsMatrix": {
+        "name": "Permisos por Rol",
+        "desc": "Configura quién puede ver qué en cada rol."
+      },
+      "feedbackReports": {
+        "name": "Reportes y Comentarios",
+        "desc": "Revisar errores y sugerencias del personal."
+      },
+      "adminTools": {
+        "name": "Herramientas Admin",
+        "desc": "Constructor de formularios y utilidades administrativas."
+      },
+      "workAreas": {
+        "name": "Áreas de Trabajo",
+        "desc": "Definir zonas de servicio para trabajos y equipos."
+      },
+      "serviceTypes": {
+        "name": "Tipos de Servicio",
+        "desc": "Categorías y etiquetas de servicio de trabajos."
+      },
+      "quickbooksOnline": {
+        "name": "QuickBooks Online",
+        "desc": "Conectar y configurar la integración con QuickBooks."
+      },
+      "itemCatalog": {
+        "name": "Catálogo de Artículos",
+        "desc": "Catálogo de materiales, mano de obra y equipo."
+      },
+      "plantLibrary": {
+        "name": "Biblioteca de Plantas",
+        "desc": "Base de datos de fichas de plantas."
+      },
+      "companyCamSync": {
+        "name": "Sincronización CompanyCam",
+        "desc": "Reconciliar fotos de CompanyCam."
+      },
+      "companyCamHealth": {
+        "name": "Salud de CompanyCam",
+        "desc": "Monitorear el estado del webhook de CompanyCam."
+      },
+      "automationCenter": {
+        "name": "Centro de Automatización",
+        "desc": "Activar automatizaciones de trabajos y facturas."
+      },
+      "featureFlags": {
+        "name": "Indicadores de Funciones",
+        "desc": "Ocultar módulos en alfa a usuarios regulares."
+      },
+      "aiKnowledge": {
+        "name": "Base de Conocimiento IA",
+        "desc": "Conocimiento de la empresa para el asistente de IA."
+      },
+      "assistantAgents": {
+        "name": "Agentes Asistentes",
+        "desc": "Configurar el comportamiento del asistente de IA."
+      },
+      "usageSummary": {
+        "name": "Resumen de Uso",
+        "desc": "Historial de tokens de IA y seguimiento de costos."
+      },
+      "aiAgents": {
+        "name": "Agentes de IA",
+        "desc": "Definir y gestionar flujos de trabajo de agentes de IA."
+      },
+      "integrationWizard": {
+        "name": "Asistente de Integración",
+        "desc": "Configuración guiada para conexiones con terceros."
+      },
+      "todoUserMgmt": {
+        "name": "Gestión de Tareas por Usuario",
+        "desc": "Controlar qué roles pueden ver los tableros de tareas."
+      },
+      "processAuditor": {
+        "name": "Auditor de Procesos",
+        "desc": "Ejecutar y revisar auditorías de cumplimiento."
+      },
+      "articleReports": {
+        "name": "Reportes de Artículos",
+        "desc": "Artículos de ayuda marcados por usuarios."
+      },
+      "customerDuplicates": {
+        "name": "Clientes Duplicados",
+        "desc": "Encontrar y fusionar registros duplicados de clientes."
+      },
+      "appTesting": {
+        "name": "Pruebas de la App",
+        "desc": "Herramientas internas de prueba y QA."
+      },
+      "systemStatus": {
+        "name": "Estado del Sistema",
+        "desc": "Estado en tiempo real de todas las integraciones."
+      },
+      "systemHealthPage": {
+        "name": "Salud del Sistema",
+        "desc": "Monitoreo de la base de datos y salud del servidor."
+      },
+      "securityAuditLog": {
+        "name": "Registro de Auditoría de Seguridad",
+        "desc": "Registro de eventos de seguridad y acciones de usuarios."
+      },
+      "diagnostics": {
+        "name": "Diagnósticos",
+        "desc": "Diagnósticos profundos del sistema y herramientas de depuración."
+      }
     }
   },
   "common": {
@@ -736,7 +883,16 @@
           "teal": "Turquesa"
         }
       }
-    }
+    },
+    "reset": "Restablecer",
+    "addWidget": "Agregar widget",
+    "done": "Listo",
+    "customize": "Personalizar",
+    "noWidgets": "Sin widgets aún",
+    "noWidgetsHint": "Agrega widgets para personalizar tu panel",
+    "addFirstWidget": "Agrega tu primer widget",
+    "addWidgetHint": "Elige un widget para agregar a tu panel",
+    "allWidgetsAdded": "Ya se agregaron todos los widgets disponibles"
   },
   "profile": {
     "title": "Mi Perfil",

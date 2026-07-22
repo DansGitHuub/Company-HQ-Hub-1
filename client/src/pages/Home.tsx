@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from "react-i18next";
@@ -70,8 +70,13 @@ export default function Home() {
   const [showAddPicker, setShowAddPicker] = useState(false);
   const [initialized, setInitialized] = useState(false);
 
-  const { data: config, isLoading } = useQuery<{ widgets: WidgetConfig[] | null }>({
+  const { data: config, isLoading: configLoading } = useQuery<{ widgets: WidgetConfig[] | null }>({
     queryKey: ["/api/dashboard-config"],
+  });
+
+  const { data: permissionsData, isLoading: permsLoading } = useQuery<Record<string, boolean>>({
+    queryKey: ["/api/my-permissions"],
+    staleTime: 60_000,
   });
 
   const isAdmin = userRole === "Admin" || user?.isMasterAdmin === true;
@@ -81,16 +86,38 @@ export default function Home() {
     refetchInterval: isAdmin ? 60000 : false,
   });
 
+  const grantedPerms: string[] = useMemo(() => {
+    if (!permissionsData) return [];
+    return Object.entries(permissionsData)
+      .filter(([, granted]) => granted)
+      .map(([perm]) => perm);
+  }, [permissionsData]);
+
+  const canSeeWidget = useCallback(
+    (widgetType: string): boolean => {
+      if (!permissionsData) return true;
+      const def = WIDGET_DEFINITIONS.find((w) => w.type === widgetType);
+      if (!def) return false;
+      if (def.masterAdminOnly && !user?.isMasterAdmin) return false;
+      if (def.requiredPermission && !permissionsData[def.requiredPermission]) return false;
+      return true;
+    },
+    [permissionsData, user?.isMasterAdmin]
+  );
+
   useEffect(() => {
-    if (config && !initialized) {
-      if (config.widgets && Array.isArray(config.widgets) && config.widgets.length > 0) {
-        setWidgets(config.widgets);
-      } else {
-        setWidgets(getDefaultWidgets(userRole));
-      }
+    if (initialized || configLoading) return;
+    if (!config) return;
+
+    if (config.widgets && Array.isArray(config.widgets) && config.widgets.length > 0) {
+      setWidgets(config.widgets);
+      setInitialized(true);
+    } else if (!permsLoading) {
+      const role = userRole === "Admin" && user?.isMasterAdmin ? "Master Admin" : userRole;
+      setWidgets(getDefaultWidgets(role, permissionsData ? grantedPerms : undefined));
       setInitialized(true);
     }
-  }, [config, initialized, userRole]);
+  }, [config, configLoading, initialized, userRole, user?.isMasterAdmin, permsLoading, permissionsData, grantedPerms]);
 
   const saveMutation = useMutation({
     mutationFn: async (newWidgets: WidgetConfig[]) => {
@@ -159,10 +186,11 @@ export default function Home() {
   );
 
   const resetToDefaults = useCallback(() => {
-    const defaults = getDefaultWidgets(userRole);
+    const role = userRole === "Admin" && user?.isMasterAdmin ? "Master Admin" : userRole;
+    const defaults = getDefaultWidgets(role, grantedPerms.length > 0 ? grantedPerms : undefined);
     saveWidgets(defaults);
     setIsEditing(false);
-  }, [userRole, saveWidgets]);
+  }, [userRole, user?.isMasterAdmin, saveWidgets, grantedPerms]);
 
   const { data: dmUnreadData } = useQuery<{ count: number }>({
     queryKey: ["/api/dm/unread-count"],
@@ -170,7 +198,11 @@ export default function Home() {
   });
   const dmUnreadCount = dmUnreadData?.count ?? 0;
 
-  const available = getAvailableWidgets(userRole, user?.isMasterAdmin === true);
+  const available = getAvailableWidgets(
+    userRole,
+    user?.isMasterAdmin === true,
+    permissionsData ? grantedPerms : undefined
+  );
   const addedTypes = widgets.map((w) => w.widgetType);
   const notAdded = available.filter((w) => !addedTypes.includes(w.type));
 
@@ -196,6 +228,8 @@ export default function Home() {
     }
   };
 
+  const isLoading = configLoading || !initialized;
+
   return (
     <div className="space-y-4">
       {isAdmin && qbStatus?.needs_reauth && (
@@ -220,7 +254,7 @@ export default function Home() {
         </TabsList>
 
         <TabsContent value="my-workspace" className="space-y-4">
-          {isLoading || !initialized ? (
+          {isLoading ? (
             <div className="flex items-center justify-center h-64">
               <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
             </div>
@@ -248,7 +282,7 @@ export default function Home() {
                         className="gap-1 text-xs"
                         data-testid="button-reset-dashboard"
                       >
-                        <RotateCcw className="h-3.5 w-3.5" /> Reset
+                        <RotateCcw className="h-3.5 w-3.5" /> {t("dashboard.reset")}
                       </Button>
                       <Button
                         variant="outline"
@@ -258,7 +292,7 @@ export default function Home() {
                         data-testid="button-add-widget"
                         disabled={notAdded.length === 0}
                       >
-                        <Plus className="h-3.5 w-3.5" /> Add Widget
+                        <Plus className="h-3.5 w-3.5" /> {t("dashboard.addWidget")}
                       </Button>
                     </>
                   )}
@@ -271,18 +305,17 @@ export default function Home() {
                   >
                     {isEditing ? (
                       <>
-                        <Check className="h-3.5 w-3.5" /> Done
+                        <Check className="h-3.5 w-3.5" /> {t("dashboard.done")}
                       </>
                     ) : (
                       <>
-                        <Settings2 className="h-3.5 w-3.5" /> Customize
+                        <Settings2 className="h-3.5 w-3.5" /> {t("dashboard.customize")}
                       </>
                     )}
                   </Button>
                 </div>
               </div>
 
-              {/* Quick-access links — formerly the MY SPACE sidebar rows */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {[
                   { icon: Sun, labelKey: "home.quickLinks.myDay", href: "/my-day", iconBg: "bg-amber-100 dark:bg-amber-900/30", iconColor: "text-amber-600 dark:text-amber-400" },
@@ -313,13 +346,13 @@ export default function Home() {
 
               <PinnedReportsSection />
 
-              {widgets.length === 0 ? (
+              {widgets.filter((w) => canSeeWidget(w.widgetType)).length === 0 ? (
                 <Card className="border-dashed">
                   <CardContent className="flex flex-col items-center justify-center py-12 text-center">
                     <Settings2 className="h-10 w-10 text-muted-foreground mb-3" />
-                    <h3 className="text-lg font-semibold mb-1">No widgets yet</h3>
+                    <h3 className="text-lg font-semibold mb-1">{t("dashboard.noWidgets")}</h3>
                     <p className="text-sm text-muted-foreground mb-4">
-                      Add widgets to customize your dashboard
+                      {t("dashboard.noWidgetsHint")}
                     </p>
                     <Button
                       onClick={() => {
@@ -329,7 +362,7 @@ export default function Home() {
                       className="gap-2"
                       data-testid="button-add-first-widget"
                     >
-                      <Plus className="h-4 w-4" /> Add Your First Widget
+                      <Plus className="h-4 w-4" /> {t("dashboard.addFirstWidget")}
                     </Button>
                   </CardContent>
                 </Card>
@@ -348,6 +381,8 @@ export default function Home() {
                           );
                           const Component = WIDGET_COMPONENTS[widget.widgetType];
                           if (!def || !Component) return null;
+
+                          if (!canSeeWidget(widget.widgetType)) return null;
 
                           const Icon = def.icon;
 
@@ -444,15 +479,15 @@ export default function Home() {
               <Dialog open={showAddPicker} onOpenChange={setShowAddPicker}>
                 <DialogContent className="max-w-md max-h-[80vh]">
                   <DialogHeader>
-                    <DialogTitle>Add Widget</DialogTitle>
+                    <DialogTitle>{t("dashboard.addWidget")}</DialogTitle>
                     <DialogDescription>
-                      Choose a widget to add to your dashboard
+                      {t("dashboard.addWidgetHint")}
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-2 overflow-y-auto max-h-[60vh] pr-1">
                     {notAdded.length === 0 ? (
                       <p className="text-sm text-muted-foreground text-center py-4">
-                        All available widgets have been added
+                        {t("dashboard.allWidgetsAdded")}
                       </p>
                     ) : (
                       notAdded.map((def) => {
