@@ -2720,5 +2720,51 @@
       "Manager": "Gerente",
       "Admin": "Administrador"
     }
+  },
+  "personalArea": {
+    "title": "Mi Cuenta",
+    "tabs": {
+      "pay": "Mi Pago",
+      "info": "Mi Info",
+      "preferences": "Preferencias",
+      "timeoff": "Tiempo Libre"
+    },
+    "pay": {
+      "currentPeriod": "Período de Pago Actual",
+      "regularHours": "Horas Regulares",
+      "overtimeHours": "Horas Extra",
+      "daysWorked": "Días Trabajados",
+      "estimatedGross": "Bruto Est.",
+      "estimatedNote": "Estimado basado en horas registradas × su tarifa. El cheque real puede diferir.",
+      "payInfo": "Información de Pago",
+      "currentRate": "Tarifa de Pago",
+      "payType": "Tipo de Pago",
+      "payPeriodLabel": "Período de Pago",
+      "paymentMethod": "Método de Pago",
+      "rateHistory": "Historial de Tarifas",
+      "noHistory": "No hay cambios de tarifa registrados.",
+      "noPayData": "No hay información de pago vinculada a su cuenta. Contacte a su administrador."
+    },
+    "timeoff": {
+      "requestTitle": "Solicitar Tiempo Libre",
+      "requestType": "Tipo",
+      "startDate": "Fecha de Inicio",
+      "endDate": "Fecha de Fin",
+      "notesOptional": "Notas (opcional)",
+      "notesPlaceholder": "Cualquier detalle que su gerente deba saber...",
+      "businessDays": "día hábil",
+      "businessDaysPlural": "días hábiles",
+      "requested": "solicitado",
+      "submit": "Enviar Solicitud",
+      "submitting": "Enviando...",
+      "history": "Mis Solicitudes",
+      "noRequests": "Aún no hay solicitudes de tiempo libre.",
+      "noEmployeeRecord": "No hay registro de empleado vinculado a su cuenta. Contacte a su administrador.",
+      "selectDates": "Por favor seleccione fechas de inicio y fin.",
+      "invalidDates": "La fecha de fin debe ser posterior a la de inicio.",
+      "submitSuccess": "Solicitud de tiempo libre enviada",
+      "submitSuccessDesc": "Su gerente ha sido notificado.",
+      "to": "a"
+    }
   }
 }

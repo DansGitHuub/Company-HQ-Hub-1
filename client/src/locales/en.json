@@ -2720,5 +2720,51 @@
       "Manager": "Manager",
       "Admin": "Admin"
     }
+  },
+  "personalArea": {
+    "title": "My Account",
+    "tabs": {
+      "pay": "My Pay",
+      "info": "My Info",
+      "preferences": "Preferences",
+      "timeoff": "Time Off"
+    },
+    "pay": {
+      "currentPeriod": "Current Pay Period",
+      "regularHours": "Regular Hours",
+      "overtimeHours": "Overtime Hours",
+      "daysWorked": "Days Worked",
+      "estimatedGross": "Est. Gross",
+      "estimatedNote": "Estimated based on clocked hours × your pay rate. Actual paycheck may differ.",
+      "payInfo": "Pay Information",
+      "currentRate": "Pay Rate",
+      "payType": "Pay Type",
+      "payPeriodLabel": "Pay Period",
+      "paymentMethod": "Payment Method",
+      "rateHistory": "Rate History",
+      "noHistory": "No rate changes on file.",
+      "noPayData": "No pay information linked to your account. Contact your administrator."
+    },
+    "timeoff": {
+      "requestTitle": "Request Time Off",
+      "requestType": "Type",
+      "startDate": "Start Date",
+      "endDate": "End Date",
+      "notesOptional": "Notes (optional)",
+      "notesPlaceholder": "Any details your manager should know...",
+      "businessDays": "business day",
+      "businessDaysPlural": "business days",
+      "requested": "requested",
+      "submit": "Submit Request",
+      "submitting": "Submitting...",
+      "history": "My Requests",
+      "noRequests": "No time off requests yet.",
+      "noEmployeeRecord": "No employee record linked to your account. Contact your administrator.",
+      "selectDates": "Please select start and end dates.",
+      "invalidDates": "End date must be after start date.",
+      "submitSuccess": "Time off request submitted",
+      "submitSuccessDesc": "Your manager has been notified.",
+      "to": "to"
+    }
   }
 }

@@ -11,6 +11,7 @@ import FeedbackButton from "@/components/FeedbackButton";
 import { useVoice } from "@/hooks/use-voice";
 import TimeClock from "@/components/TimeClock";
 import CalendarPage from "@/pages/Calendar";
+import PersonalAreaSheet from "@/components/PersonalAreaSheet";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -108,6 +109,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const sidebarScrollPosition = React.useRef<number>(0);
   const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = React.useState(false);
+  const [isPersonalOpen, setIsPersonalOpen] = React.useState(false);
   const { settings: voiceSettings, isListening, stopListening, setOpenAssistantWithVoice } = useVoice();
 
   const menuHelpContent: Record<string, { title: string; description: string; tips: string[] }> = {
@@ -669,13 +671,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {isMobileSheet ? (
           /* Mobile sheet: single compact row — avatar + name + 3 icon actions */
           <div className="flex items-center gap-2">
-            <Link href="/profile" className="shrink-0" onClick={() => setIsMobileOpen(false)}>
-              <Avatar className="h-8 w-8 border border-white/20" data-testid="link-profile-mobile">
+            <button
+              className="shrink-0"
+              onClick={() => { setIsMobileOpen(false); setIsPersonalOpen(true); }}
+              data-testid="link-profile-mobile"
+            >
+              <Avatar className="h-8 w-8 border border-white/20">
                 <AvatarFallback className="bg-primary/20 text-xs font-bold">
                   {user?.name?.split(" ").map((n: string) => n[0]).join("") || "U"}
                 </AvatarFallback>
               </Avatar>
-            </Link>
+            </button>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold truncate leading-tight text-sidebar-foreground">
                 {user?.name || user?.username}
@@ -715,10 +721,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         ) : (
           /* Desktop: direct navigation — no dropdown */
           <div className="w-full flex items-center gap-2">
-            <Link href="/profile" className="flex-1 min-w-0">
+            <button
+              className="flex-1 min-w-0 text-left"
+              onClick={() => setIsPersonalOpen(true)}
+              data-testid="button-user-profile"
+            >
               <div
                 className="flex items-center gap-3 px-3 py-2 rounded-lg border border-white/20 hover:bg-white/10 text-sidebar-foreground transition-colors cursor-pointer"
-                data-testid="button-user-profile"
               >
                 <Avatar className="h-8 w-8 border border-white/20 shrink-0">
                   <AvatarFallback className="bg-primary/20 text-xs font-bold">
@@ -734,7 +743,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   </p>
                 </div>
               </div>
-            </Link>
+            </button>
             <Link href="/?tab=company-hq">
               <button
                 className="p-1 rounded-lg hover:bg-white/10 text-sidebar-foreground transition-colors shrink-0"
@@ -1033,6 +1042,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {/* Feedback dialog — controlled from the More dropdown (no floating bubble) */}
       <FeedbackButton open={isFeedbackOpen} onOpenChange={setIsFeedbackOpen} />
       <WorksheetWidget />
+      <PersonalAreaSheet open={isPersonalOpen} onOpenChange={setIsPersonalOpen} />
     </div>
     </>
   );

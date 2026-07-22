@@ -562,9 +562,35 @@ export function registerHiringRoutes(app: Express, requireAuth: RequestHandler) 
         emergencyContactPhone: emp.emergency_contact_phone,
         profilePhoto: emp.profile_photo,
         status: emp.status,
+        payRate: emp.pay_rate,
+        payType: emp.pay_type,
+        payPeriod: emp.pay_period,
+        paymentMethod: emp.payment_method,
       });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Self-service pay history (employee sees their own rate changes)
+  app.get("/api/employees/me/pay-history", requireAuth, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: "Not authenticated" });
+      const { pool } = await import("./db");
+      const empResult = await pool.query(
+        `SELECT id FROM employees WHERE user_id = $1 LIMIT 1`,
+        [userId]
+      );
+      if (empResult.rows.length === 0) return res.json([]);
+      const employeeId = empResult.rows[0].id;
+      const result = await pool.query(
+        `SELECT * FROM employee_pay_history WHERE employee_id = $1 ORDER BY created_at DESC`,
+        [employeeId]
+      );
+      return res.json(result.rows);
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
     }
   });
 

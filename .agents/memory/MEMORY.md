@@ -32,5 +32,6 @@
 - [Test-account cleanup fires on restart](test-account-cleanup-on-restart.md) — a mid-session workflow restart re-runs seed.ts's cleanup sweep, silently deleting @example.com test users and cascading their data, mimicking a feature bug.
 - [WO→job auto-complete pattern](wo-job-auto-complete.md) — wo_auto_completed_at column on jobs guards reversible WO task rollup; only reverts if that column IS NOT NULL (i.e. WO triggered the completion, not a manual admin action).
 - [Lead auto-assign + map app pattern](lead-autoassign-map-app.md) — lead helpers exported from consultationRoutes.ts; map URLs centralized in client/src/lib/mapUrl.ts; preferred_map_app migrated via raw SQL in consultationRoutes.ts migration block.
+- [Personal area sheet pattern](personal-area-sheet.md) — /api/employees/me omits pay fields by default; /api/employees/:id/pay-history is manager-gated; full page components (Profile, EmployeePortal) embed cleanly in Sheet tabs as they render plain divs.
 - [index.ts pool import](index-ts-pool-import.md) — server/index.ts does NOT import pool by default; migration blocks added directly there must add `import { pool } from "./db"` themselves.
 - [Role permissions system](role-permissions-system.md) — configurable RBAC via role_permissions table + in-memory cache; pattern for adding new permissions, lock rules, and approved default loosenings.
